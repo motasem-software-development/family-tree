@@ -649,4 +649,883 @@ git commit -m "feat: add FamilyTree aggregate"
 
 ---
 
-*Tasks 4–12 are appended in the sections that follow.*
+### Task 4: Domain — permission catalog and authorization entities
+
+**Files:**
+- Create: `src/FamilyTree.Domain/Authorization/Permissions.cs`, `Permission.cs`, `Role.cs`, `RolePermission.cs`, `UserRole.cs`
+- Create: `src/FamilyTree.Domain/Authentication/RefreshToken.cs`
+- Test: `tests/FamilyTree.Domain.Tests/Authorization/PermissionsCatalogTests.cs`, `Authorization/RoleTests.cs`, `Authentication/RefreshTokenTests.cs`
+
+**Interfaces:**
+- Consumes: `Entity`, `ITenantOwned`, `DomainException` from Task 2.
+- Produces:
+  - `static class Permissions` — nested classes `FamilyTree`, `Member`, `User`, `Role`, `Audit`, `PublicLink` each holding `const string` codes; `static IReadOnlyList<string> All { get; }`.
+  - `Permission` — `Code`, `Description`. System-level, **not** tenant-owned.
+  - `Role.Create(Guid tenantId, string name, string? description, DateTimeOffset now)`, `Role.CreateSystem(...)`; members `TenantId`, `Name`, `Description`, `IsSystem`, `Rename`, `EnsureDeletable()`.
+  - `RolePermission(Guid RoleId, Guid PermissionId)`, `UserRole(Guid UserId, Guid RoleId)` — join entities.
+  - `RefreshToken.Issue(Guid userId, Guid tenantId, string tokenHash, DateTimeOffset now, TimeSpan lifetime)`; members `TokenHash`, `ExpiresAt`, `RevokedAt`, `ReplacedByTokenHash`, `IsActive(DateTimeOffset)`, `Revoke(DateTimeOffset, string? replacedBy)`.
+
+- [ ] **Step 1: Write the failing catalog test**
+
+Create `tests/FamilyTree.Domain.Tests/Authorization/PermissionsCatalogTests.cs`:
+
+```csharp
+using FluentAssertions;
+using FamilyTree.Domain.Authorization;
+
+namespace FamilyTree.Domain.Tests.Authorization;
+
+public class PermissionsCatalogTests
+{
+    [Fact]
+    public void All_contains_every_permission_from_the_specification()
+    {
+        Permissions.All.Should().BeEquivalentTo(new[]
+        {
+            "FamilyTree.View", "FamilyTree.Edit",
+            "Member.View", "Member.Create", "Member.Edit", "Member.Move", "Member.Delete",
+            "User.View", "User.Create", "User.Edit", "User.Deactivate",
+            "Role.View", "Role.Create", "Role.Edit", "Role.Delete",
+            "Audit.View",
+            "PublicLink.Create", "PublicLink.Revoke"
+        });
+    }
+
+    [Fact]
+    public void All_contains_no_duplicates()
+    {
+        Permissions.All.Should().OnlyHaveUniqueItems();
+    }
+}
+```
+
+- [ ] **Step 2: Write the failing Role and RefreshToken tests**
+
+Create `tests/FamilyTree.Domain.Tests/Authorization/RoleTests.cs`:
+
+```csharp
+using FluentAssertions;
+using FamilyTree.Domain.Authorization;
+using FamilyTree.Domain.Common;
+
+namespace FamilyTree.Domain.Tests.Authorization;
+
+public class RoleTests
+{
+    private static readonly DateTimeOffset Now = new(2026, 8, 16, 12, 0, 0, TimeSpan.Zero);
+    private static readonly Guid TenantId = Guid.CreateVersion7();
+
+    [Fact]
+    public void Create_makes_a_tenant_scoped_custom_role()
+    {
+        var role = Role.Create(TenantId, "Genealogy Editor", "Can edit members", Now);
+
+        role.TenantId.Should().Be(TenantId);
+        role.Name.Should().Be("Genealogy Editor");
+        role.Description.Should().Be("Can edit members");
+        role.IsSystem.Should().BeFalse();
+    }
+
+    [Fact]
+    public void CreateSystem_marks_the_role_as_system_owned()
+    {
+        var role = Role.CreateSystem(TenantId, "Super Admin", "All permissions", Now);
+
+        role.IsSystem.Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void Create_rejects_a_blank_name(string name)
+    {
+        var act = () => Role.Create(TenantId, name, null, Now);
+
+        act.Should().Throw<DomainException>()
+           .Which.Code.Should().Be("ROLE_NAME_REQUIRED");
+    }
+
+    [Fact]
+    public void EnsureDeletable_rejects_deleting_a_system_role()
+    {
+        var role = Role.CreateSystem(TenantId, "Super Admin", null, Now);
+
+        var act = role.EnsureDeletable;
+
+        act.Should().Throw<DomainException>()
+           .Which.Code.Should().Be("ROLE_IS_SYSTEM");
+    }
+
+    [Fact]
+    public void EnsureDeletable_allows_deleting_a_custom_role()
+    {
+        var role = Role.Create(TenantId, "Genealogy Editor", null, Now);
+
+        var act = role.EnsureDeletable;
+
+        act.Should().NotThrow();
+    }
+
+    [Fact]
+    public void Rename_rejects_renaming_a_system_role()
+    {
+        var role = Role.CreateSystem(TenantId, "Viewer", null, Now);
+
+        var act = () => role.Rename("Something Else", Now);
+
+        act.Should().Throw<DomainException>()
+           .Which.Code.Should().Be("ROLE_IS_SYSTEM");
+    }
+}
+```
+
+Create `tests/FamilyTree.Domain.Tests/Authentication/RefreshTokenTests.cs`:
+
+```csharp
+using FluentAssertions;
+using FamilyTree.Domain.Authentication;
+
+namespace FamilyTree.Domain.Tests.Authentication;
+
+public class RefreshTokenTests
+{
+    private static readonly DateTimeOffset Now = new(2026, 8, 16, 12, 0, 0, TimeSpan.Zero);
+    private static readonly Guid UserId = Guid.CreateVersion7();
+    private static readonly Guid TenantId = Guid.CreateVersion7();
+    private static readonly TimeSpan Lifetime = TimeSpan.FromDays(14);
+
+    private static RefreshToken Issue() =>
+        RefreshToken.Issue(UserId, TenantId, "hash-of-token", Now, Lifetime);
+
+    [Fact]
+    public void Issue_sets_expiry_from_the_lifetime_and_leaves_the_token_active()
+    {
+        var token = Issue();
+
+        token.UserId.Should().Be(UserId);
+        token.TenantId.Should().Be(TenantId);
+        token.TokenHash.Should().Be("hash-of-token");
+        token.ExpiresAt.Should().Be(Now + Lifetime);
+        token.RevokedAt.Should().BeNull();
+        token.IsActive(Now).Should().BeTrue();
+    }
+
+    [Fact]
+    public void A_token_is_inactive_once_it_expires()
+    {
+        var token = Issue();
+
+        token.IsActive(Now + Lifetime).Should().BeFalse();
+        token.IsActive(Now + Lifetime + TimeSpan.FromSeconds(1)).Should().BeFalse();
+    }
+
+    [Fact]
+    public void Revoke_deactivates_the_token_and_records_its_replacement()
+    {
+        var token = Issue();
+        var later = Now.AddHours(1);
+
+        token.Revoke(later, "hash-of-next-token");
+
+        token.RevokedAt.Should().Be(later);
+        token.ReplacedByTokenHash.Should().Be("hash-of-next-token");
+        token.IsActive(later).Should().BeFalse();
+    }
+
+    [Fact]
+    public void Revoking_an_already_revoked_token_keeps_the_first_revocation_time()
+    {
+        var token = Issue();
+        var first = Now.AddHours(1);
+
+        token.Revoke(first, null);
+        token.Revoke(Now.AddHours(5), null);
+
+        token.RevokedAt.Should().Be(first);
+    }
+}
+```
+
+- [ ] **Step 3: Run the tests to verify they fail**
+
+Run: `dotnet test tests/FamilyTree.Domain.Tests`
+Expected: compilation failure — `Permissions`, `Role`, and `RefreshToken` do not exist.
+
+- [ ] **Step 4: Write the permission catalog**
+
+Create `src/FamilyTree.Domain/Authorization/Permissions.cs`:
+
+```csharp
+namespace FamilyTree.Domain.Authorization;
+
+/// <summary>
+/// The permission catalog from SRS §21. Authorization is evaluated against these codes,
+/// never against role names — that is what makes custom roles possible.
+/// Adding a capability means adding a constant here plus a seed row; no handler changes.
+/// </summary>
+public static class Permissions
+{
+    public static class FamilyTree
+    {
+        public const string View = "FamilyTree.View";
+        public const string Edit = "FamilyTree.Edit";
+    }
+
+    public static class Member
+    {
+        public const string View = "Member.View";
+        public const string Create = "Member.Create";
+        public const string Edit = "Member.Edit";
+        public const string Move = "Member.Move";
+        public const string Delete = "Member.Delete";
+    }
+
+    public static class User
+    {
+        public const string View = "User.View";
+        public const string Create = "User.Create";
+        public const string Edit = "User.Edit";
+        public const string Deactivate = "User.Deactivate";
+    }
+
+    public static class Role
+    {
+        public const string View = "Role.View";
+        public const string Create = "Role.Create";
+        public const string Edit = "Role.Edit";
+        public const string Delete = "Role.Delete";
+    }
+
+    public static class Audit
+    {
+        public const string View = "Audit.View";
+    }
+
+    public static class PublicLink
+    {
+        public const string Create = "PublicLink.Create";
+        public const string Revoke = "PublicLink.Revoke";
+    }
+
+    public static IReadOnlyList<string> All { get; } =
+    [
+        FamilyTree.View, FamilyTree.Edit,
+        Member.View, Member.Create, Member.Edit, Member.Move, Member.Delete,
+        User.View, User.Create, User.Edit, User.Deactivate,
+        Role.View, Role.Create, Role.Edit, Role.Delete,
+        Audit.View,
+        PublicLink.Create, PublicLink.Revoke
+    ];
+}
+```
+
+- [ ] **Step 5: Write the authorization entities**
+
+Create `src/FamilyTree.Domain/Authorization/Permission.cs`:
+
+```csharp
+using FamilyTree.Domain.Common;
+
+namespace FamilyTree.Domain.Authorization;
+
+/// <summary>A system-level capability definition. Not tenant-owned — the catalog is global.</summary>
+public sealed class Permission : Entity
+{
+    private Permission() { }
+
+    public string Code { get; private set; } = null!;
+    public string? Description { get; private set; }
+
+    public static Permission Create(string code, string? description, DateTimeOffset now)
+    {
+        if (string.IsNullOrWhiteSpace(code))
+            throw new DomainException("PERMISSION_CODE_REQUIRED", "Permission code is required.");
+
+        var permission = new Permission { Code = code.Trim(), Description = description };
+        permission.InitializeTimestamps(now);
+        return permission;
+    }
+}
+```
+
+Create `src/FamilyTree.Domain/Authorization/Role.cs`:
+
+```csharp
+using FamilyTree.Domain.Common;
+
+namespace FamilyTree.Domain.Authorization;
+
+public sealed class Role : Entity, ITenantOwned
+{
+    public const int MaxNameLength = 100;
+
+    private Role() { }
+
+    public Guid TenantId { get; private set; }
+    public string Name { get; private set; } = null!;
+    public string? Description { get; private set; }
+
+    /// <summary>Seeded roles cannot be renamed or deleted, so a tenant cannot lock itself out.</summary>
+    public bool IsSystem { get; private set; }
+
+    public static Role Create(Guid tenantId, string name, string? description, DateTimeOffset now) =>
+        Build(tenantId, name, description, isSystem: false, now);
+
+    public static Role CreateSystem(Guid tenantId, string name, string? description, DateTimeOffset now) =>
+        Build(tenantId, name, description, isSystem: true, now);
+
+    public void Rename(string name, DateTimeOffset now)
+    {
+        EnsureDeletable();
+        Name = ValidateName(name);
+        Touch(now);
+    }
+
+    /// <summary>Throws when the role is system-owned. Also guards renaming.</summary>
+    public void EnsureDeletable()
+    {
+        if (IsSystem)
+            throw new DomainException("ROLE_IS_SYSTEM", "System roles cannot be modified or deleted.");
+    }
+
+    private static Role Build(Guid tenantId, string name, string? description, bool isSystem, DateTimeOffset now)
+    {
+        if (tenantId == Guid.Empty)
+            throw new DomainException("ROLE_TENANT_REQUIRED", "A role must belong to a tenant.");
+
+        var role = new Role { TenantId = tenantId, Description = description, IsSystem = isSystem };
+        role.Name = ValidateName(name);
+        role.InitializeTimestamps(now);
+        return role;
+    }
+
+    private static string ValidateName(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            throw new DomainException("ROLE_NAME_REQUIRED", "Role name is required.");
+        var trimmed = name.Trim();
+        if (trimmed.Length > MaxNameLength)
+            throw new DomainException("ROLE_NAME_TOO_LONG", $"Role name exceeds {MaxNameLength} characters.");
+        return trimmed;
+    }
+}
+```
+
+Create `src/FamilyTree.Domain/Authorization/RolePermission.cs`:
+
+```csharp
+namespace FamilyTree.Domain.Authorization;
+
+/// <summary>Join entity. Composite key (RoleId, PermissionId) is configured in Task 5.</summary>
+public sealed class RolePermission
+{
+    private RolePermission() { }
+
+    public Guid RoleId { get; private set; }
+    public Guid PermissionId { get; private set; }
+
+    public static RolePermission Create(Guid roleId, Guid permissionId) =>
+        new() { RoleId = roleId, PermissionId = permissionId };
+}
+```
+
+Create `src/FamilyTree.Domain/Authorization/UserRole.cs`:
+
+```csharp
+namespace FamilyTree.Domain.Authorization;
+
+/// <summary>Join entity. Composite key (UserId, RoleId) is configured in Task 5.</summary>
+public sealed class UserRole
+{
+    private UserRole() { }
+
+    public Guid UserId { get; private set; }
+    public Guid RoleId { get; private set; }
+
+    public static UserRole Create(Guid userId, Guid roleId) =>
+        new() { UserId = userId, RoleId = roleId };
+}
+```
+
+- [ ] **Step 6: Write the RefreshToken entity**
+
+Create `src/FamilyTree.Domain/Authentication/RefreshToken.cs`:
+
+```csharp
+using FamilyTree.Domain.Common;
+
+namespace FamilyTree.Domain.Authentication;
+
+/// <summary>
+/// One row per issued refresh token. Only the hash is stored, never the raw token.
+/// Rotation on use means a replaced token records what superseded it, so a replayed
+/// old token is detectable.
+/// </summary>
+public sealed class RefreshToken : Entity, ITenantOwned
+{
+    private RefreshToken() { }
+
+    public Guid UserId { get; private set; }
+    public Guid TenantId { get; private set; }
+    public string TokenHash { get; private set; } = null!;
+    public DateTimeOffset ExpiresAt { get; private set; }
+    public DateTimeOffset? RevokedAt { get; private set; }
+    public string? ReplacedByTokenHash { get; private set; }
+
+    public static RefreshToken Issue(
+        Guid userId, Guid tenantId, string tokenHash, DateTimeOffset now, TimeSpan lifetime)
+    {
+        if (string.IsNullOrWhiteSpace(tokenHash))
+            throw new DomainException("REFRESH_TOKEN_HASH_REQUIRED", "Refresh token hash is required.");
+
+        var token = new RefreshToken
+        {
+            UserId = userId,
+            TenantId = tenantId,
+            TokenHash = tokenHash,
+            ExpiresAt = now + lifetime
+        };
+        token.InitializeTimestamps(now);
+        return token;
+    }
+
+    public bool IsActive(DateTimeOffset now) => RevokedAt is null && now < ExpiresAt;
+
+    public void Revoke(DateTimeOffset now, string? replacedByTokenHash)
+    {
+        if (RevokedAt is not null) return;
+
+        RevokedAt = now;
+        ReplacedByTokenHash = replacedByTokenHash;
+        Touch(now);
+    }
+}
+```
+
+- [ ] **Step 7: Run the tests to verify they pass**
+
+Run: `dotnet test tests/FamilyTree.Domain.Tests`
+Expected: PASS — 26 tests total.
+
+- [ ] **Step 8: Commit**
+
+```bash
+git add src/FamilyTree.Domain tests/FamilyTree.Domain.Tests
+git commit -m "feat: add permission catalog, role, and refresh token entities"
+```
+
+---
+
+### Task 5: Persistence — DbContext, configurations, and the initial migration
+
+**Files:**
+- Create: `src/FamilyTree.Infrastructure/Identity/ApplicationUser.cs`
+- Create: `src/FamilyTree.Infrastructure/Persistence/ApplicationDbContext.cs`
+- Create: `src/FamilyTree.Infrastructure/Persistence/Configurations/{Tenant,FamilyTree,Permission,Role,RolePermission,UserRole,RefreshToken}Configuration.cs`
+- Create: `src/FamilyTree.Application/Common/ITenantContext.cs`
+- Modify: `src/FamilyTree.Api/Program.cs` (register the DbContext so `dotnet ef` can build a design-time model)
+- Create: `src/FamilyTree.Infrastructure/Persistence/Migrations/*` (generated)
+
+**Interfaces:**
+- Consumes: every entity from Tasks 2–4.
+- Produces:
+  - `interface ITenantContext { Guid TenantId { get; } Guid UserId { get; } bool IsAuthenticated { get; } }`
+  - `ApplicationDbContext(DbContextOptions<ApplicationDbContext>, ITenantContext)` exposing `DbSet<Tenant> Tenants`, `DbSet<FamilyTreeAggregate> FamilyTrees`, `DbSet<Permission> Permissions`, `DbSet<Role> Roles`, `DbSet<RolePermission> RolePermissions`, `DbSet<UserRole> UserRoles`, `DbSet<RefreshToken> RefreshTokens`, plus the Identity sets.
+  - `class ApplicationUser : IdentityUser<Guid>` with `Guid TenantId`, `bool IsActive`, `DateTimeOffset CreatedAt`, `DateTimeOffset? LastLoginAt`.
+
+- [ ] **Step 1: Add the persistence packages**
+
+```bash
+dotnet add src/FamilyTree.Infrastructure package Microsoft.EntityFrameworkCore
+dotnet add src/FamilyTree.Infrastructure package Npgsql.EntityFrameworkCore.PostgreSQL
+dotnet add src/FamilyTree.Infrastructure package Microsoft.AspNetCore.Identity.EntityFrameworkCore
+dotnet add src/FamilyTree.Infrastructure package EFCore.NamingConventions
+dotnet add src/FamilyTree.Api package Microsoft.EntityFrameworkCore.Design
+dotnet tool install --global dotnet-ef
+```
+
+- [ ] **Step 2: Define the tenant context abstraction**
+
+Create `src/FamilyTree.Application/Common/ITenantContext.cs`:
+
+```csharp
+namespace FamilyTree.Application.Common;
+
+/// <summary>
+/// The tenant and user for the current request, resolved server-side from the authenticated
+/// principal. Never populated from a header, query string, or route value — see spec §2.3.
+/// </summary>
+public interface ITenantContext
+{
+    Guid TenantId { get; }
+    Guid UserId { get; }
+    bool IsAuthenticated { get; }
+}
+```
+
+- [ ] **Step 3: Define the Identity user**
+
+Create `src/FamilyTree.Infrastructure/Identity/ApplicationUser.cs`:
+
+```csharp
+using Microsoft.AspNetCore.Identity;
+
+namespace FamilyTree.Infrastructure.Identity;
+
+/// <summary>
+/// Identity supplies the credential store. Roles are NOT Identity roles — they are
+/// tenant-scoped and permission-backed, which Identity's global roles cannot express.
+/// </summary>
+public sealed class ApplicationUser : IdentityUser<Guid>
+{
+    public Guid TenantId { get; set; }
+    public bool IsActive { get; set; } = true;
+    public DateTimeOffset CreatedAt { get; set; }
+    public DateTimeOffset? LastLoginAt { get; set; }
+}
+```
+
+- [ ] **Step 4: Write the DbContext**
+
+Create `src/FamilyTree.Infrastructure/Persistence/ApplicationDbContext.cs`:
+
+```csharp
+using FamilyTree.Application.Common;
+using FamilyTree.Domain.Authentication;
+using FamilyTree.Domain.Authorization;
+using FamilyTree.Domain.FamilyTrees;
+using FamilyTree.Domain.Tenants;
+using FamilyTree.Infrastructure.Identity;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
+
+namespace FamilyTree.Infrastructure.Persistence;
+
+public sealed class ApplicationDbContext(
+    DbContextOptions<ApplicationDbContext> options,
+    ITenantContext tenantContext)
+    : IdentityDbContext<ApplicationUser, IdentityRole<Guid>, Guid>(options)
+{
+    /// <summary>
+    /// Read once per context instance and referenced by the global query filters below.
+    /// EF re-evaluates this field per query, so filters follow the request's tenant.
+    /// The context is registered scoped (not pooled) precisely so this stays correct.
+    /// </summary>
+    private readonly Guid _tenantId = tenantContext.TenantId;
+
+    public DbSet<Tenant> Tenants => Set<Tenant>();
+    public DbSet<FamilyTreeAggregate> FamilyTrees => Set<FamilyTreeAggregate>();
+    public DbSet<Permission> Permissions => Set<Permission>();
+    public DbSet<Role> Roles => Set<Role>();
+    public DbSet<RolePermission> RolePermissions => Set<RolePermission>();
+    public DbSet<UserRole> UserRoles => Set<UserRole>();
+    public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+
+    protected override void OnModelCreating(ModelBuilder builder)
+    {
+        base.OnModelCreating(builder);
+        builder.ApplyConfigurationsFromAssembly(typeof(ApplicationDbContext).Assembly);
+
+        // Global query filters — the reason a forgotten Where clause is not a vulnerability.
+        builder.Entity<FamilyTreeAggregate>().HasQueryFilter(x => x.TenantId == _tenantId);
+        builder.Entity<Role>().HasQueryFilter(x => x.TenantId == _tenantId);
+        builder.Entity<RefreshToken>().HasQueryFilter(x => x.TenantId == _tenantId);
+        builder.Entity<ApplicationUser>().HasQueryFilter(x => x.TenantId == _tenantId);
+
+        // Tenant and Permission are deliberately unfiltered: Tenant is the filter's own subject,
+        // and the permission catalog is system-level rather than tenant-owned.
+    }
+}
+```
+
+- [ ] **Step 5: Write the entity configurations**
+
+Create `src/FamilyTree.Infrastructure/Persistence/Configurations/TenantConfiguration.cs`:
+
+```csharp
+using FamilyTree.Domain.Tenants;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
+
+namespace FamilyTree.Infrastructure.Persistence.Configurations;
+
+public sealed class TenantConfiguration : IEntityTypeConfiguration<Tenant>
+{
+    public void Configure(EntityTypeBuilder<Tenant> builder)
+    {
+        builder.HasKey(x => x.Id);
+        builder.Property(x => x.Name).IsRequired().HasMaxLength(Tenant.MaxNameLength);
+        builder.Property(x => x.Slug).IsRequired().HasMaxLength(Tenant.MaxSlugLength);
+        builder.HasIndex(x => x.Slug).IsUnique();
+    }
+}
+```
+
+Create `src/FamilyTree.Infrastructure/Persistence/Configurations/FamilyTreeConfiguration.cs`:
+
+```csharp
+using FamilyTree.Domain.FamilyTrees;
+using FamilyTree.Domain.Tenants;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
+
+namespace FamilyTree.Infrastructure.Persistence.Configurations;
+
+public sealed class FamilyTreeConfiguration : IEntityTypeConfiguration<FamilyTreeAggregate>
+{
+    public void Configure(EntityTypeBuilder<FamilyTreeAggregate> builder)
+    {
+        builder.ToTable("family_trees");
+        builder.HasKey(x => x.Id);
+        builder.Property(x => x.Name).IsRequired().HasMaxLength(FamilyTreeAggregate.MaxNameLength);
+
+        // BR-001: one customer owns exactly one family tree in V1.
+        builder.HasIndex(x => x.TenantId).IsUnique();
+
+        builder.HasOne<Tenant>()
+               .WithMany()
+               .HasForeignKey(x => x.TenantId)
+               .OnDelete(DeleteBehavior.Restrict);
+    }
+}
+```
+
+Create `src/FamilyTree.Infrastructure/Persistence/Configurations/PermissionConfiguration.cs`:
+
+```csharp
+using FamilyTree.Domain.Authorization;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
+
+namespace FamilyTree.Infrastructure.Persistence.Configurations;
+
+public sealed class PermissionConfiguration : IEntityTypeConfiguration<Permission>
+{
+    public void Configure(EntityTypeBuilder<Permission> builder)
+    {
+        builder.HasKey(x => x.Id);
+        builder.Property(x => x.Code).IsRequired().HasMaxLength(100);
+        builder.HasIndex(x => x.Code).IsUnique();
+    }
+}
+```
+
+Create `src/FamilyTree.Infrastructure/Persistence/Configurations/RoleConfiguration.cs`:
+
+```csharp
+using FamilyTree.Domain.Authorization;
+using FamilyTree.Domain.Tenants;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
+
+namespace FamilyTree.Infrastructure.Persistence.Configurations;
+
+public sealed class RoleConfiguration : IEntityTypeConfiguration<Role>
+{
+    public void Configure(EntityTypeBuilder<Role> builder)
+    {
+        builder.ToTable("roles");
+        builder.HasKey(x => x.Id);
+        builder.Property(x => x.Name).IsRequired().HasMaxLength(Role.MaxNameLength);
+        builder.Property(x => x.Description).HasMaxLength(500);
+
+        // Role names are unique within a tenant, not globally.
+        builder.HasIndex(x => new { x.TenantId, x.Name }).IsUnique();
+
+        builder.HasOne<Tenant>()
+               .WithMany()
+               .HasForeignKey(x => x.TenantId)
+               .OnDelete(DeleteBehavior.Restrict);
+    }
+}
+```
+
+Create `src/FamilyTree.Infrastructure/Persistence/Configurations/RolePermissionConfiguration.cs`:
+
+```csharp
+using FamilyTree.Domain.Authorization;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
+
+namespace FamilyTree.Infrastructure.Persistence.Configurations;
+
+public sealed class RolePermissionConfiguration : IEntityTypeConfiguration<RolePermission>
+{
+    public void Configure(EntityTypeBuilder<RolePermission> builder)
+    {
+        builder.ToTable("role_permissions");
+        builder.HasKey(x => new { x.RoleId, x.PermissionId });
+
+        builder.HasOne<Role>().WithMany().HasForeignKey(x => x.RoleId).OnDelete(DeleteBehavior.Cascade);
+        builder.HasOne<Permission>().WithMany().HasForeignKey(x => x.PermissionId).OnDelete(DeleteBehavior.Cascade);
+    }
+}
+```
+
+Create `src/FamilyTree.Infrastructure/Persistence/Configurations/UserRoleConfiguration.cs`:
+
+```csharp
+using FamilyTree.Domain.Authorization;
+using FamilyTree.Infrastructure.Identity;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
+
+namespace FamilyTree.Infrastructure.Persistence.Configurations;
+
+public sealed class UserRoleConfiguration : IEntityTypeConfiguration<UserRole>
+{
+    public void Configure(EntityTypeBuilder<UserRole> builder)
+    {
+        // Named app_user_roles to avoid colliding with Identity's AspNetUserRoles.
+        builder.ToTable("app_user_roles");
+        builder.HasKey(x => new { x.UserId, x.RoleId });
+
+        builder.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+        builder.HasOne<Role>().WithMany().HasForeignKey(x => x.RoleId).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+```
+
+`OnDelete(Restrict)` on the role side is what makes "a role still assigned to users cannot be deleted" (technical spec §20) a database guarantee, not just a service check.
+
+Create `src/FamilyTree.Infrastructure/Persistence/Configurations/RefreshTokenConfiguration.cs`:
+
+```csharp
+using FamilyTree.Domain.Authentication;
+using FamilyTree.Infrastructure.Identity;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
+
+namespace FamilyTree.Infrastructure.Persistence.Configurations;
+
+public sealed class RefreshTokenConfiguration : IEntityTypeConfiguration<RefreshToken>
+{
+    public void Configure(EntityTypeBuilder<RefreshToken> builder)
+    {
+        builder.ToTable("refresh_tokens");
+        builder.HasKey(x => x.Id);
+        builder.Property(x => x.TokenHash).IsRequired().HasMaxLength(200);
+        builder.Property(x => x.ReplacedByTokenHash).HasMaxLength(200);
+
+        builder.HasIndex(x => x.TokenHash).IsUnique();
+        builder.HasIndex(x => new { x.UserId, x.RevokedAt });
+
+        builder.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+    }
+}
+```
+
+- [ ] **Step 6: Register the DbContext and a design-time tenant context**
+
+Create `src/FamilyTree.Infrastructure/DependencyInjection.cs`:
+
+```csharp
+using FamilyTree.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+
+namespace FamilyTree.Infrastructure;
+
+public static class DependencyInjection
+{
+    public static IServiceCollection AddInfrastructure(
+        this IServiceCollection services, IConfiguration configuration)
+    {
+        // AddDbContext, not AddDbContextPool: the context holds per-request tenant state,
+        // and a pooled instance reused across requests would leak tenant scope. See plan header.
+        services.AddDbContext<ApplicationDbContext>(options =>
+            options.UseNpgsql(configuration.GetConnectionString("DefaultConnection"))
+                   .UseSnakeCaseNamingConvention());
+
+        return services;
+    }
+}
+```
+
+Replace `src/FamilyTree.Api/Program.cs` with a minimal host that can build the model:
+
+```csharp
+using FamilyTree.Api.Middleware;
+using FamilyTree.Application.Common;
+using FamilyTree.Infrastructure;
+
+var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<ITenantContext, HttpTenantContext>();
+builder.Services.AddInfrastructure(builder.Configuration);
+
+var app = builder.Build();
+app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
+app.Run();
+
+public partial class Program;
+```
+
+The trailing `public partial class Program;` is what lets `WebApplicationFactory<Program>` find the entry point in Task 6.
+
+Create `src/FamilyTree.Api/Middleware/HttpTenantContext.cs`:
+
+```csharp
+using System.Security.Claims;
+using FamilyTree.Application.Common;
+
+namespace FamilyTree.Api.Middleware;
+
+/// <summary>
+/// Reads tenant and user identity from the authenticated principal's claims only.
+/// Anything the client can set — headers, query strings, route values — is ignored by design.
+/// </summary>
+public sealed class HttpTenantContext(IHttpContextAccessor accessor) : ITenantContext
+{
+    public const string TenantIdClaim = "tenant_id";
+
+    private ClaimsPrincipal? Principal => accessor.HttpContext?.User;
+
+    public bool IsAuthenticated => Principal?.Identity?.IsAuthenticated == true;
+
+    public Guid TenantId =>
+        Guid.TryParse(Principal?.FindFirstValue(TenantIdClaim), out var id) ? id : Guid.Empty;
+
+    public Guid UserId =>
+        Guid.TryParse(Principal?.FindFirstValue(ClaimTypes.NameIdentifier), out var id) ? id : Guid.Empty;
+}
+```
+
+An unauthenticated request yields `Guid.Empty`, which matches no row — so the filters fail closed rather than open.
+
+- [ ] **Step 7: Generate and apply the initial migration**
+
+```bash
+docker compose up -d postgres
+export ConnectionStrings__DefaultConnection="Host=localhost;Port=5432;Database=familytree;Username=familytree;Password=devpassword"
+
+dotnet ef migrations add InitialCreate \
+  --project src/FamilyTree.Infrastructure \
+  --startup-project src/FamilyTree.Api \
+  --output-dir Persistence/Migrations
+
+dotnet ef database update \
+  --project src/FamilyTree.Infrastructure \
+  --startup-project src/FamilyTree.Api
+```
+
+- [ ] **Step 8: Verify the schema landed with snake_case names**
+
+```bash
+docker compose exec postgres psql -U familytree -d familytree -c "\dt"
+```
+
+Expected tables include: `tenants`, `family_trees`, `permissions`, `roles`, `role_permissions`, `app_user_roles`, `refresh_tokens`, `asp_net_users`, plus the remaining Identity tables. Every identifier is lower snake_case.
+
+- [ ] **Step 9: Commit**
+
+```bash
+git add src/FamilyTree.Infrastructure src/FamilyTree.Application src/FamilyTree.Api
+git commit -m "feat: add DbContext, entity configurations, and initial migration"
+```
+
+---
+
+*Tasks 6–12 are appended in the sections that follow.*
