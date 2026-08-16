@@ -8,12 +8,36 @@
     "signOut": "Sign out",
     "signingIn": "Signing in…"
   },
+  "members": {
+    "title": "Family members",
+    "empty": "No members yet. Add the first generation to begin.",
+    "add": "Add member",
+    "name": "Name",
+    "parent": "Parent",
+    "noParent": "First generation (no parent)",
+    "save": "Save",
+    "saving": "Saving…",
+    "cancel": "Cancel",
+    "edit": "Edit",
+    "delete": "Delete",
+    "deleting": "Deleting…",
+    "confirmDelete": "Delete {{name}}?",
+    "loading": "Loading members…"
+  },
   "errors": {
     "INVALID_CREDENTIALS": "The email or password is incorrect.",
     "ACCOUNT_INACTIVE": "This account has been deactivated.",
     "TENANT_INACTIVE": "This account's subscription is inactive.",
     "VALIDATION_FAILED": "Please check the highlighted fields.",
     "NETWORK": "Could not reach the server. Please try again.",
-    "UNKNOWN": "Something went wrong. Please try again."
+    "UNKNOWN": "Something went wrong. Please try again.",
+    "MEMBER_NAME_REQUIRED": "A name is required.",
+    "MEMBER_NAME_TOO_LONG": "That name is too long (200 characters maximum).",
+    "MEMBER_PARENT_NOT_FOUND": "That parent no longer exists. Reload and try again.",
+    "MEMBER_HAS_CHILDREN": "This member cannot be deleted because they have children.",
+    "MEMBER_FIELD_NOT_UPDATABLE": "Only the name can be changed here.",
+    "MEMBER_NOT_FOUND": "That member no longer exists. Reload and try again.",
+    "CONCURRENCY_CONFLICT": "Someone else changed this member. Reload and try again.",
+    "FAMILY_TREE_NOT_FOUND": "This family tree could not be found."
   }
 }
