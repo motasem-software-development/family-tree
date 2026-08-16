@@ -1,12 +1,14 @@
 import { tokenStorage } from './tokenStorage'
 
 export class ApiError extends Error {
-  constructor(
-    readonly code: string,
-    readonly status: number,
-  ) {
+  readonly code: string
+  readonly status: number
+
+  constructor(code: string, status: number) {
     super(code)
     this.name = 'ApiError'
+    this.code = code
+    this.status = status
   }
 }
 
@@ -28,15 +30,31 @@ const errorFrom = async (response: Response): Promise<ApiError> => {
   }
 }
 
-const tryRefresh = async (): Promise<boolean> => {
+/**
+ * Guards concurrent refresh attempts. The backend rotates refresh tokens, so a second
+ * caller presenting the same (now-revoked) token while a refresh is already in flight
+ * would get a 401 and clear a session that actually just succeeded. All concurrent
+ * callers instead await the one in-flight refresh and share its result.
+ */
+let refreshInFlight: Promise<boolean> | null = null
+
+const performRefresh = async (): Promise<boolean> => {
   const tokens = tokenStorage.read()
   if (!tokens?.refreshToken) return false
 
-  const response = await fetch(REFRESH_PATH, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ refreshToken: tokens.refreshToken }),
-  })
+  let response: Response
+  try {
+    response = await fetch(REFRESH_PATH, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refreshToken: tokens.refreshToken }),
+    })
+  } catch {
+    // Network failure: treat the same as a failed refresh rather than leaking a raw
+    // exception past the caller, which expects the original 401 to surface as an ApiError.
+    tokenStorage.clear()
+    return false
+  }
 
   if (!response.ok) {
     tokenStorage.clear()
@@ -46,6 +64,15 @@ const tryRefresh = async (): Promise<boolean> => {
   const body = (await response.json()) as { accessToken: string; refreshToken: string }
   tokenStorage.write({ accessToken: body.accessToken, refreshToken: body.refreshToken })
   return true
+}
+
+const tryRefresh = (): Promise<boolean> => {
+  if (!refreshInFlight) {
+    refreshInFlight = performRefresh().finally(() => {
+      refreshInFlight = null
+    })
+  }
+  return refreshInFlight
 }
 
 /**
