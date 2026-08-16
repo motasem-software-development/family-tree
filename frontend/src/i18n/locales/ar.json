@@ -38,6 +38,8 @@
     "MEMBER_FIELD_NOT_UPDATABLE": "يمكن تغيير الاسم فقط هنا.",
     "MEMBER_NOT_FOUND": "هذا الفرد لم يعد موجودًا. أعد التحميل وحاول مجددًا.",
     "CONCURRENCY_CONFLICT": "قام شخص آخر بتعديل هذا الفرد. أعد التحميل وحاول مجددًا.",
-    "FAMILY_TREE_NOT_FOUND": "تعذر العثور على شجرة العائلة."
+    "FAMILY_TREE_NOT_FOUND": "تعذر العثور على شجرة العائلة.",
+    "FAMILY_TREE_NAME_REQUIRED": "اسم شجرة العائلة مطلوب.",
+    "FAMILY_TREE_NAME_TOO_LONG": "اسم شجرة العائلة طويل جدًا (٢٠٠ حرف كحد أقصى)."
   }
 }

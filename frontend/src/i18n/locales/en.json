@@ -38,6 +38,8 @@
     "MEMBER_FIELD_NOT_UPDATABLE": "Only the name can be changed here.",
     "MEMBER_NOT_FOUND": "That member no longer exists. Reload and try again.",
     "CONCURRENCY_CONFLICT": "Someone else changed this member. Reload and try again.",
-    "FAMILY_TREE_NOT_FOUND": "This family tree could not be found."
+    "FAMILY_TREE_NOT_FOUND": "This family tree could not be found.",
+    "FAMILY_TREE_NAME_REQUIRED": "A family tree name is required.",
+    "FAMILY_TREE_NAME_TOO_LONG": "That family tree name is too long (200 characters maximum)."
   }
 }

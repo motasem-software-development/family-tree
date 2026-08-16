@@ -62,9 +62,13 @@ message text is not part of the contract.
 | `MEMBER_NAME_TOO_LONG` | 400 | Name exceeds 200 characters |
 | `MEMBER_PARENT_NOT_FOUND` | 400 | Parent id unknown within this family tree |
 | `MEMBER_FIELD_NOT_UPDATABLE` | 400 | Attempt to change parent, tenant, or tree via PUT |
+| `FAMILY_TREE_NAME_REQUIRED` | 400 | Family tree name missing or whitespace |
+| `FAMILY_TREE_NAME_TOO_LONG` | 400 | Family tree name exceeds 200 characters |
 | `MEMBER_NOT_FOUND` | 404 | No such member for this tenant |
 | `FAMILY_TREE_NOT_FOUND` | 404 | This tenant has no family tree |
 | `MEMBER_HAS_CHILDREN` | 409 | Cannot delete a member who has children |
 | `CONCURRENCY_CONFLICT` | 409 | The member changed since it was read |
 | `INVALID_CREDENTIALS` | 401 | Login failed |
 | `INVALID_REFRESH_TOKEN` | 401 | Refresh token unknown, rotated, or revoked |
+| `ACCOUNT_INACTIVE` | 401 | The authenticated account has been deactivated |
+| `TENANT_INACTIVE` | 401 | The authenticated account's tenant subscription is inactive |
