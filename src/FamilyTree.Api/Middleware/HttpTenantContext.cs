@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using FamilyTree.Application.Auth;
 using FamilyTree.Application.Common;
 
 namespace FamilyTree.Api.Middleware;
@@ -9,7 +10,7 @@ namespace FamilyTree.Api.Middleware;
 /// </summary>
 public sealed class HttpTenantContext(IHttpContextAccessor accessor) : ITenantContext
 {
-    public const string TenantIdClaim = "tenant_id";
+    public const string TenantIdClaim = AuthClaims.TenantId;
 
     private ClaimsPrincipal? Principal => accessor.HttpContext?.User;
 

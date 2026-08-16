@@ -51,17 +51,17 @@ public class JwtTokenServiceTests
     }
 
     [Fact]
-    public void CreateAccessToken_produces_a_token_that_validates_against_the_signing_key()
+    public async Task CreateAccessToken_produces_a_token_that_validates_against_the_signing_key()
     {
         var token = CreateService().CreateAccessToken(UserId, TenantId, "admin@example.com", []);
 
-        var result = new JsonWebTokenHandler().ValidateTokenAsync(token.Value, new TokenValidationParameters
+        var result = await new JsonWebTokenHandler().ValidateTokenAsync(token.Value, new TokenValidationParameters
         {
             ValidIssuer = "https://localhost:5001",
             ValidAudience = "familytree-api",
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(SigningKey)),
             ValidateIssuerSigningKey = true
-        }).GetAwaiter().GetResult();
+        });
 
         result.IsValid.Should().BeTrue();
     }

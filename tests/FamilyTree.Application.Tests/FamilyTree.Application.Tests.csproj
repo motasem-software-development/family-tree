@@ -2,10 +2,6 @@
 
   <PropertyGroup>
     <IsPackable>false</IsPackable>
-    <!-- xUnit1031: the brief's synchronous ValidateTokenAsync(...).GetAwaiter().GetResult() call
-         is intentional test-only blocking on a single deterministic in-memory validation, not a
-         deadlock risk. Narrowly suppressed rather than disabling TreatWarningsAsErrors. -->
-    <NoWarn>$(NoWarn);xUnit1031</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>

@@ -8,17 +8,48 @@ using Microsoft.IdentityModel.Tokens;
 
 namespace FamilyTree.Infrastructure.Auth;
 
-public sealed class JwtTokenService(IOptions<JwtOptions> options, TimeProvider timeProvider) : ITokenService
+public sealed class JwtTokenService : ITokenService
 {
-    public const string TenantIdClaim = "tenant_id";
-    public const string PermissionClaim = "permission";
+    public const string TenantIdClaim = AuthClaims.TenantId;
+    public const string PermissionClaim = AuthClaims.Permission;
 
-    private readonly JwtOptions _options = options.Value;
+    private const int MinimumSigningKeyBytes = 32;
+
+    private readonly JwtOptions _options;
+    private readonly TimeProvider _timeProvider;
+
+    public JwtTokenService(IOptions<JwtOptions> options, TimeProvider timeProvider)
+    {
+        _options = options.Value;
+        _timeProvider = timeProvider;
+
+        if (string.IsNullOrWhiteSpace(_options.Issuer))
+        {
+            throw new InvalidOperationException("Jwt:Issuer must be configured and non-empty.");
+        }
+
+        if (string.IsNullOrWhiteSpace(_options.Audience))
+        {
+            throw new InvalidOperationException("Jwt:Audience must be configured and non-empty.");
+        }
+
+        if (string.IsNullOrWhiteSpace(_options.SigningKey))
+        {
+            throw new InvalidOperationException("Jwt:SigningKey must be configured and non-empty.");
+        }
+
+        if (Encoding.UTF8.GetByteCount(_options.SigningKey) < MinimumSigningKeyBytes)
+        {
+            throw new InvalidOperationException(
+                $"Jwt:SigningKey must be at least {MinimumSigningKeyBytes} bytes " +
+                "(UTF-8 encoded) for HMAC-SHA256 signing.");
+        }
+    }
 
     public AccessToken CreateAccessToken(
         Guid userId, Guid tenantId, string email, IReadOnlyCollection<string> permissions)
     {
-        var now = timeProvider.GetUtcNow();
+        var now = _timeProvider.GetUtcNow();
         var expires = now.AddMinutes(_options.AccessTokenLifetimeMinutes);
 
         var claims = new List<Claim>
