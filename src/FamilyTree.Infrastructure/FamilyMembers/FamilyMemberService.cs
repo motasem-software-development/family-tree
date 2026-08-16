@@ -5,6 +5,7 @@ using FamilyTree.Domain.Common;
 using FamilyTree.Domain.FamilyMembers;
 using FamilyTree.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace FamilyTree.Infrastructure.FamilyMembers;
 
@@ -18,6 +19,9 @@ public sealed class FamilyMemberService(
     ITenantContext tenant,
     TimeProvider timeProvider) : IFamilyMemberService
 {
+    /// <summary>PostgreSQL SQLSTATE for a foreign key violation.</summary>
+    private const string ForeignKeyViolation = "23503";
+
     public async Task<FamilyMemberResponse> CreateAsync(
         CreateFamilyMemberRequest request, CancellationToken ct = default)
     {
@@ -38,7 +42,18 @@ public sealed class FamilyMemberService(
             tenant.TenantId, tree.Id, request.ParentId, request.Name, timeProvider.GetUtcNow());
 
         context.FamilyMembers.Add(member);
-        await context.SaveChangesAsync(ct);
+
+        try
+        {
+            await context.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: ForeignKeyViolation })
+        {
+            // The pre-check above is check-then-act and can lose a race to a concurrent delete
+            // of the parent. The raw fk_member_parent violation carries no code on its own, so
+            // it must be mapped to the same code the pre-check emits (spec §26 / import races).
+            throw new DomainException("MEMBER_PARENT_NOT_FOUND", "The specified parent does not exist.");
+        }
 
         return Map(member);
     }
@@ -74,6 +89,15 @@ public sealed class FamilyMemberService(
         var member = await context.FamilyMembers.FirstOrDefaultAsync(m => m.Id == id, ct)
             ?? throw new NotFoundException("MEMBER_NOT_FOUND", "Member not found.");
 
+        // Design spec §3.2, layer 2: an explicit ownership assertion in the application
+        // service, independent of the EF global query filter (layer 1). Deliberately
+        // redundant today — the filter already hides other tenants' rows — so that a future
+        // change to layer 1 (e.g. an .IgnoreQueryFilters() lookup) cannot silently open a
+        // cross-tenant write. Same exception, same code, same message as "no such member":
+        // the two cases must stay indistinguishable (design spec §4.4).
+        if (member.TenantId != tenant.TenantId)
+            throw new NotFoundException("MEMBER_NOT_FOUND", "Member not found.");
+
         member.Rename(request.Name, timeProvider.GetUtcNow());
 
         // Load-bearing. EF builds `UPDATE ... WHERE id = @id AND version = @original`, and
@@ -100,6 +124,10 @@ public sealed class FamilyMemberService(
         var member = await context.FamilyMembers.FirstOrDefaultAsync(m => m.Id == id, ct)
             ?? throw new NotFoundException("MEMBER_NOT_FOUND", "Member not found.");
 
+        // Design spec §3.2, layer 2: see the identical assertion in UpdateAsync for rationale.
+        if (member.TenantId != tenant.TenantId)
+            throw new NotFoundException("MEMBER_NOT_FOUND", "Member not found.");
+
         // The FK's OnDelete(Restrict) would also stop this, but a DbUpdateException carries no
         // stable code for the client. Checking first is what makes the 409 contractual
         // (technical specification §26).
@@ -109,7 +137,18 @@ public sealed class FamilyMemberService(
                 "MEMBER_HAS_CHILDREN", "This member cannot be deleted because they have children.");
 
         context.FamilyMembers.Remove(member);
-        await context.SaveChangesAsync(ct);
+
+        try
+        {
+            await context.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: ForeignKeyViolation })
+        {
+            // The pre-check above raced a concurrent create of a child under this member. Map
+            // the raw fk_member_parent violation to the same coded 409 the pre-check emits.
+            throw new ConflictException(
+                "MEMBER_HAS_CHILDREN", "This member cannot be deleted because they have children.");
+        }
     }
 
     internal static FamilyMemberResponse Map(FamilyMember member) => new(

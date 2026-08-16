@@ -235,6 +235,40 @@ public sealed class FamilyMemberServiceTests(PostgresFixture fixture) : Database
     }
 
     [Fact]
+    public async Task UpdateAsync_rejects_a_cross_tenant_write_even_when_the_query_filter_lets_the_row_through()
+    {
+        // Design spec §3.2, layer 2. The EF global query filter (layer 1) is bound to the
+        // context at construction and normally hides another tenant's row before the service
+        // ever sees it — which is exactly why "UpdateAsync_reports_another_tenants_member_as_
+        // not_found" above cannot prove the new assertion is load-bearing on its own: with the
+        // assertion deleted, that test would still pass on layer 1 alone.
+        //
+        // To exercise layer 2 in isolation we decouple the two: the DbContext here is scoped
+        // to tenant B (the row's real owner), so layer 1 lets the row through untouched — the
+        // same effect a future `.IgnoreQueryFilters()` lookup would have. The service's own
+        // `ITenantContext`, however, is wired to tenant A, modelling the caller layer 1 failed
+        // to stop. Only the ownership assertion added to UpdateAsync can catch this.
+        var (tenantA, _) = await SeedTenantWithTreeAsync("layer2-a");
+        var (tenantB, _) = await SeedTenantWithTreeAsync("layer2-b");
+
+        Guid foreignId;
+        await using (var contextB = ContextFor(tenantB))
+        {
+            foreignId = (await ServiceFor(contextB, tenantB)
+                .CreateAsync(new CreateFamilyMemberRequest("غريب", null), default)).Id;
+        }
+
+        await using var rowVisibleContext = ContextFor(tenantB);
+        var service = new FamilyMemberService(
+            rowVisibleContext, new StubTenantContext(tenantA, Guid.CreateVersion7()), Clock);
+
+        var act = async () => await service.UpdateAsync(
+            foreignId, new UpdateFamilyMemberRequest("مخترق", 1), default);
+
+        (await act.Should().ThrowAsync<NotFoundException>()).Which.Code.Should().Be("MEMBER_NOT_FOUND");
+    }
+
+    [Fact]
     public async Task UpdateAsync_reports_another_tenants_member_as_not_found()
     {
         var (tenantA, _) = await SeedTenantWithTreeAsync("upd-delta");
