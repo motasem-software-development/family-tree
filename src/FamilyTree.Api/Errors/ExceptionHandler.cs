@@ -15,13 +15,24 @@ public sealed class DomainExceptionHandler(ILogger<DomainExceptionHandler> logge
     {
         if (exception is not DomainException domainException) return false;
 
+        // The subclass decides the status; a bare DomainException is a request-level rule
+        // violation and stays a 400.
+        var (status, title) = domainException switch
+        {
+            NotFoundException => (StatusCodes.Status404NotFound, "Resource not found"),
+            ConflictException => (StatusCodes.Status409Conflict, "Request conflicts with the current state"),
+            _ => (StatusCodes.Status400BadRequest, "Request violates a business rule")
+        };
+
         logger.LogWarning("Domain rule violated: {Code}", domainException.Code);
 
         var problem = new ProblemDetails
         {
-            Status = StatusCodes.Status400BadRequest,
-            Title = "Request violates a business rule",
-            Detail = domainException.Message,
+            Status = status,
+            Title = title,
+            // A 404 must not describe what was missing — the response stays identical whether
+            // the id is unknown or owned by another tenant (design spec §4.4).
+            Detail = status == StatusCodes.Status404NotFound ? null : domainException.Message,
             Extensions = { ["code"] = domainException.Code }
         };
 
