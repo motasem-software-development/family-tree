@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - run: dotnet restore
+      - run: dotnet build --no-restore --configuration Release
+
+      # Integration tests start their own PostgreSQL via Testcontainers, which needs
+      # the Docker daemon the ubuntu-latest runner already provides.
+      - run: dotnet test --no-build --configuration Release --verbosity normal
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - run: npm ci
+      # `tsconfig.json` has "files": [] and delegates to project references, so bare
+      # `tsc --noEmit` type-checks an empty program and always exits 0. `tsc -b` builds
+      # the referenced projects (tsconfig.app.json, tsconfig.node.json) and actually
+      # reports type errors.
+      - run: npx tsc -b
+      - run: npm test
+      - run: npm run build
+
+  docker:
+    runs-on: ubuntu-latest
+    needs: [backend, frontend]
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -f src/FamilyTree.Api/Dockerfile -t familytree-api .
+      - run: docker build -f frontend/Dockerfile -t familytree-frontend ./frontend
