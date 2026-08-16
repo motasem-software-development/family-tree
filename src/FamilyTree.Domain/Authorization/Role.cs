@@ -23,13 +23,13 @@ public sealed class Role : Entity, ITenantOwned
 
     public void Rename(string name, DateTimeOffset now)
     {
-        EnsureDeletable();
+        EnsureNotSystem();
         Name = ValidateName(name);
         Touch(now);
     }
 
-    /// <summary>Throws when the role is system-owned. Also guards renaming.</summary>
-    public void EnsureDeletable()
+    /// <summary>Throws when the role is system-owned. Guards all modification paths including rename and delete.</summary>
+    public void EnsureNotSystem()
     {
         if (IsSystem)
             throw new DomainException("ROLE_IS_SYSTEM", "System roles cannot be modified or deleted.");

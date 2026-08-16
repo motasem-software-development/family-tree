@@ -40,22 +40,22 @@ public class RoleTests
     }
 
     [Fact]
-    public void EnsureDeletable_rejects_deleting_a_system_role()
+    public void EnsureNotSystem_rejects_modifying_a_system_role()
     {
         var role = Role.CreateSystem(TenantId, "Super Admin", null, Now);
 
-        var act = role.EnsureDeletable;
+        var act = role.EnsureNotSystem;
 
         act.Should().Throw<DomainException>()
            .Which.Code.Should().Be("ROLE_IS_SYSTEM");
     }
 
     [Fact]
-    public void EnsureDeletable_allows_deleting_a_custom_role()
+    public void EnsureNotSystem_allows_modifying_a_custom_role()
     {
         var role = Role.Create(TenantId, "Genealogy Editor", null, Now);
 
-        var act = role.EnsureDeletable;
+        var act = role.EnsureNotSystem;
 
         act.Should().NotThrow();
     }
