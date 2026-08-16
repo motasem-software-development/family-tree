@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import { LanguageSwitcher } from '../components/LanguageSwitcher'
 import { useDirection } from '../i18n/useDirection'
+import { AppRoutes } from '../routes/AppRoutes'
 
 export const App = () => {
   const { t } = useTranslation()
@@ -12,7 +13,9 @@ export const App = () => {
         <h1>{t('app.title')}</h1>
         <LanguageSwitcher />
       </header>
-      <main />
+      <main>
+        <AppRoutes />
+      </main>
     </>
   )
 }
