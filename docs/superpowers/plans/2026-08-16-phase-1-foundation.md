@@ -53,21 +53,22 @@ src/FamilyTree.Contracts/
 
 src/FamilyTree.Application/
   Common/ITenantContext.cs
-  Auth/ITokenService.cs  AuthService.cs
+  Auth/ITokenService.cs  IAuthService.cs      interfaces only; implementations live in Infrastructure
   Authorization/IPermissionResolver.cs
 
 src/FamilyTree.Infrastructure/
   Persistence/ApplicationDbContext.cs
   Persistence/Configurations/*.cs  one file per entity
-  Persistence/Seed/DatabaseSeeder.cs
+  Persistence/Seed/SeedOptions.cs  SystemRoles.cs  DatabaseSeeder.cs
   Identity/ApplicationUser.cs      the IdentityUser<Guid> subclass
-  Auth/JwtTokenService.cs  JwtOptions.cs
+  Auth/JwtTokenService.cs  JwtOptions.cs  AuthService.cs
   Authorization/PermissionResolver.cs
   DependencyInjection.cs
 
 src/FamilyTree.Api/
   Program.cs
-  Middleware/TenantContextMiddleware.cs  HttpTenantContext.cs
+  Middleware/HttpTenantContext.cs  scoped ITenantContext over IHttpContextAccessor —
+                                   no custom middleware class is needed
   Authorization/PermissionRequirement.cs  PermissionAuthorizationHandler.cs
   Authorization/EndpointExtensions.cs   .RequirePermission(...)
   Endpoints/Auth/AuthEndpoints.cs
@@ -482,7 +483,7 @@ public sealed partial class Tenant : Entity
 - [ ] **Step 6: Run the tests to verify they pass**
 
 Run: `dotnet test tests/FamilyTree.Domain.Tests`
-Expected: PASS — 9 tests, including the dependency guard.
+Expected: PASS — 11 tests (1 dependency guard plus 10 Tenant cases; each `[Theory]` row counts separately).
 
 - [ ] **Step 7: Commit**
 
@@ -638,7 +639,7 @@ public sealed class FamilyTreeAggregate : Entity, ITenantOwned
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run: `dotnet test tests/FamilyTree.Domain.Tests`
-Expected: PASS — 14 tests total.
+Expected: PASS — 17 tests total.
 
 - [ ] **Step 5: Commit**
 
@@ -1105,7 +1106,7 @@ public sealed class RefreshToken : Entity, ITenantOwned
 - [ ] **Step 7: Run the tests to verify they pass**
 
 Run: `dotnet test tests/FamilyTree.Domain.Tests`
-Expected: PASS — 26 tests total.
+Expected: PASS — 30 tests total.
 
 - [ ] **Step 8: Commit**
 
@@ -2121,7 +2122,7 @@ public sealed class PermissionResolverTests(PostgresFixture fixture) : DatabaseT
             ("Editor", [Permissions.Member.View, Permissions.Member.Create]));
 
         await using var context = ContextFor(tenantId);
-        var resolver = new PermissionResolver(context);
+        var resolver = new PermissionResolver(context, new StubTenantContext(tenantId, userId));
 
         var permissions = await resolver.GetPermissionsAsync(userId);
 
@@ -2136,7 +2137,7 @@ public sealed class PermissionResolverTests(PostgresFixture fixture) : DatabaseT
             ("Mover",  [Permissions.Member.View, Permissions.Member.Move]));
 
         await using var context = ContextFor(tenantId);
-        var resolver = new PermissionResolver(context);
+        var resolver = new PermissionResolver(context, new StubTenantContext(tenantId, userId));
 
         var permissions = await resolver.GetPermissionsAsync(userId);
 
@@ -2150,7 +2151,7 @@ public sealed class PermissionResolverTests(PostgresFixture fixture) : DatabaseT
         var (tenantId, userId) = await SeedUserWithRolesAsync();
 
         await using var context = ContextFor(tenantId);
-        var resolver = new PermissionResolver(context);
+        var resolver = new PermissionResolver(context, new StubTenantContext(tenantId, userId));
 
         (await resolver.GetPermissionsAsync(userId)).Should().BeEmpty();
     }
@@ -2159,12 +2160,39 @@ public sealed class PermissionResolverTests(PostgresFixture fixture) : DatabaseT
     public async Task Returns_empty_for_a_user_id_belonging_to_another_tenant()
     {
         var (_, userId) = await SeedUserWithRolesAsync(("Editor", [Permissions.Member.View]));
+        var otherTenant = Guid.CreateVersion7();
 
-        await using var context = ContextFor(Guid.CreateVersion7());
-        var resolver = new PermissionResolver(context);
+        await using var context = ContextFor(otherTenant);
+        var resolver = new PermissionResolver(context, new StubTenantContext(otherTenant, userId));
 
-        // The role query filter excludes the other tenant's roles, so no permission leaks across.
+        // The tenant predicate excludes the other tenant's roles, so no permission leaks across.
         (await resolver.GetPermissionsAsync(userId)).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task The_explicit_tenant_overload_resolves_permissions_without_an_ambient_tenant()
+    {
+        var (tenantId, userId) = await SeedUserWithRolesAsync(
+            ("Editor", [Permissions.Member.View, Permissions.Member.Create]));
+
+        // Models login: no authenticated principal yet, so the ambient tenant is empty.
+        await using var context = ContextFor(Guid.Empty);
+        var resolver = new PermissionResolver(context, new StubTenantContext(Guid.Empty, Guid.Empty));
+
+        var permissions = await resolver.GetPermissionsAsync(userId, tenantId);
+
+        permissions.Should().BeEquivalentTo("Member.View", "Member.Create");
+    }
+
+    [Fact]
+    public async Task The_explicit_tenant_overload_returns_empty_when_the_tenant_does_not_match()
+    {
+        var (_, userId) = await SeedUserWithRolesAsync(("Editor", [Permissions.Member.View]));
+
+        await using var context = ContextFor(Guid.Empty);
+        var resolver = new PermissionResolver(context, new StubTenantContext(Guid.Empty, Guid.Empty));
+
+        (await resolver.GetPermissionsAsync(userId, Guid.CreateVersion7())).Should().BeEmpty();
     }
 }
 ```
@@ -2183,8 +2211,18 @@ namespace FamilyTree.Application.Authorization;
 
 public interface IPermissionResolver
 {
-    /// <summary>The union of every permission granted by every role the user holds.</summary>
+    /// <summary>
+    /// The union of every permission granted by every role the user holds, within the
+    /// current request's tenant.
+    /// </summary>
     Task<IReadOnlyCollection<string>> GetPermissionsAsync(Guid userId, CancellationToken ct = default);
+
+    /// <summary>
+    /// The same, for an explicitly supplied tenant. Needed during login, where no
+    /// authenticated principal exists yet and the ambient tenant is therefore empty.
+    /// </summary>
+    Task<IReadOnlyCollection<string>> GetPermissionsAsync(
+        Guid userId, Guid tenantId, CancellationToken ct = default);
 }
 ```
 
@@ -2192,23 +2230,33 @@ Create `src/FamilyTree.Infrastructure/Authorization/PermissionResolver.cs`:
 
 ```csharp
 using FamilyTree.Application.Authorization;
+using FamilyTree.Application.Common;
 using FamilyTree.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
 namespace FamilyTree.Infrastructure.Authorization;
 
-public sealed class PermissionResolver(ApplicationDbContext context) : IPermissionResolver
+public sealed class PermissionResolver(
+    ApplicationDbContext context, ITenantContext tenantContext) : IPermissionResolver
 {
+    public Task<IReadOnlyCollection<string>> GetPermissionsAsync(
+        Guid userId, CancellationToken ct = default) =>
+        GetPermissionsAsync(userId, tenantContext.TenantId, ct);
+
     public async Task<IReadOnlyCollection<string>> GetPermissionsAsync(
-        Guid userId, CancellationToken ct = default)
+        Guid userId, Guid tenantId, CancellationToken ct = default)
     {
-        // Roles carry a tenant query filter, so a user id from another tenant joins to nothing.
+        if (tenantId == Guid.Empty) return [];
+
+        // IgnoreQueryFilters with an explicit TenantId predicate: the tenant is stated rather
+        // than ambient, which is what makes this usable during login. The predicate is not
+        // optional — dropping it would cross tenants.
         var codes = await (
             from userRole in context.UserRoles
-            join role in context.Roles on userRole.RoleId equals role.Id
+            join role in context.Roles.IgnoreQueryFilters() on userRole.RoleId equals role.Id
             join rolePermission in context.RolePermissions on role.Id equals rolePermission.RoleId
             join permission in context.Permissions on rolePermission.PermissionId equals permission.Id
-            where userRole.UserId == userId
+            where userRole.UserId == userId && role.TenantId == tenantId
             select permission.Code)
             .Distinct()
             .ToListAsync(ct);
@@ -2565,7 +2613,7 @@ public sealed class DatabaseSeeder(
 - [ ] **Step 7: Run the tests to verify they pass**
 
 Run: `dotnet test tests/FamilyTree.Api.IntegrationTests`
-Expected: PASS — 15 tests (6 isolation + 4 resolver + 5 seeder).
+Expected: PASS — 17 tests (6 isolation + 6 resolver + 5 seeder).
 
 - [ ] **Step 8: Commit**
 
@@ -2951,7 +2999,9 @@ public sealed class AuthService(
     private async Task<LoginResponse> IssueTokensAsync(
         ApplicationUser user, DateTimeOffset now, CancellationToken ct)
     {
-        var permissions = await permissionResolver.GetPermissionsAsync(user.Id, ct);
+        // Two-argument overload: login has no authenticated principal, so the tenant must be
+        // stated explicitly rather than taken from the ambient context.
+        var permissions = await permissionResolver.GetPermissionsAsync(user.Id, user.TenantId, ct);
 
         var access = tokenService.CreateAccessToken(
             user.Id, user.TenantId, user.Email!, permissions);
@@ -2967,15 +3017,7 @@ public sealed class AuthService(
 }
 ```
 
-`PermissionResolver` reads through the tenant-filtered context. During login the principal is not yet set, so the filter would return nothing — pass the resolver a context that has the user's tenant. Handle this by resolving permissions with an explicit unfiltered join in `PermissionResolver`; change its query to `context.Roles.IgnoreQueryFilters().Where(r => r.TenantId == <user's tenant>)`. To keep the resolver signature honest, add an overload:
-
-```csharp
-// Add to IPermissionResolver and PermissionResolver
-Task<IReadOnlyCollection<string>> GetPermissionsAsync(
-    Guid userId, Guid tenantId, CancellationToken ct = default);
-```
-
-The two-argument overload bypasses the filter and constrains by the supplied tenant explicitly; the one-argument overload delegates to it using `ITenantContext.TenantId`. Call the two-argument form from `AuthService`. Update `PermissionResolverTests` to cover both, asserting the two-argument form returns empty when the tenant does not match the user's roles.
+Note the call `permissionResolver.GetPermissionsAsync(user.Id, user.TenantId, ct)` inside `IssueTokensAsync` — the two-argument overload from Task 8. At login there is no authenticated principal yet, so the ambient tenant is empty and the one-argument overload would return nothing.
 
 - [ ] **Step 5: Write the error handler**
 
@@ -3208,7 +3250,7 @@ dotnet add src/FamilyTree.Api package Microsoft.AspNetCore.OpenApi
 - [ ] **Step 8: Run the tests to verify they pass**
 
 Run: `dotnet test tests/FamilyTree.Api.IntegrationTests`
-Expected: PASS — 24 tests.
+Expected: PASS — 26 integration tests (17 from Task 8 plus 9 auth endpoint tests).
 
 - [ ] **Step 9: Commit**
 
@@ -3563,7 +3605,7 @@ using (var scope = app.Services.CreateScope())
 - [ ] **Step 6: Run the full backend test suite**
 
 Run: `dotnet test`
-Expected: PASS — 57 tests (26 domain, 6 application, 25 integration).
+Expected: PASS — 69 tests (30 domain, 6 application, 33 integration).
 
 - [ ] **Step 7: Verify the running API end to end by hand**
 
@@ -4560,4 +4602,315 @@ git commit -m "feat: add frontend authentication with token refresh and protecte
 
 ---
 
-*Task 13 is appended in the section that follows.*
+### Task 13: Containerization and continuous integration
+
+**Files:**
+- Create: `src/FamilyTree.Api/Dockerfile`, `frontend/Dockerfile`, `frontend/nginx.conf`
+- Modify: `docker-compose.yml`
+- Create: `.github/workflows/ci.yml`
+- Create: `README.md`
+
+**Interfaces:**
+- Consumes: everything built in Tasks 1–12.
+- Produces: `docker compose up` serving the SPA on `http://localhost:8080` against the API on `http://localhost:5000`, and a CI pipeline that builds, tests, and fails on any failure.
+
+- [ ] **Step 1: Write the API Dockerfile**
+
+Create `src/FamilyTree.Api/Dockerfile` (build context is the repository root):
+
+```dockerfile
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+WORKDIR /src
+
+COPY Directory.Build.props ./
+COPY src/ ./src/
+RUN dotnet publish src/FamilyTree.Api/FamilyTree.Api.csproj -c Release -o /app/publish
+
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
+WORKDIR /app
+COPY --from=build /app/publish .
+
+# Runs unprivileged: a container compromise should not also be a root compromise.
+USER $APP_UID
+
+EXPOSE 8080
+ENTRYPOINT ["dotnet", "FamilyTree.Api.dll"]
+```
+
+- [ ] **Step 2: Write the frontend Dockerfile**
+
+Create `frontend/Dockerfile`:
+
+```dockerfile
+FROM node:24-alpine AS build
+WORKDIR /app
+
+COPY package*.json ./
+RUN npm ci
+
+COPY . .
+RUN npm run build
+
+FROM nginx:alpine AS runtime
+COPY --from=build /app/dist /usr/share/nginx/html
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+EXPOSE 80
+```
+
+Create `frontend/nginx.conf`:
+
+```nginx
+server {
+    listen 80;
+    server_name _;
+    root /usr/share/nginx/html;
+
+    # SPA history fallback: every unknown path serves index.html so client routing works.
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    location /api/ {
+        proxy_pass http://api:8080;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+- [ ] **Step 3: Extend docker-compose with the api and frontend services**
+
+Replace `docker-compose.yml`:
+
+```yaml
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: familytree
+      POSTGRES_USER: familytree
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-devpassword}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U familytree -d familytree"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: src/FamilyTree.Api/Dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__DefaultConnection: "Host=postgres;Port=5432;Database=familytree;Username=familytree;Password=${POSTGRES_PASSWORD:-devpassword}"
+      Jwt__Issuer: ${JWT_ISSUER:-http://localhost:5000}
+      Jwt__Audience: ${JWT_AUDIENCE:-familytree-api}
+      Jwt__SigningKey: ${JWT_SIGNING_KEY:?JWT_SIGNING_KEY must be set}
+      Seed__TenantName: ${SEED_TENANT_NAME:-Al-Saqqa Family}
+      Seed__TenantSlug: ${SEED_TENANT_SLUG:-al-saqqa}
+      Seed__FamilyTreeName: ${SEED_FAMILY_TREE_NAME:-عائلة السقا}
+      Seed__AdminEmail: ${SEED_ADMIN_EMAIL:?SEED_ADMIN_EMAIL must be set}
+      Seed__AdminPassword: ${SEED_ADMIN_PASSWORD:?SEED_ADMIN_PASSWORD must be set}
+    ports:
+      - "5000:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+    ports:
+      - "8080:80"
+    depends_on:
+      - api
+
+volumes:
+  pgdata:
+```
+
+`${VAR:?message}` makes compose refuse to start when a secret is missing, instead of quietly booting with an empty signing key.
+
+Update `.env.example` to list the compose variables:
+
+```bash
+POSTGRES_PASSWORD=change-me-locally
+JWT_ISSUER=http://localhost:5000
+JWT_AUDIENCE=familytree-api
+JWT_SIGNING_KEY=generate-a-32-byte-random-value-do-not-commit-a-real-one
+SEED_TENANT_NAME=Al-Saqqa Family
+SEED_TENANT_SLUG=al-saqqa
+SEED_FAMILY_TREE_NAME=عائلة السقا
+SEED_ADMIN_EMAIL=admin@example.com
+SEED_ADMIN_PASSWORD=choose-a-strong-password
+```
+
+- [ ] **Step 4: Add the schema migration step to compose startup**
+
+The API does not migrate on startup (technical spec §48). For local use, apply migrations before bringing the stack up:
+
+```bash
+docker compose up -d postgres
+export ConnectionStrings__DefaultConnection="Host=localhost;Port=5432;Database=familytree;Username=familytree;Password=devpassword"
+dotnet ef database update --project src/FamilyTree.Infrastructure --startup-project src/FamilyTree.Api
+docker compose up -d
+```
+
+Document this in the README as the required order. Automating migration deployment belongs to Phase 7.
+
+- [ ] **Step 5: Write the CI workflow**
+
+Create `.github/workflows/ci.yml`:
+
+```yaml
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - run: dotnet restore
+      - run: dotnet build --no-restore --configuration Release
+
+      # Integration tests start their own PostgreSQL via Testcontainers, which needs
+      # the Docker daemon the ubuntu-latest runner already provides.
+      - run: dotnet test --no-build --configuration Release --verbosity normal
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - run: npm test
+      - run: npm run build
+
+  docker:
+    runs-on: ubuntu-latest
+    needs: [backend, frontend]
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -f src/FamilyTree.Api/Dockerfile -t familytree-api .
+      - run: docker build -f frontend/Dockerfile -t familytree-frontend ./frontend
+```
+
+- [ ] **Step 6: Write the README**
+
+Create `README.md`:
+
+````markdown
+# Family Tree SaaS
+
+Multi-tenant family tree platform. Arabic/English, RTL-first.
+
+- **Design spec:** `docs/superpowers/specs/2026-08-16-family-tree-saas-design.md`
+- **Current phase:** Phase 1 — Foundation
+
+## Requirements
+
+.NET 10 SDK, Node 24, Docker.
+
+## Running locally
+
+```bash
+cp .env.example .env    # then edit: set JWT_SIGNING_KEY and SEED_ADMIN_PASSWORD
+docker compose up -d postgres
+
+export ConnectionStrings__DefaultConnection="Host=localhost;Port=5432;Database=familytree;Username=familytree;Password=devpassword"
+dotnet ef database update --project src/FamilyTree.Infrastructure --startup-project src/FamilyTree.Api
+
+docker compose up -d
+```
+
+The SPA is on http://localhost:8080 and the API on http://localhost:5000.
+
+Migrations are applied deliberately, never on application startup — production schema
+changes belong to the deployment pipeline.
+
+## Tests
+
+```bash
+dotnet test                    # unit + integration (integration needs Docker running)
+cd frontend && npm test        # component tests
+```
+
+## Architecture
+
+Modular monolith. Dependencies point inward: `Domain` → nothing, `Application` → `Domain`,
+`Infrastructure` → `Application`, `Api` → all. Tenant isolation is enforced in three layers —
+EF global query filters, service-level ownership assertions, and database constraints.
+````
+
+- [ ] **Step 7: Verify the full stack runs**
+
+```bash
+docker compose build
+docker compose up -d
+curl -s http://localhost:5000/health
+```
+
+Expected: `{"status":"ok"}`. Then open http://localhost:8080, sign in with the seeded
+credentials, and confirm the dashboard renders and the language switcher flips direction.
+
+- [ ] **Step 8: Commit**
+
+```bash
+git add -A
+git commit -m "chore: add containerization, CI pipeline, and README"
+```
+
+---
+
+## Phase 1 exit criteria
+
+Phase 1 is complete when all of the following hold:
+
+1. `dotnet test` passes — 69 backend tests, integration tests running against real PostgreSQL.
+2. `cd frontend && npm test` passes — 18 component tests.
+3. `docker compose up` serves the SPA and API, and the seeded administrator can sign in.
+4. A cross-tenant query returns nothing, proven by `TenantIsolationTests`, not by inspection.
+5. `GET /api/v1/me` returns 401 without a token, 403 with an insufficient token, and 200 with the seeded administrator's token.
+6. The UI renders correctly in Arabic RTL and switches to English LTR.
+7. `dotnet build` produces zero warnings, with `TreatWarningsAsErrors` on.
+8. No secret appears anywhere in git history.
+
+## What Phase 1 deliberately does not deliver
+
+No family members, no tree visualization, no user or role management screens, no audit log,
+no public links. Those are Phases 2 through 6 and get their own plans. Phase 1's job is to
+make every one of them safe to build: tenant isolation proven, permissions enforced, and the
+test harness that will verify all of it already running against real PostgreSQL.
+
+## Test-tooling note
+
+The `dotnet new xunit` template on .NET 10 scaffolds **xUnit v3**, whose `IAsyncLifetime`
+returns `ValueTask` — which is what the fixtures in this plan use. If the scaffolded project
+turns out to be xUnit v2, change the four `ValueTask` lifetime signatures to `Task` and
+`ValueTask.CompletedTask` to `Task.CompletedTask`. Nothing else in the plan depends on the
+version.
