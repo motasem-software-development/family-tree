@@ -1,0 +1,404 @@
+import type { CSSProperties, ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
+import { Link, useLocation } from 'react-router-dom'
+import { useAuth } from '../features/auth/AuthContext'
+import type { FamilyTreeNode } from '../features/members/types'
+
+const FamilyIcon = ({ size = 17 }: { size?: number }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.8"
+    strokeLinecap="round"
+    aria-hidden="true"
+  >
+    <rect x="9" y="3" width="6" height="4" rx="1" />
+    <path d="M12 7v5M6 20v-4M18 20v-4M6 16h12" />
+  </svg>
+)
+
+const navItemStyle = (active: boolean, enabled: boolean): CSSProperties => ({
+  display: 'flex',
+  alignItems: 'center',
+  gap: 10,
+  width: '100%',
+  padding: '9px 10px',
+  border: 'none',
+  borderRadius: 'var(--r-md)',
+  background: active ? 'var(--primary-subtle)' : 'transparent',
+  color: active ? 'var(--primary-hover)' : enabled ? 'var(--text-2)' : 'var(--text-disabled)',
+  fontWeight: active ? 600 : 400,
+  fontSize: 14,
+  fontFamily: 'inherit',
+  textAlign: 'start',
+  cursor: enabled ? 'pointer' : 'not-allowed',
+  textDecoration: 'none',
+})
+
+/** A nav destination whose phase has not shipped. Visible, but honestly inert. */
+const PendingNavItem = ({ label, icon }: { label: string; icon: ReactNode }) => {
+  const { t } = useTranslation()
+  return (
+    <button type="button" disabled title={t('nav.comingSoon')} style={navItemStyle(false, false)}>
+      {icon}
+      {label}
+    </button>
+  )
+}
+
+export interface SearchResult {
+  node: FamilyTreeNode
+  meta: string
+}
+
+interface AppShellProps {
+  familyName: string
+  statLine: string
+  /** Omit the search props on screens that have nothing to search — the box is then hidden. */
+  query?: string
+  results?: readonly SearchResult[]
+  onQueryChange?: (value: string) => void
+  onSelectResult?: (id: string) => void
+  children: ReactNode
+}
+
+export const AppShell = ({
+  familyName,
+  statLine,
+  query = '',
+  results = [],
+  onQueryChange,
+  onSelectResult,
+  children,
+}: AppShellProps) => {
+  const { t, i18n } = useTranslation()
+  const { user, hasPermission, logout } = useAuth()
+  const { pathname } = useLocation()
+
+  const initials = (user?.email ?? '?').slice(0, 2).toUpperCase()
+  const showResults = query.trim().length > 0
+
+  const toggleLanguage = () => {
+    void i18n.changeLanguage(i18n.language.startsWith('ar') ? 'en' : 'ar')
+  }
+
+  return (
+    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: 'var(--bg)' }}>
+      <aside
+        style={{
+          width: 248,
+          flex: '0 0 248px',
+          background: 'var(--surface)',
+          borderInlineEnd: '1px solid var(--border)',
+          display: 'flex',
+          flexDirection: 'column',
+          padding: '18px 14px',
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            padding: '0 8px',
+            marginBottom: 22,
+          }}
+        >
+          <div
+            style={{
+              width: 28,
+              height: 28,
+              borderRadius: 'var(--r-sm)',
+              background: 'var(--primary)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#fff',
+              flex: '0 0 28px',
+            }}
+          >
+            <FamilyIcon />
+          </div>
+          <div style={{ minWidth: 0 }}>
+            <div
+              style={{
+                fontSize: 14,
+                fontWeight: 600,
+                lineHeight: 1.3,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {familyName}
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--text-3)' }}>{t('nav.tenantTag')}</div>
+          </div>
+        </div>
+
+        <nav style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <PendingNavItem
+            label={t('nav.dashboard')}
+            icon={
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true">
+                <rect x="4" y="4" width="7" height="7" rx="1.5" />
+                <rect x="13" y="4" width="7" height="7" rx="1.5" />
+                <rect x="4" y="13" width="7" height="7" rx="1.5" />
+                <rect x="13" y="13" width="7" height="7" rx="1.5" />
+              </svg>
+            }
+          />
+          <Link to="/" style={navItemStyle(pathname === '/', true)}>
+            <FamilyIcon />
+            {t('nav.tree')}
+          </Link>
+          <Link to="/members" style={navItemStyle(pathname === '/members', true)}>
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true">
+              <path d="M5 6h14M5 12h14M5 18h14" />
+            </svg>
+            {t('nav.members')}
+          </Link>
+          {hasPermission('User.View') && (
+            <PendingNavItem
+              label={t('nav.users')}
+              icon={
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <circle cx="9" cy="8" r="3" />
+                  <path d="M3 19c0-3.3 2.7-5 6-5s6 1.7 6 5M17 8h4M19 6v4" />
+                </svg>
+              }
+            />
+          )}
+          {hasPermission('Role.View') && (
+            <PendingNavItem
+              label={t('nav.roles')}
+              icon={
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M12 3l7 3v6c0 4-3 7.5-7 9-4-1.5-7-5-7-9V6z" />
+                </svg>
+              }
+            />
+          )}
+          {hasPermission('Audit.View') && (
+            <PendingNavItem
+              label={t('nav.audit')}
+              icon={
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true">
+                  <circle cx="12" cy="12" r="8" />
+                  <path d="M12 7.5V12l3 2" />
+                </svg>
+              }
+            />
+          )}
+          {hasPermission('PublicLink.Create') && (
+            <PendingNavItem
+              label={t('nav.share')}
+              icon={
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <circle cx="17" cy="6" r="2.5" />
+                  <circle cx="7" cy="12" r="2.5" />
+                  <circle cx="17" cy="18" r="2.5" />
+                  <path d="M9.2 10.8 14.8 7.2M9.2 13.2l5.6 3.6" />
+                </svg>
+              }
+            />
+          )}
+          <div style={{ height: 1, background: 'var(--divider)', margin: '8px 4px' }} />
+          <PendingNavItem
+            label={t('nav.settings')}
+            icon={
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true">
+                <circle cx="12" cy="12" r="3" />
+                <path d="M12 3v3M12 18v3M3 12h3M18 12h3" />
+              </svg>
+            }
+          />
+        </nav>
+
+        <div style={{ marginTop: 'auto' }}>
+          <button
+            type="button"
+            onClick={() => void logout()}
+            style={{
+              ...navItemStyle(false, true),
+              border: '1px solid var(--border)',
+              background: 'var(--surface)',
+            }}
+          >
+            {t('auth.signOut')}
+          </button>
+        </div>
+      </aside>
+
+      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+        <header
+          style={{
+            height: 60,
+            flex: '0 0 60px',
+            background: 'var(--surface)',
+            borderBottom: '1px solid var(--border)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 14,
+            padding: '0 20px',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, minWidth: 0 }}>
+            <div style={{ fontSize: 17, fontWeight: 600, whiteSpace: 'nowrap' }}>{familyName}</div>
+            <div style={{ fontSize: 12, color: 'var(--text-3)', whiteSpace: 'nowrap' }}>
+              {statLine}
+            </div>
+          </div>
+
+          <div
+            style={{
+              position: 'relative',
+              marginInlineStart: 'auto',
+              width: 300,
+              display: onQueryChange === undefined ? 'none' : 'block',
+            }}
+          >
+            <div
+              style={{
+                height: 36,
+                border: '1px solid var(--border-strong)',
+                borderRadius: 'var(--r-md)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                padding: '0 10px',
+                background: 'var(--surface)',
+              }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#79838B" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true">
+                <circle cx="11" cy="11" r="6" />
+                <path d="M15.5 15.5 20 20" />
+              </svg>
+              <input
+                value={query}
+                onChange={(event) => onQueryChange?.(event.target.value)}
+                placeholder={t('tree.searchPlaceholder')}
+                aria-label={t('tree.searchPlaceholder')}
+                style={{
+                  flex: 1,
+                  minWidth: 0,
+                  border: 'none',
+                  outline: 'none',
+                  background: 'transparent',
+                  fontFamily: 'inherit',
+                  fontSize: 13,
+                  color: 'var(--text-1)',
+                }}
+              />
+            </div>
+            {showResults && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: 42,
+                  insetInlineStart: 0,
+                  width: '100%',
+                  background: 'var(--surface)',
+                  border: '1px solid var(--border)',
+                  borderRadius: 'var(--r-md)',
+                  boxShadow: 'var(--shadow-med)',
+                  overflow: 'hidden',
+                  zIndex: 40,
+                  maxHeight: 320,
+                  overflowY: 'auto',
+                }}
+              >
+                <div
+                  style={{
+                    padding: '8px 12px',
+                    fontSize: 11,
+                    color: 'var(--text-3)',
+                    borderBottom: '1px solid var(--divider)',
+                  }}
+                >
+                  {t('tree.resultCount', { count: results.length })}
+                </div>
+                {results.map((result) => (
+                  <button
+                    key={result.node.id}
+                    type="button"
+                    onClick={() => onSelectResult?.(result.node.id)}
+                    style={{
+                      display: 'block',
+                      width: '100%',
+                      textAlign: 'start',
+                      padding: '9px 12px',
+                      border: 'none',
+                      borderBottom: '1px solid var(--divider)',
+                      background: 'transparent',
+                      fontFamily: 'inherit',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <div style={{ fontSize: 13, fontWeight: 500 }}>{result.node.name}</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 2 }}>
+                      {result.meta}
+                    </div>
+                  </button>
+                ))}
+                {results.length === 0 && (
+                  <div
+                    style={{
+                      padding: '18px 12px',
+                      textAlign: 'center',
+                      fontSize: 13,
+                      color: 'var(--text-2)',
+                    }}
+                  >
+                    {t('tree.noResults')}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          <button
+            type="button"
+            onClick={toggleLanguage}
+            style={{
+              height: 36,
+              padding: '0 12px',
+              border: '1px solid var(--border-strong)',
+              borderRadius: 'var(--r-md)',
+              background: 'var(--surface)',
+              fontFamily: 'inherit',
+              fontSize: 13,
+              cursor: 'pointer',
+            }}
+          >
+            {i18n.language.startsWith('ar') ? t('language.en') : t('language.ar')}
+          </button>
+
+          <span
+            title={user?.email ?? ''}
+            style={{
+              width: 32,
+              height: 32,
+              borderRadius: '50%',
+              background: 'var(--primary-subtle)',
+              color: 'var(--primary-hover)',
+              fontSize: 12,
+              fontWeight: 600,
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flex: '0 0 32px',
+            }}
+          >
+            {initials}
+          </span>
+        </header>
+
+        <div style={{ flex: 1, minHeight: 0, display: 'flex' }}>{children}</div>
+      </div>
+    </div>
+  )
+}

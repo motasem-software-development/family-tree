@@ -248,6 +248,25 @@ messages. Message text is not part of the contract — it cannot be, given the b
 
 ## 5. Tree visualization
 
+> **SUPERSEDED on 2026-08-17 by the Claude Design handoff bundle in `design/`.**
+>
+> The bundle's `Family Tree.dc.html` renders the tree as an **indented outline** — 44px rows,
+> a depth rail drawn with a repeating linear gradient, an elbow connector, a caret, the node,
+> and a `⋮` menu — not as an SVG canvas. There is **no orientation toggle**; direction follows
+> `dir` on `<html>` and the rail gradient mirrors with it.
+>
+> The user was shown the conflict and chose the design. What that drops: §5.1's `d3-hierarchy`
+> dependency, §5.2's three-mode projection and the user-facing orientation toggle chosen during
+> brainstorming, and §5.3's canvas `measureText` sizing — nodes are now CSS-flexible between
+> 140px and 240px with ellipsis and a title tooltip. §5.4's performance argument also changes
+> shape: an outline renders only expanded rows, so cost tracks what is visible rather than tree
+> size, and virtualization becomes a later concern rather than a designed-in one.
+>
+> §5.5's node component contract still holds in spirit — the node is a button carrying its own
+> permission-aware actions. The implementation lives in `frontend/src/features/tree/`.
+>
+> The sections below are retained as the record of what was originally decided, and why.
+
 ### 5.1 Rendering approach
 
 A custom SVG renderer using `d3-hierarchy` for layout mathematics only.

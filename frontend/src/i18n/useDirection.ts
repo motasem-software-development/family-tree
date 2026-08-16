@@ -18,6 +18,12 @@ export const useDirection = (): Direction => {
   useEffect(() => {
     document.documentElement.dir = direction
     document.documentElement.lang = i18n.language
+    // The tree canvas scales from the reading edge, so zooming grows away from the root
+    // rather than dragging it off-screen. transform-origin has no logical-property form.
+    document.documentElement.style.setProperty(
+      '--origin-x',
+      direction === 'rtl' ? 'right' : 'left',
+    )
   }, [direction, i18n.language])
 
   return direction

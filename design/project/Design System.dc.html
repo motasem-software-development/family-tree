@@ -1,0 +1,1176 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700&family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+--bg:#F6F7F8; --surface:#FFFFFF; --sunken:#F0F2F4;
+--border:#E0E4E7; --border-strong:#C9CFD4; --divider:#EDEFF1;
+--text-1:#15181B; --text-2:#4C555C; --text-3:#79838B; --text-disabled:#A9B1B8;
+--primary:#0E5C60; --primary-hover:#0B4A4E; --primary-active:#083A3D;
+--primary-subtle:#E5EFEF; --primary-border:#B9D3D4;
+--success:#1C7A4D; --success-subtle:#E6F3EC;
+--warning:#8A5D06; --warning-subtle:#FAF0DC;
+--error:#AF3A2E; --error-subtle:#FAEAE7;
+--info:#1E5C99; --info-subtle:#E8F0F8;
+--tree-canvas:#FAFBFB; --tree-node:#FFFFFF; --tree-node-border:#DCE1E5;
+--tree-connector:#C4CBD1; --tree-highlight:#F5D9A0;
+--r-sm:4px; --r-md:8px; --r-lg:12px; --r-xl:16px; --r-pill:999px;
+--shadow-low:0 1px 2px rgba(21,24,27,.06),0 1px 1px rgba(21,24,27,.04);
+--shadow-med:0 2px 4px rgba(21,24,27,.05),0 8px 16px -6px rgba(21,24,27,.10);
+--shadow-high:0 4px 8px rgba(21,24,27,.05),0 24px 48px -12px rgba(21,24,27,.16);
+--font-latin:'Archivo','Helvetica Neue',Helvetica,Arial,sans-serif;
+--font-ar:'Cairo','Segoe UI',sans-serif;
+--mono:'IBM Plex Mono',ui-monospace,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text-1);font-family:var(--font-latin);-webkit-font-smoothing:antialiased}
+a{color:var(--primary);text-decoration:none}
+a:hover{color:var(--primary-hover);text-decoration:underline}
+@keyframes shimmer{0%{background-position:-400px 0}100%{background-position:400px 0}}
+@media (prefers-reduced-motion:reduce){*{animation-duration:.01ms !important;transition-duration:.01ms !important}}
+</style>
+</helmet>
+
+<div style="display:flex;align-items:flex-start;min-height:100vh;background:var(--bg)">
+
+  <aside style="position:sticky;top:0;width:248px;flex:0 0 248px;height:100vh;overflow-y:auto;background:var(--surface);border-right:1px solid var(--border);padding:28px 20px 48px">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+      <div style="width:26px;height:26px;border-radius:var(--r-sm);background:var(--primary)"></div>
+      <div style="font-size:15px;font-weight:600;letter-spacing:-0.01em">Family Tree</div>
+    </div>
+    <div style="font-size:12px;color:var(--text-3);margin-bottom:26px">Design System · v1.0</div>
+    <nav style="display:flex;flex-direction:column;gap:2px;font-size:13px">
+      <a href="#brand" style="padding:7px 10px;border-radius:var(--r-sm);color:var(--text-2)" style-hover="background:var(--sunken);color:var(--text-1)">01 · Brand</a>
+      <a href="#color" style="padding:7px 10px;border-radius:var(--r-sm);color:var(--text-2)" style-hover="background:var(--sunken);color:var(--text-1)">02 · Color</a>
+      <a href="#type" style="padding:7px 10px;border-radius:var(--r-sm);color:var(--text-2)" style-hover="background:var(--sunken);color:var(--text-1)">03 · Typography</a>
+      <a href="#space" style="padding:7px 10px;border-radius:var(--r-sm);color:var(--text-2)" style-hover="background:var(--sunken);color:var(--text-1)">04 · Spacing &amp; grid</a>
+      <a href="#shape" style="padding:7px 10px;border-radius:var(--r-sm);color:var(--text-2)" style-hover="background:var(--sunken);color:var(--text-1)">05 · Radius &amp; elevation</a>
+      <a href="#icons" style="padding:7px 10px;border-radius:var(--r-sm);color:var(--text-2)" style-hover="background:var(--sunken);color:var(--text-1)">06 · Icons</a>
+      <a href="#buttons" style="padding:7px 10px;border-radius:var(--r-sm);color:var(--text-2)" style-hover="background:var(--sunken);color:var(--text-1)">07 · Buttons</a>
+      <a href="#forms" style="padding:7px 10px;border-radius:var(--r-sm);color:var(--text-2)" style-hover="background:var(--sunken);color:var(--text-1)">08 · Forms</a>
+      <a href="#data" style="padding:7px 10px;border-radius:var(--r-sm);color:var(--text-2)" style-hover="background:var(--sunken);color:var(--text-1)">09 · Data display</a>
+      <a href="#overlays" style="padding:7px 10px;border-radius:var(--r-sm);color:var(--text-2)" style-hover="background:var(--sunken);color:var(--text-1)">10 · Overlays</a>
+      <a href="#nav" style="padding:7px 10px;border-radius:var(--r-sm);color:var(--text-2)" style-hover="background:var(--sunken);color:var(--text-1)">11 · Navigation</a>
+      <a href="#tree" style="padding:7px 10px;border-radius:var(--r-sm);color:var(--text-2);background:var(--primary-subtle)" style-hover="background:var(--primary-subtle);color:var(--primary)">12 · Tree primitives</a>
+      <a href="#feedback" style="padding:7px 10px;border-radius:var(--r-sm);color:var(--text-2)" style-hover="background:var(--sunken);color:var(--text-1)">13 · Feedback states</a>
+      <a href="#rtl" style="padding:7px 10px;border-radius:var(--r-sm);color:var(--text-2)" style-hover="background:var(--sunken);color:var(--text-1)">14 · RTL &amp; i18n</a>
+      <a href="#a11y" style="padding:7px 10px;border-radius:var(--r-sm);color:var(--text-2)" style-hover="background:var(--sunken);color:var(--text-1)">15 · Accessibility</a>
+      <a href="#motion" style="padding:7px 10px;border-radius:var(--r-sm);color:var(--text-2)" style-hover="background:var(--sunken);color:var(--text-1)">16 · Motion</a>
+      <a href="#handoff" style="padding:7px 10px;border-radius:var(--r-sm);color:var(--text-2)" style-hover="background:var(--sunken);color:var(--text-1)">17 · Handoff</a>
+    </nav>
+  </aside>
+
+  <main style="flex:1;min-width:0;padding:56px 64px 120px;max-width:1180px">
+
+    <header style="margin-bottom:64px">
+      <div style="font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--primary);margin-bottom:14px">Design system</div>
+      <h1 style="margin:0 0 16px;font-size:44px;line-height:1.1;font-weight:600;letter-spacing:-0.025em;max-width:16ch">Family Tree — foundations and component library</h1>
+      <p style="margin:0;font-size:16px;line-height:1.65;color:var(--text-2);max-width:64ch;text-wrap:pretty">Tokens, primitives and tree-specific components for a multi-tenant genealogy SaaS. Arabic (RTL) is the primary locale; every token, component and layout rule below is direction-agnostic by construction. Values map one-to-one to CSS custom properties and Tailwind theme keys.</p>
+      <div style="display:flex;gap:8px;margin-top:24px;flex-wrap:wrap">
+        <span style="font-family:var(--mono);font-size:11px;padding:5px 10px;border-radius:var(--r-pill);background:var(--surface);border:1px solid var(--border);color:var(--text-2)">React 18</span>
+        <span style="font-family:var(--mono);font-size:11px;padding:5px 10px;border-radius:var(--r-pill);background:var(--surface);border:1px solid var(--border);color:var(--text-2)">TypeScript</span>
+        <span style="font-family:var(--mono);font-size:11px;padding:5px 10px;border-radius:var(--r-pill);background:var(--surface);border:1px solid var(--border);color:var(--text-2)">Vite</span>
+        <span style="font-family:var(--mono);font-size:11px;padding:5px 10px;border-radius:var(--r-pill);background:var(--surface);border:1px solid var(--border);color:var(--text-2)">WCAG 2.2 AA</span>
+      </div>
+    </header>
+
+    <section id="brand" style="margin-bottom:72px">
+      <div style="display:flex;align-items:baseline;gap:12px;padding-bottom:12px;border-bottom:1px solid var(--border);margin-bottom:28px">
+        <span style="font-family:var(--mono);font-size:12px;color:var(--text-3)">01</span>
+        <h2 style="margin:0;font-size:22px;font-weight:600;letter-spacing:-0.015em">Brand</h2>
+      </div>
+      <div style="display:grid;grid-template-columns:1.1fr 1fr;gap:24px">
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:28px">
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px">
+            <div style="width:36px;height:36px;border-radius:var(--r-md);background:var(--primary);display:flex;align-items:center;justify-content:center">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round"><path d="M12 4v5M5 20v-5M19 20v-5M5 15h14M12 9h0M5 15v0"></path><rect x="9" y="2" width="6" height="4" rx="1"></rect><rect x="2" y="18" width="6" height="4" rx="1"></rect><rect x="16" y="18" width="6" height="4" rx="1"></rect></svg>
+            </div>
+            <div>
+              <div style="font-size:17px;font-weight:600;letter-spacing:-0.01em">Family Tree</div>
+              <div style="font-family:var(--font-ar);font-size:14px;color:var(--text-2);direction:rtl">شجرة العائلة</div>
+            </div>
+          </div>
+          <p style="margin:0;font-size:14px;line-height:1.7;color:var(--text-2);text-wrap:pretty">The mark is a three-node lineage glyph: one ancestor, two descendants. It is drawn on an 8px grid at 24px and scales to 20/24/32/36. It never sits on a photograph, never gains a gradient, and never appears inside the tree canvas.</p>
+        </div>
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:28px">
+          <div style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);margin-bottom:16px">Voice</div>
+          <div style="display:flex;flex-direction:column;gap:14px;font-size:14px;line-height:1.6">
+            <div><span style="color:var(--success);font-weight:600">Do</span> <span style="color:var(--text-2)">— “Moving Mohamed will move his 7 descendants with him.”</span></div>
+            <div><span style="color:var(--error);font-weight:600">Don't</span> <span style="color:var(--text-2)">— “Are you sure? This will perform a subtree relocation.”</span></div>
+            <div><span style="color:var(--success);font-weight:600">Do</span> <span style="color:var(--text-2)">— “We couldn't reach the server. Your changes weren't saved.”</span></div>
+            <div><span style="color:var(--error);font-weight:600">Don't</span> <span style="color:var(--text-2)">— “Error 503: upstream timeout.”</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="color" style="margin-bottom:72px">
+      <div style="display:flex;align-items:baseline;gap:12px;padding-bottom:12px;border-bottom:1px solid var(--border);margin-bottom:12px">
+        <span style="font-family:var(--mono);font-size:12px;color:var(--text-3)">02</span>
+        <h2 style="margin:0;font-size:22px;font-weight:600;letter-spacing:-0.015em">Color</h2>
+      </div>
+      <p style="margin:0 0 28px;font-size:14px;line-height:1.65;color:var(--text-2);max-width:70ch">Semantic tokens only — no component ever references a raw hex. Contrast ratios are stated against the token's intended pairing; all text pairings meet 4.5:1, all non-text UI meets 3:1.</p>
+
+      <div style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);margin-bottom:12px">Primary</div>
+      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:32px">
+        <div style="border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;background:var(--surface)">
+          <div style="height:64px;background:var(--primary)"></div>
+          <div style="padding:10px 12px"><div style="font-size:12px;font-weight:600">primary</div><div style="font-family:var(--mono);font-size:11px;color:var(--text-3)">#0E5C60</div></div>
+        </div>
+        <div style="border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;background:var(--surface)">
+          <div style="height:64px;background:var(--primary-hover)"></div>
+          <div style="padding:10px 12px"><div style="font-size:12px;font-weight:600">primary.hover</div><div style="font-family:var(--mono);font-size:11px;color:var(--text-3)">#0B4A4E</div></div>
+        </div>
+        <div style="border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;background:var(--surface)">
+          <div style="height:64px;background:var(--primary-active)"></div>
+          <div style="padding:10px 12px"><div style="font-size:12px;font-weight:600">primary.active</div><div style="font-family:var(--mono);font-size:11px;color:var(--text-3)">#083A3D</div></div>
+        </div>
+        <div style="border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;background:var(--surface)">
+          <div style="height:64px;background:var(--primary-subtle)"></div>
+          <div style="padding:10px 12px"><div style="font-size:12px;font-weight:600">primary.subtle</div><div style="font-family:var(--mono);font-size:11px;color:var(--text-3)">#E5EFEF</div></div>
+        </div>
+        <div style="border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;background:var(--surface)">
+          <div style="height:64px;background:var(--primary-border)"></div>
+          <div style="padding:10px 12px"><div style="font-size:12px;font-weight:600">primary.border</div><div style="font-family:var(--mono);font-size:11px;color:var(--text-3)">#B9D3D4</div></div>
+        </div>
+      </div>
+
+      <div style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);margin-bottom:12px">Neutrals — surface &amp; text</div>
+      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:14px">
+        <div style="border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;background:var(--surface)">
+          <div style="height:56px;background:var(--bg)"></div>
+          <div style="padding:10px 12px"><div style="font-size:12px;font-weight:600">background</div><div style="font-family:var(--mono);font-size:11px;color:var(--text-3)">#F6F7F8</div></div>
+        </div>
+        <div style="border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;background:var(--surface)">
+          <div style="height:56px;background:var(--surface)"></div>
+          <div style="padding:10px 12px"><div style="font-size:12px;font-weight:600">surface</div><div style="font-family:var(--mono);font-size:11px;color:var(--text-3)">#FFFFFF</div></div>
+        </div>
+        <div style="border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;background:var(--surface)">
+          <div style="height:56px;background:var(--sunken)"></div>
+          <div style="padding:10px 12px"><div style="font-size:12px;font-weight:600">surface.sunken</div><div style="font-family:var(--mono);font-size:11px;color:var(--text-3)">#F0F2F4</div></div>
+        </div>
+        <div style="border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;background:var(--surface)">
+          <div style="height:56px;background:var(--border)"></div>
+          <div style="padding:10px 12px"><div style="font-size:12px;font-weight:600">border</div><div style="font-family:var(--mono);font-size:11px;color:var(--text-3)">#E0E4E7</div></div>
+        </div>
+        <div style="border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;background:var(--surface)">
+          <div style="height:56px;background:var(--border-strong)"></div>
+          <div style="padding:10px 12px"><div style="font-size:12px;font-weight:600">border.strong</div><div style="font-family:var(--mono);font-size:11px;color:var(--text-3)">#C9CFD4</div></div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:32px">
+        <div style="border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface);padding:14px 16px">
+          <div style="font-size:15px;font-weight:600;color:var(--text-1);margin-bottom:6px">Text primary</div>
+          <div style="font-family:var(--mono);font-size:11px;color:var(--text-3)">#15181B · 16.1:1</div>
+        </div>
+        <div style="border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface);padding:14px 16px">
+          <div style="font-size:15px;font-weight:600;color:var(--text-2);margin-bottom:6px">Text secondary</div>
+          <div style="font-family:var(--mono);font-size:11px;color:var(--text-3)">#4C555C · 8.2:1</div>
+        </div>
+        <div style="border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface);padding:14px 16px">
+          <div style="font-size:15px;font-weight:600;color:var(--text-3);margin-bottom:6px">Text muted</div>
+          <div style="font-family:var(--mono);font-size:11px;color:var(--text-3)">#79838B · 4.6:1</div>
+        </div>
+        <div style="border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface);padding:14px 16px">
+          <div style="font-size:15px;font-weight:600;color:var(--text-disabled);margin-bottom:6px">Text disabled</div>
+          <div style="font-family:var(--mono);font-size:11px;color:var(--text-3)">#A9B1B8 · non-text</div>
+        </div>
+      </div>
+
+      <div style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);margin-bottom:12px">Status</div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:32px">
+        <div style="border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface);overflow:hidden">
+          <div style="height:8px;background:var(--success)"></div>
+          <div style="padding:14px 16px;background:var(--success-subtle)">
+            <div style="font-size:13px;font-weight:600;color:var(--success)">Success</div>
+            <div style="font-family:var(--mono);font-size:11px;color:var(--text-2);margin-top:4px">#1C7A4D / #E6F3EC</div>
+          </div>
+        </div>
+        <div style="border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface);overflow:hidden">
+          <div style="height:8px;background:var(--warning)"></div>
+          <div style="padding:14px 16px;background:var(--warning-subtle)">
+            <div style="font-size:13px;font-weight:600;color:var(--warning)">Warning</div>
+            <div style="font-family:var(--mono);font-size:11px;color:var(--text-2);margin-top:4px">#8A5D06 / #FAF0DC</div>
+          </div>
+        </div>
+        <div style="border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface);overflow:hidden">
+          <div style="height:8px;background:var(--error)"></div>
+          <div style="padding:14px 16px;background:var(--error-subtle)">
+            <div style="font-size:13px;font-weight:600;color:var(--error)">Error</div>
+            <div style="font-family:var(--mono);font-size:11px;color:var(--text-2);margin-top:4px">#AF3A2E / #FAEAE7</div>
+          </div>
+        </div>
+        <div style="border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface);overflow:hidden">
+          <div style="height:8px;background:var(--info)"></div>
+          <div style="padding:14px 16px;background:var(--info-subtle)">
+            <div style="font-size:13px;font-weight:600;color:var(--info)">Info</div>
+            <div style="font-family:var(--mono);font-size:11px;color:var(--text-2);margin-top:4px">#1E5C99 / #E8F0F8</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);margin-bottom:12px">Tree canvas</div>
+      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px">
+        <div style="border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;background:var(--surface)">
+          <div style="height:56px;background:var(--tree-canvas)"></div>
+          <div style="padding:10px 12px"><div style="font-size:12px;font-weight:600">tree.canvas</div><div style="font-family:var(--mono);font-size:11px;color:var(--text-3)">#FAFBFB</div></div>
+        </div>
+        <div style="border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;background:var(--surface)">
+          <div style="height:56px;background:var(--tree-node);border-bottom:1px solid var(--tree-node-border)"></div>
+          <div style="padding:10px 12px"><div style="font-size:12px;font-weight:600">tree.node</div><div style="font-family:var(--mono);font-size:11px;color:var(--text-3)">#FFFFFF</div></div>
+        </div>
+        <div style="border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;background:var(--surface)">
+          <div style="height:56px;background:var(--tree-connector)"></div>
+          <div style="padding:10px 12px"><div style="font-size:12px;font-weight:600">tree.connector</div><div style="font-family:var(--mono);font-size:11px;color:var(--text-3)">#C4CBD1</div></div>
+        </div>
+        <div style="border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;background:var(--surface)">
+          <div style="height:56px;background:var(--tree-highlight)"></div>
+          <div style="padding:10px 12px"><div style="font-size:12px;font-weight:600">tree.highlight</div><div style="font-family:var(--mono);font-size:11px;color:var(--text-3)">#F5D9A0</div></div>
+        </div>
+        <div style="border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;background:var(--surface)">
+          <div style="height:56px;background:var(--primary);border-bottom:3px solid var(--primary-active)"></div>
+          <div style="padding:10px 12px"><div style="font-size:12px;font-weight:600">tree.root</div><div style="font-family:var(--mono);font-size:11px;color:var(--text-3)">primary / on-primary</div></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="type" style="margin-bottom:72px">
+      <div style="display:flex;align-items:baseline;gap:12px;padding-bottom:12px;border-bottom:1px solid var(--border);margin-bottom:12px">
+        <span style="font-family:var(--mono);font-size:12px;color:var(--text-3)">03</span>
+        <h2 style="margin:0;font-size:22px;font-weight:600;letter-spacing:-0.015em">Typography</h2>
+      </div>
+      <p style="margin:0 0 28px;font-size:14px;line-height:1.65;color:var(--text-2);max-width:70ch">Cairo carries the Arabic UI and all Arabic names inside tree nodes; Archivo carries Latin. Both are set at the same optical size, but Arabic gets +0.08 line-height and never letter-spacing — tracking breaks Arabic joins.</p>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:28px">
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:24px">
+          <div style="font-family:var(--mono);font-size:11px;color:var(--text-3);margin-bottom:14px">--font-latin · Archivo</div>
+          <div style="font-size:40px;font-weight:600;letter-spacing:-0.02em;line-height:1.1">Aa Bb Cc</div>
+          <div style="font-size:14px;color:var(--text-2);margin-top:10px">400 Regular · 500 Medium · 600 Semibold · 700 Bold</div>
+        </div>
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:24px;direction:rtl">
+          <div style="font-family:var(--mono);font-size:11px;color:var(--text-3);margin-bottom:14px;direction:ltr;text-align:right">--font-ar · Cairo</div>
+          <div style="font-family:var(--font-ar);font-size:40px;font-weight:600;line-height:1.25">عائلة السقّا</div>
+          <div style="font-family:var(--font-ar);font-size:14px;color:var(--text-2);margin-top:10px">٤٠٠ عادي · ٥٠٠ متوسط · ٦٠٠ شبه عريض · ٧٠٠ عريض</div>
+        </div>
+      </div>
+
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden">
+        <div style="display:grid;grid-template-columns:150px 1fr 220px;gap:16px;padding:12px 24px;background:var(--sunken);border-bottom:1px solid var(--border);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3)">
+          <div>Token</div><div>Specimen</div><div>Spec</div>
+        </div>
+        <div style="display:grid;grid-template-columns:150px 1fr 220px;gap:16px;padding:18px 24px;border-bottom:1px solid var(--divider);align-items:center">
+          <div style="font-family:var(--mono);font-size:12px;color:var(--text-2)">text.display</div>
+          <div style="font-size:40px;font-weight:600;letter-spacing:-0.025em;line-height:1.1">Al-Saqqa Family</div>
+          <div style="font-family:var(--mono);font-size:11px;color:var(--text-3);line-height:1.6">40/44 · 600 · -0.025em</div>
+        </div>
+        <div style="display:grid;grid-template-columns:150px 1fr 220px;gap:16px;padding:18px 24px;border-bottom:1px solid var(--divider);align-items:center">
+          <div style="font-family:var(--mono);font-size:12px;color:var(--text-2)">text.h1</div>
+          <div style="font-size:30px;font-weight:600;letter-spacing:-0.02em;line-height:1.2">Family tree</div>
+          <div style="font-family:var(--mono);font-size:11px;color:var(--text-3);line-height:1.6">30/36 · 600 · -0.02em</div>
+        </div>
+        <div style="display:grid;grid-template-columns:150px 1fr 220px;gap:16px;padding:18px 24px;border-bottom:1px solid var(--divider);align-items:center">
+          <div style="font-family:var(--mono);font-size:12px;color:var(--text-2)">text.h2</div>
+          <div style="font-size:22px;font-weight:600;letter-spacing:-0.015em;line-height:1.3">Roles &amp; permissions</div>
+          <div style="font-family:var(--mono);font-size:11px;color:var(--text-3);line-height:1.6">22/28 · 600 · -0.015em</div>
+        </div>
+        <div style="display:grid;grid-template-columns:150px 1fr 220px;gap:16px;padding:18px 24px;border-bottom:1px solid var(--divider);align-items:center">
+          <div style="font-family:var(--mono);font-size:12px;color:var(--text-2)">text.h3</div>
+          <div style="font-size:17px;font-weight:600;line-height:1.4">Member details</div>
+          <div style="font-family:var(--mono);font-size:11px;color:var(--text-3);line-height:1.6">17/24 · 600 · 0</div>
+        </div>
+        <div style="display:grid;grid-template-columns:150px 1fr 220px;gap:16px;padding:18px 24px;border-bottom:1px solid var(--divider);align-items:center">
+          <div style="font-family:var(--mono);font-size:12px;color:var(--text-2)">text.h4</div>
+          <div style="font-size:15px;font-weight:600;line-height:1.45">Permissions</div>
+          <div style="font-family:var(--mono);font-size:11px;color:var(--text-3);line-height:1.6">15/22 · 600 · 0</div>
+        </div>
+        <div style="display:grid;grid-template-columns:150px 1fr 220px;gap:16px;padding:18px 24px;border-bottom:1px solid var(--divider);align-items:center">
+          <div style="font-family:var(--mono);font-size:12px;color:var(--text-2)">text.body.lg</div>
+          <div style="font-size:16px;line-height:1.65;color:var(--text-2)">Anyone with this link can view the tree.</div>
+          <div style="font-family:var(--mono);font-size:11px;color:var(--text-3);line-height:1.6">16/26 · 400 · 0</div>
+        </div>
+        <div style="display:grid;grid-template-columns:150px 1fr 220px;gap:16px;padding:18px 24px;border-bottom:1px solid var(--divider);align-items:center">
+          <div style="font-family:var(--mono);font-size:12px;color:var(--text-2)">text.body</div>
+          <div style="font-size:14px;line-height:1.6;color:var(--text-2)">Moved Mohamed from Ahmed to Khaled.</div>
+          <div style="font-family:var(--mono);font-size:11px;color:var(--text-3);line-height:1.6">14/22 · 400 · 0</div>
+        </div>
+        <div style="display:grid;grid-template-columns:150px 1fr 220px;gap:16px;padding:18px 24px;border-bottom:1px solid var(--divider);align-items:center">
+          <div style="font-family:var(--mono);font-size:12px;color:var(--text-2)">text.body.sm</div>
+          <div style="font-size:13px;line-height:1.55;color:var(--text-2)">Generation 4 · Parent: Ahmed</div>
+          <div style="font-family:var(--mono);font-size:11px;color:var(--text-3);line-height:1.6">13/20 · 400 · 0</div>
+        </div>
+        <div style="display:grid;grid-template-columns:150px 1fr 220px;gap:16px;padding:18px 24px;border-bottom:1px solid var(--divider);align-items:center">
+          <div style="font-family:var(--mono);font-size:12px;color:var(--text-2)">text.label</div>
+          <div style="font-size:13px;font-weight:500;line-height:1.4">Name <span style="color:var(--error)">*</span></div>
+          <div style="font-family:var(--mono);font-size:11px;color:var(--text-3);line-height:1.6">13/18 · 500 · 0</div>
+        </div>
+        <div style="display:grid;grid-template-columns:150px 1fr 220px;gap:16px;padding:18px 24px;align-items:center">
+          <div style="font-family:var(--mono);font-size:12px;color:var(--text-2)">text.caption</div>
+          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3)">Last updated</div>
+          <div style="font-family:var(--mono);font-size:11px;color:var(--text-3);line-height:1.6">11/16 · 600 · .08em<br>(Latin only — no tracking in AR)</div>
+        </div>
+      </div>
+
+      <div style="margin-top:20px;background:var(--warning-subtle);border:1px solid #E8D6AC;border-radius:var(--r-md);padding:16px 18px;display:flex;gap:12px;align-items:flex-start">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8A5D06" stroke-width="1.7" stroke-linecap="round" style="flex:0 0 18px;margin-top:1px"><circle cx="12" cy="12" r="9"></circle><path d="M12 8v5M12 16h0"></path></svg>
+        <div style="font-size:13px;line-height:1.6;color:#5E410A">Arabic node labels run 20–40% wider than their Latin equivalents at the same point size. Tree nodes are width-flexible between 120px and 240px; they never truncate a first name, only a long compound name, and always with a tooltip.</div>
+      </div>
+    </section>
+
+    <section id="space" style="margin-bottom:72px">
+      <div style="display:flex;align-items:baseline;gap:12px;padding-bottom:12px;border-bottom:1px solid var(--border);margin-bottom:28px">
+        <span style="font-family:var(--mono);font-size:12px;color:var(--text-3)">04</span>
+        <h2 style="margin:0;font-size:22px;font-weight:600;letter-spacing:-0.015em">Spacing, grid &amp; breakpoints</h2>
+      </div>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:24px;margin-bottom:20px">
+        <div style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);margin-bottom:18px">Scale — 4px base</div>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <div style="display:flex;align-items:center;gap:16px"><span style="font-family:var(--mono);font-size:11px;color:var(--text-3);width:80px">space.1 · 4</span><div style="height:14px;width:4px;background:var(--primary);border-radius:2px"></div></div>
+          <div style="display:flex;align-items:center;gap:16px"><span style="font-family:var(--mono);font-size:11px;color:var(--text-3);width:80px">space.2 · 8</span><div style="height:14px;width:8px;background:var(--primary);border-radius:2px"></div></div>
+          <div style="display:flex;align-items:center;gap:16px"><span style="font-family:var(--mono);font-size:11px;color:var(--text-3);width:80px">space.3 · 12</span><div style="height:14px;width:12px;background:var(--primary);border-radius:2px"></div></div>
+          <div style="display:flex;align-items:center;gap:16px"><span style="font-family:var(--mono);font-size:11px;color:var(--text-3);width:80px">space.4 · 16</span><div style="height:14px;width:16px;background:var(--primary);border-radius:2px"></div></div>
+          <div style="display:flex;align-items:center;gap:16px"><span style="font-family:var(--mono);font-size:11px;color:var(--text-3);width:80px">space.5 · 20</span><div style="height:14px;width:20px;background:var(--primary);border-radius:2px"></div></div>
+          <div style="display:flex;align-items:center;gap:16px"><span style="font-family:var(--mono);font-size:11px;color:var(--text-3);width:80px">space.6 · 24</span><div style="height:14px;width:24px;background:var(--primary);border-radius:2px"></div></div>
+          <div style="display:flex;align-items:center;gap:16px"><span style="font-family:var(--mono);font-size:11px;color:var(--text-3);width:80px">space.8 · 32</span><div style="height:14px;width:32px;background:var(--primary);border-radius:2px"></div></div>
+          <div style="display:flex;align-items:center;gap:16px"><span style="font-family:var(--mono);font-size:11px;color:var(--text-3);width:80px">space.10 · 40</span><div style="height:14px;width:40px;background:var(--primary);border-radius:2px"></div></div>
+          <div style="display:flex;align-items:center;gap:16px"><span style="font-family:var(--mono);font-size:11px;color:var(--text-3);width:80px">space.12 · 48</span><div style="height:14px;width:48px;background:var(--primary);border-radius:2px"></div></div>
+          <div style="display:flex;align-items:center;gap:16px"><span style="font-family:var(--mono);font-size:11px;color:var(--text-3);width:80px">space.16 · 64</span><div style="height:14px;width:64px;background:var(--primary);border-radius:2px"></div></div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);padding:18px">
+          <div style="font-size:13px;font-weight:600;margin-bottom:6px">Mobile</div>
+          <div style="font-family:var(--mono);font-size:11px;color:var(--text-3);line-height:1.7">&lt; 640px<br>4 cols · 16 gutter<br>Sidebar → drawer</div>
+        </div>
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);padding:18px">
+          <div style="font-size:13px;font-weight:600;margin-bottom:6px">Tablet</div>
+          <div style="font-family:var(--mono);font-size:11px;color:var(--text-3);line-height:1.7">640–1023<br>8 cols · 20 gutter<br>Sidebar → icon rail</div>
+        </div>
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);padding:18px">
+          <div style="font-size:13px;font-weight:600;margin-bottom:6px">Laptop</div>
+          <div style="font-family:var(--mono);font-size:11px;color:var(--text-3);line-height:1.7">1024–1439<br>12 cols · 24 gutter<br>Sidebar 240px</div>
+        </div>
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);padding:18px">
+          <div style="font-size:13px;font-weight:600;margin-bottom:6px">Desktop</div>
+          <div style="font-family:var(--mono);font-size:11px;color:var(--text-3);line-height:1.7">≥ 1440px<br>12 cols · 32 gutter<br>Sidebar 264px</div>
+        </div>
+      </div>
+    </section>
+
+    <section id="shape" style="margin-bottom:72px">
+      <div style="display:flex;align-items:baseline;gap:12px;padding-bottom:12px;border-bottom:1px solid var(--border);margin-bottom:28px">
+        <span style="font-family:var(--mono);font-size:12px;color:var(--text-3)">05</span>
+        <h2 style="margin:0;font-size:22px;font-weight:600;letter-spacing:-0.015em">Radius &amp; elevation</h2>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:24px">
+          <div style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);margin-bottom:20px">Radius</div>
+          <div style="display:flex;gap:16px;flex-wrap:wrap">
+            <div style="text-align:center"><div style="width:72px;height:56px;background:var(--sunken);border:1px solid var(--border-strong);border-radius:4px;margin-bottom:8px"></div><div style="font-family:var(--mono);font-size:11px;color:var(--text-3)">sm · 4</div></div>
+            <div style="text-align:center"><div style="width:72px;height:56px;background:var(--sunken);border:1px solid var(--border-strong);border-radius:8px;margin-bottom:8px"></div><div style="font-family:var(--mono);font-size:11px;color:var(--text-3)">md · 8</div></div>
+            <div style="text-align:center"><div style="width:72px;height:56px;background:var(--sunken);border:1px solid var(--border-strong);border-radius:12px;margin-bottom:8px"></div><div style="font-family:var(--mono);font-size:11px;color:var(--text-3)">lg · 12</div></div>
+            <div style="text-align:center"><div style="width:72px;height:56px;background:var(--sunken);border:1px solid var(--border-strong);border-radius:16px;margin-bottom:8px"></div><div style="font-family:var(--mono);font-size:11px;color:var(--text-3)">xl · 16</div></div>
+            <div style="text-align:center"><div style="width:72px;height:56px;background:var(--sunken);border:1px solid var(--border-strong);border-radius:999px;margin-bottom:8px"></div><div style="font-family:var(--mono);font-size:11px;color:var(--text-3)">pill</div></div>
+          </div>
+          <div style="margin-top:20px;font-size:13px;line-height:1.6;color:var(--text-2)">Controls (buttons, inputs, chips) use <b>sm</b>–<b>md</b>. Cards, panels and modals use <b>lg</b>. Tree nodes use <b>md</b> so they stay crisp when scaled down. Pill is reserved for badges and status dots.</div>
+        </div>
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:24px">
+          <div style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);margin-bottom:20px">Elevation</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+            <div style="text-align:center"><div style="height:64px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);margin-bottom:8px"></div><div style="font-family:var(--mono);font-size:11px;color:var(--text-3)">none — cards</div></div>
+            <div style="text-align:center"><div style="height:64px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);box-shadow:var(--shadow-low);margin-bottom:8px"></div><div style="font-family:var(--mono);font-size:11px;color:var(--text-3)">low — nodes</div></div>
+            <div style="text-align:center"><div style="height:64px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);box-shadow:var(--shadow-med);margin-bottom:8px"></div><div style="font-family:var(--mono);font-size:11px;color:var(--text-3)">med — popovers</div></div>
+            <div style="text-align:center"><div style="height:64px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);box-shadow:var(--shadow-high);margin-bottom:8px"></div><div style="font-family:var(--mono);font-size:11px;color:var(--text-3)">high — modals</div></div>
+          </div>
+          <div style="margin-top:20px;font-size:13px;line-height:1.6;color:var(--text-2)">Shadows carry elevation only, never decoration. On the tree canvas only the selected node and hovered node raise; a canvas of 500 shadowed cards is visual noise and a paint cost.</div>
+        </div>
+      </div>
+    </section>
+
+    <section id="icons" style="margin-bottom:72px">
+      <div style="display:flex;align-items:baseline;gap:12px;padding-bottom:12px;border-bottom:1px solid var(--border);margin-bottom:12px">
+        <span style="font-family:var(--mono);font-size:12px;color:var(--text-3)">06</span>
+        <h2 style="margin:0;font-size:22px;font-weight:600;letter-spacing:-0.015em">Icons</h2>
+      </div>
+      <p style="margin:0 0 24px;font-size:14px;line-height:1.65;color:var(--text-2);max-width:70ch">One family, 24×24 grid, 1.7px stroke, round caps and joins. Icons are decorative by default (<span style="font-family:var(--mono);font-size:12px">aria-hidden</span>) and never the only carrier of meaning. Directional icons (chevrons, arrows, move) flip under RTL; non-directional ones (search, trash, clock) do not.</p>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:28px;display:grid;grid-template-columns:repeat(9,1fr);gap:24px 16px">
+        <div style="text-align:center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#4C555C" stroke-width="1.7" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg><div style="font-size:11px;color:var(--text-3);margin-top:8px">add</div></div>
+        <div style="text-align:center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#4C555C" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4l10-10-4-4L4 16v4zM14 6l4 4"></path></svg><div style="font-size:11px;color:var(--text-3);margin-top:8px">edit</div></div>
+        <div style="text-align:center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#4C555C" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13"></path></svg><div style="font-size:11px;color:var(--text-3);margin-top:8px">delete</div></div>
+        <div style="text-align:center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#4C555C" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h16M14 6l6 6-6 6"></path></svg><div style="font-size:11px;color:var(--text-3);margin-top:8px">move</div></div>
+        <div style="text-align:center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#4C555C" stroke-width="1.7" stroke-linecap="round"><circle cx="11" cy="11" r="6"></circle><path d="M15.5 15.5 20 20"></path></svg><div style="font-size:11px;color:var(--text-3);margin-top:8px">search</div></div>
+        <div style="text-align:center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#4C555C" stroke-width="1.7" stroke-linecap="round"><circle cx="11" cy="11" r="6"></circle><path d="M15.5 15.5 20 20M8.5 11h5M11 8.5v5"></path></svg><div style="font-size:11px;color:var(--text-3);margin-top:8px">zoom-in</div></div>
+        <div style="text-align:center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#4C555C" stroke-width="1.7" stroke-linecap="round"><circle cx="11" cy="11" r="6"></circle><path d="M15.5 15.5 20 20M8.5 11h5"></path></svg><div style="font-size:11px;color:var(--text-3);margin-top:8px">zoom-out</div></div>
+        <div style="text-align:center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#4C555C" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"></path></svg><div style="font-size:11px;color:var(--text-3);margin-top:8px">fit</div></div>
+        <div style="text-align:center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#4C555C" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg><div style="font-size:11px;color:var(--text-3);margin-top:8px">expand</div></div>
+        <div style="text-align:center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#4C555C" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"></path></svg><div style="font-size:11px;color:var(--text-3);margin-top:8px">collapse</div></div>
+        <div style="text-align:center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#4C555C" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"></circle><path d="M3 19c0-3.3 2.7-5 6-5s6 1.7 6 5"></path><path d="M17 8h4M19 6v4"></path></svg><div style="font-size:11px;color:var(--text-3);margin-top:8px">users</div></div>
+        <div style="text-align:center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#4C555C" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v6c0 4-3 7.5-7 9-4-1.5-7-5-7-9V6z"></path><path d="M9.5 12l1.8 1.8 3.4-3.6"></path></svg><div style="font-size:11px;color:var(--text-3);margin-top:8px">roles</div></div>
+        <div style="text-align:center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#4C555C" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="8"></circle><path d="M12 7.5V12l3 2"></path></svg><div style="font-size:11px;color:var(--text-3);margin-top:8px">audit</div></div>
+        <div style="text-align:center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#4C555C" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="17" cy="6" r="2.5"></circle><circle cx="7" cy="12" r="2.5"></circle><circle cx="17" cy="18" r="2.5"></circle><path d="M9.2 10.8 14.8 7.2M9.2 13.2l5.6 3.6"></path></svg><div style="font-size:11px;color:var(--text-3);margin-top:8px">share</div></div>
+        <div style="text-align:center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#4C555C" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="3"></circle><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"></path></svg><div style="font-size:11px;color:var(--text-3);margin-top:8px">settings</div></div>
+        <div style="text-align:center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#4C555C" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4M9 12h11M16 8l4 4-4 4"></path></svg><div style="font-size:11px;color:var(--text-3);margin-top:8px">logout</div></div>
+        <div style="text-align:center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#8A5D06" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4 2.5 20h19z"></path><path d="M12 10v4M12 17h0"></path></svg><div style="font-size:11px;color:var(--text-3);margin-top:8px">warning</div></div>
+        <div style="text-align:center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1C7A4D" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"></circle><path d="M8.5 12.2l2.4 2.4 4.6-4.9"></path></svg><div style="font-size:11px;color:var(--text-3);margin-top:8px">success</div></div>
+        <div style="text-align:center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#AF3A2E" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="8"></circle><path d="M9 9l6 6M15 9l-6 6"></path></svg><div style="font-size:11px;color:var(--text-3);margin-top:8px">error</div></div>
+      </div>
+    </section>
+
+    <section id="buttons" style="margin-bottom:72px">
+      <div style="display:flex;align-items:baseline;gap:12px;padding-bottom:12px;border-bottom:1px solid var(--border);margin-bottom:12px">
+        <span style="font-family:var(--mono);font-size:12px;color:var(--text-3)">07</span>
+        <h2 style="margin:0;font-size:22px;font-weight:600;letter-spacing:-0.015em">Buttons</h2>
+      </div>
+      <p style="margin:0 0 24px;font-size:14px;line-height:1.65;color:var(--text-2);max-width:70ch">Heights 32 / 36 / 44 (sm / md / lg). Mobile always uses lg — 44px is the minimum touch target. Focus ring is a 2px primary outline with a 2px white offset, identical on every variant.</p>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden">
+        <div style="display:grid;grid-template-columns:110px repeat(6,1fr);gap:12px;padding:12px 20px;background:var(--sunken);border-bottom:1px solid var(--border);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3)">
+          <div>Variant</div><div>Default</div><div>Hover</div><div>Active</div><div>Focus</div><div>Disabled</div><div>Loading</div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:110px repeat(6,1fr);gap:12px;padding:16px 20px;border-bottom:1px solid var(--divider);align-items:center">
+          <div style="font-family:var(--mono);font-size:12px;color:var(--text-2)">primary</div>
+          <div><button style="height:36px;padding:0 16px;border:none;border-radius:var(--r-md);background:var(--primary);color:#fff;font-family:inherit;font-size:13px;font-weight:500;cursor:pointer">Add member</button></div>
+          <div><button style="height:36px;padding:0 16px;border:none;border-radius:var(--r-md);background:var(--primary-hover);color:#fff;font-family:inherit;font-size:13px;font-weight:500;cursor:pointer">Add member</button></div>
+          <div><button style="height:36px;padding:0 16px;border:none;border-radius:var(--r-md);background:var(--primary-active);color:#fff;font-family:inherit;font-size:13px;font-weight:500;cursor:pointer">Add member</button></div>
+          <div><button style="height:36px;padding:0 16px;border:none;border-radius:var(--r-md);background:var(--primary);color:#fff;font-family:inherit;font-size:13px;font-weight:500;outline:2px solid var(--primary);outline-offset:2px;cursor:pointer">Add member</button></div>
+          <div><button disabled="disabled" style="height:36px;padding:0 16px;border:none;border-radius:var(--r-md);background:#D3DADE;color:#8A939A;font-family:inherit;font-size:13px;font-weight:500;cursor:not-allowed">Add member</button></div>
+          <div><button style="height:36px;padding:0 16px;border:none;border-radius:var(--r-md);background:var(--primary);color:#fff;font-family:inherit;font-size:13px;font-weight:500;display:inline-flex;align-items:center;gap:8px;cursor:progress"><span style="width:13px;height:13px;border:2px solid rgba(255,255,255,.35);border-top-color:#fff;border-radius:50%;display:inline-block"></span>Saving…</button></div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:110px repeat(6,1fr);gap:12px;padding:16px 20px;border-bottom:1px solid var(--divider);align-items:center">
+          <div style="font-family:var(--mono);font-size:12px;color:var(--text-2)">secondary</div>
+          <div><button style="height:36px;padding:0 16px;border:1px solid var(--border-strong);border-radius:var(--r-md);background:var(--surface);color:var(--text-1);font-family:inherit;font-size:13px;font-weight:500;cursor:pointer">Cancel</button></div>
+          <div><button style="height:36px;padding:0 16px;border:1px solid var(--border-strong);border-radius:var(--r-md);background:var(--sunken);color:var(--text-1);font-family:inherit;font-size:13px;font-weight:500;cursor:pointer">Cancel</button></div>
+          <div><button style="height:36px;padding:0 16px;border:1px solid var(--border-strong);border-radius:var(--r-md);background:#E4E8EB;color:var(--text-1);font-family:inherit;font-size:13px;font-weight:500;cursor:pointer">Cancel</button></div>
+          <div><button style="height:36px;padding:0 16px;border:1px solid var(--border-strong);border-radius:var(--r-md);background:var(--surface);color:var(--text-1);font-family:inherit;font-size:13px;font-weight:500;outline:2px solid var(--primary);outline-offset:2px;cursor:pointer">Cancel</button></div>
+          <div><button disabled="disabled" style="height:36px;padding:0 16px;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface);color:var(--text-disabled);font-family:inherit;font-size:13px;font-weight:500;cursor:not-allowed">Cancel</button></div>
+          <div><button style="height:36px;padding:0 16px;border:1px solid var(--border-strong);border-radius:var(--r-md);background:var(--surface);color:var(--text-2);font-family:inherit;font-size:13px;font-weight:500;display:inline-flex;align-items:center;gap:8px;cursor:progress"><span style="width:13px;height:13px;border:2px solid #D3DADE;border-top-color:var(--text-2);border-radius:50%;display:inline-block"></span>Working…</button></div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:110px repeat(6,1fr);gap:12px;padding:16px 20px;border-bottom:1px solid var(--divider);align-items:center">
+          <div style="font-family:var(--mono);font-size:12px;color:var(--text-2)">tertiary</div>
+          <div><button style="height:36px;padding:0 12px;border:none;border-radius:var(--r-md);background:transparent;color:var(--primary);font-family:inherit;font-size:13px;font-weight:500;cursor:pointer">View all</button></div>
+          <div><button style="height:36px;padding:0 12px;border:none;border-radius:var(--r-md);background:var(--primary-subtle);color:var(--primary-hover);font-family:inherit;font-size:13px;font-weight:500;cursor:pointer">View all</button></div>
+          <div><button style="height:36px;padding:0 12px;border:none;border-radius:var(--r-md);background:#D5E5E5;color:var(--primary-active);font-family:inherit;font-size:13px;font-weight:500;cursor:pointer">View all</button></div>
+          <div><button style="height:36px;padding:0 12px;border:none;border-radius:var(--r-md);background:transparent;color:var(--primary);font-family:inherit;font-size:13px;font-weight:500;outline:2px solid var(--primary);outline-offset:2px;cursor:pointer">View all</button></div>
+          <div><button disabled="disabled" style="height:36px;padding:0 12px;border:none;border-radius:var(--r-md);background:transparent;color:var(--text-disabled);font-family:inherit;font-size:13px;font-weight:500;cursor:not-allowed">View all</button></div>
+          <div style="font-size:12px;color:var(--text-3)">n/a</div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:110px repeat(6,1fr);gap:12px;padding:16px 20px;border-bottom:1px solid var(--divider);align-items:center">
+          <div style="font-family:var(--mono);font-size:12px;color:var(--text-2)">danger</div>
+          <div><button style="height:36px;padding:0 16px;border:none;border-radius:var(--r-md);background:var(--error);color:#fff;font-family:inherit;font-size:13px;font-weight:500;cursor:pointer">Delete</button></div>
+          <div><button style="height:36px;padding:0 16px;border:none;border-radius:var(--r-md);background:#932F25;color:#fff;font-family:inherit;font-size:13px;font-weight:500;cursor:pointer">Delete</button></div>
+          <div><button style="height:36px;padding:0 16px;border:none;border-radius:var(--r-md);background:#79251D;color:#fff;font-family:inherit;font-size:13px;font-weight:500;cursor:pointer">Delete</button></div>
+          <div><button style="height:36px;padding:0 16px;border:none;border-radius:var(--r-md);background:var(--error);color:#fff;font-family:inherit;font-size:13px;font-weight:500;outline:2px solid var(--error);outline-offset:2px;cursor:pointer">Delete</button></div>
+          <div><button disabled="disabled" style="height:36px;padding:0 16px;border:none;border-radius:var(--r-md);background:#E4C9C5;color:#9A7E7A;font-family:inherit;font-size:13px;font-weight:500;cursor:not-allowed">Delete</button></div>
+          <div><button style="height:36px;padding:0 16px;border:none;border-radius:var(--r-md);background:var(--error);color:#fff;font-family:inherit;font-size:13px;font-weight:500;display:inline-flex;align-items:center;gap:8px;cursor:progress"><span style="width:13px;height:13px;border:2px solid rgba(255,255,255,.35);border-top-color:#fff;border-radius:50%;display:inline-block"></span>Deleting…</button></div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:110px repeat(6,1fr);gap:12px;padding:16px 20px;align-items:center">
+          <div style="font-family:var(--mono);font-size:12px;color:var(--text-2)">icon</div>
+          <div><button style="width:36px;height:36px;border:1px solid var(--border-strong);border-radius:var(--r-md);background:var(--surface);display:inline-flex;align-items:center;justify-content:center;cursor:pointer"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#4C555C" stroke-width="1.7" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg></button></div>
+          <div><button style="width:36px;height:36px;border:1px solid var(--border-strong);border-radius:var(--r-md);background:var(--sunken);display:inline-flex;align-items:center;justify-content:center;cursor:pointer"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#15181B" stroke-width="1.7" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg></button></div>
+          <div><button style="width:36px;height:36px;border:1px solid var(--border-strong);border-radius:var(--r-md);background:#E4E8EB;display:inline-flex;align-items:center;justify-content:center;cursor:pointer"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#15181B" stroke-width="1.7" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg></button></div>
+          <div><button style="width:36px;height:36px;border:1px solid var(--border-strong);border-radius:var(--r-md);background:var(--surface);display:inline-flex;align-items:center;justify-content:center;outline:2px solid var(--primary);outline-offset:2px;cursor:pointer"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#4C555C" stroke-width="1.7" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg></button></div>
+          <div><button disabled="disabled" style="width:36px;height:36px;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface);display:inline-flex;align-items:center;justify-content:center;cursor:not-allowed"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#A9B1B8" stroke-width="1.7" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg></button></div>
+          <div style="font-size:12px;color:var(--text-3)">n/a</div>
+        </div>
+      </div>
+
+      <div style="margin-top:20px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:20px 24px">
+        <div style="font-size:13px;font-weight:600;margin-bottom:10px">Permission-disabled ≠ disabled</div>
+        <div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap">
+          <button disabled="disabled" style="height:36px;padding:0 16px;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface);color:var(--text-disabled);font-family:inherit;font-size:13px;font-weight:500;display:inline-flex;align-items:center;gap:8px;cursor:not-allowed">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#A9B1B8" stroke-width="1.8" stroke-linecap="round"><rect x="5" y="11" width="14" height="9" rx="2"></rect><path d="M8 11V8a4 4 0 0 1 8 0v3"></path></svg>
+            Delete
+          </button>
+          <div style="font-size:13px;line-height:1.6;color:var(--text-2);max-width:52ch">An action the user's role does not grant is rendered disabled <b>with a lock glyph and a tooltip naming the missing permission</b> (“Requires Member.Delete”) — never silently hidden inside an open menu, and never conveyed by color alone. Whole nav sections the user cannot access are hidden instead.</div>
+        </div>
+      </div>
+    </section>
+
+    <section id="forms" style="margin-bottom:72px">
+      <div style="display:flex;align-items:baseline;gap:12px;padding-bottom:12px;border-bottom:1px solid var(--border);margin-bottom:28px">
+        <span style="font-family:var(--mono);font-size:12px;color:var(--text-3)">08</span>
+        <h2 style="margin:0;font-size:22px;font-weight:600;letter-spacing:-0.015em">Forms</h2>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-bottom:24px">
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:20px">
+          <div style="font-family:var(--mono);font-size:11px;color:var(--text-3);margin-bottom:14px">default</div>
+          <label style="display:block;font-size:13px;font-weight:500;margin-bottom:6px">Name <span style="color:var(--error)">*</span></label>
+          <div style="height:40px;border:1px solid var(--border-strong);border-radius:var(--r-md);background:var(--surface);display:flex;align-items:center;padding:0 12px;font-size:14px;color:var(--text-3)">Full name</div>
+          <div style="font-size:12px;color:var(--text-3);margin-top:6px">Required. Arabic or English.</div>
+        </div>
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:20px">
+          <div style="font-family:var(--mono);font-size:11px;color:var(--text-3);margin-bottom:14px">focus</div>
+          <label style="display:block;font-size:13px;font-weight:500;margin-bottom:6px">Name <span style="color:var(--error)">*</span></label>
+          <div style="height:40px;border:1px solid var(--primary);border-radius:var(--r-md);background:var(--surface);display:flex;align-items:center;padding:0 12px;font-size:14px;color:var(--text-1);outline:2px solid var(--primary-border);outline-offset:1px">محمود<span style="width:1px;height:18px;background:var(--primary);margin-inline-start:2px"></span></div>
+          <div style="font-size:12px;color:var(--text-3);margin-top:6px">Required. Arabic or English.</div>
+        </div>
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:20px">
+          <div style="font-family:var(--mono);font-size:11px;color:var(--text-3);margin-bottom:14px">filled</div>
+          <label style="display:block;font-size:13px;font-weight:500;margin-bottom:6px">Name <span style="color:var(--error)">*</span></label>
+          <div style="height:40px;border:1px solid var(--border-strong);border-radius:var(--r-md);background:var(--surface);display:flex;align-items:center;padding:0 12px;font-size:14px;color:var(--text-1)">Mahmoud Faris</div>
+          <div style="font-size:12px;color:var(--text-3);margin-top:6px">Required. Arabic or English.</div>
+        </div>
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:20px">
+          <div style="font-family:var(--mono);font-size:11px;color:var(--text-3);margin-bottom:14px">error</div>
+          <label style="display:block;font-size:13px;font-weight:500;margin-bottom:6px">Name <span style="color:var(--error)">*</span></label>
+          <div style="height:40px;border:1px solid var(--error);border-radius:var(--r-md);background:var(--surface);display:flex;align-items:center;padding:0 12px;font-size:14px;color:var(--text-1)"></div>
+          <div style="display:flex;gap:6px;align-items:center;margin-top:6px">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#AF3A2E" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="8"></circle><path d="M12 8v5M12 16h0"></path></svg>
+            <span style="font-size:12px;color:var(--error)">Name is required.</span>
+          </div>
+        </div>
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:20px">
+          <div style="font-family:var(--mono);font-size:11px;color:var(--text-3);margin-bottom:14px">disabled</div>
+          <label style="display:block;font-size:13px;font-weight:500;margin-bottom:6px;color:var(--text-disabled)">Parent</label>
+          <div style="height:40px;border:1px solid var(--border);border-radius:var(--r-md);background:var(--sunken);display:flex;align-items:center;padding:0 12px;font-size:14px;color:var(--text-disabled)">Al-Saqqa Family</div>
+          <div style="font-size:12px;color:var(--text-3);margin-top:6px">Set by the node you started from.</div>
+        </div>
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:20px">
+          <div style="font-family:var(--mono);font-size:11px;color:var(--text-3);margin-bottom:14px">read-only</div>
+          <label style="display:block;font-size:13px;font-weight:500;margin-bottom:6px">Current parent</label>
+          <div style="height:40px;border:1px dashed var(--border-strong);border-radius:var(--r-md);background:transparent;display:flex;align-items:center;padding:0 12px;font-size:14px;color:var(--text-2)">Ahmed</div>
+          <div style="font-size:12px;color:var(--text-3);margin-top:6px">Change with <b>Move</b>, not Edit.</div>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px">
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:20px">
+          <div style="font-family:var(--mono);font-size:11px;color:var(--text-3);margin-bottom:14px">select / combobox</div>
+          <div style="height:40px;border:1px solid var(--border-strong);border-radius:var(--r-md);display:flex;align-items:center;justify-content:space-between;padding:0 12px;font-size:14px">Editor
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#79838B" stroke-width="1.7" stroke-linecap="round"><path d="M6 9l6 6 6-6"></path></svg>
+          </div>
+          <div style="margin-top:6px;border:1px solid var(--border);border-radius:var(--r-md);box-shadow:var(--shadow-med);overflow:hidden">
+            <div style="padding:9px 12px;font-size:13px;background:var(--primary-subtle);color:var(--primary-hover);display:flex;justify-content:space-between">Editor <span>✓</span></div>
+            <div style="padding:9px 12px;font-size:13px;color:var(--text-2)">Viewer</div>
+            <div style="padding:9px 12px;font-size:13px;color:var(--text-2)">Administrator</div>
+          </div>
+        </div>
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:20px">
+          <div style="font-family:var(--mono);font-size:11px;color:var(--text-3);margin-bottom:14px">checkbox · radio · switch</div>
+          <div style="display:flex;flex-direction:column;gap:14px">
+            <div style="display:flex;align-items:center;gap:10px"><span style="width:18px;height:18px;border-radius:var(--r-sm);background:var(--primary);display:inline-flex;align-items:center;justify-content:center"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7"></path></svg></span><span style="font-size:13px">Member.Edit</span></div>
+            <div style="display:flex;align-items:center;gap:10px"><span style="width:18px;height:18px;border-radius:var(--r-sm);border:1px solid var(--border-strong);display:inline-block"></span><span style="font-size:13px">Member.Delete</span></div>
+            <div style="display:flex;align-items:center;gap:10px"><span style="width:18px;height:18px;border-radius:var(--r-sm);border:1px solid var(--border);background:var(--sunken);display:inline-flex;align-items:center;justify-content:center"><span style="width:9px;height:2px;background:var(--text-disabled);border-radius:1px"></span></span><span style="font-size:13px;color:var(--text-disabled)">Role.Delete <span style="font-size:11px">(locked)</span></span></div>
+            <div style="display:flex;align-items:center;gap:10px"><span style="width:16px;height:16px;border-radius:50%;border:5px solid var(--primary);display:inline-block"></span><span style="font-size:13px">Arabic (RTL)</span></div>
+            <div style="display:flex;align-items:center;gap:10px"><span style="width:34px;height:20px;border-radius:var(--r-pill);background:var(--primary);position:relative;display:inline-block"><span style="position:absolute;top:2px;inset-inline-end:2px;width:16px;height:16px;border-radius:50%;background:#fff"></span></span><span style="font-size:13px">Public sharing</span></div>
+          </div>
+        </div>
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:20px">
+          <div style="font-family:var(--mono);font-size:11px;color:var(--text-3);margin-bottom:14px">search input · autocomplete</div>
+          <div style="height:40px;border:1px solid var(--primary);border-radius:var(--r-md);display:flex;align-items:center;gap:8px;padding:0 12px;outline:2px solid var(--primary-border);outline-offset:1px">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#79838B" stroke-width="1.7" stroke-linecap="round"><circle cx="11" cy="11" r="6"></circle><path d="M15.5 15.5 20 20"></path></svg>
+            <span style="font-size:14px">محم</span>
+          </div>
+          <div style="margin-top:6px;border:1px solid var(--border);border-radius:var(--r-md);box-shadow:var(--shadow-med);overflow:hidden">
+            <div style="padding:9px 12px;background:var(--sunken)"><div style="font-size:13px;font-weight:500">محمود السقّا</div><div style="font-size:11px;color:var(--text-3)">Generation 4 · Parent: أحمد</div></div>
+            <div style="padding:9px 12px"><div style="font-size:13px;font-weight:500">محمد السقّا</div><div style="font-size:11px;color:var(--text-3)">Generation 3 · Parent: سليمان</div></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="tree" style="margin-bottom:72px">
+      <div style="display:flex;align-items:baseline;gap:12px;padding-bottom:12px;border-bottom:1px solid var(--border);margin-bottom:12px">
+        <span style="font-family:var(--mono);font-size:12px;color:var(--text-3)">12</span>
+        <h2 style="margin:0;font-size:22px;font-weight:600;letter-spacing:-0.015em">Tree primitives</h2>
+      </div>
+      <p style="margin:0 0 24px;font-size:14px;line-height:1.65;color:var(--text-2);max-width:70ch">The tree is the product. These primitives are tuned for a canvas that may hold 10,000 nodes: fixed row height, no per-node shadow at rest, connectors drawn as one SVG layer beneath the node layer, and virtualised rendering outside the viewport.</p>
+
+      <div style="background:var(--tree-canvas);border:1px solid var(--border);border-radius:var(--r-lg);padding:32px;margin-bottom:20px">
+        <div style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);margin-bottom:22px">Node states — 40px row, 8px radius</div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:20px 24px">
+          <div>
+            <div style="height:40px;background:var(--tree-node);border:1px solid var(--tree-node-border);border-radius:var(--r-md);display:flex;align-items:center;padding:0 12px;font-family:var(--font-ar);font-size:14px;font-weight:500;box-shadow:var(--shadow-low)">محمود</div>
+            <div style="font-family:var(--mono);font-size:11px;color:var(--text-3);margin-top:8px">default</div>
+          </div>
+          <div>
+            <div style="height:40px;background:var(--surface);border:1px solid var(--border-strong);border-radius:var(--r-md);display:flex;align-items:center;justify-content:space-between;padding:0 12px;font-family:var(--font-ar);font-size:14px;font-weight:500;box-shadow:var(--shadow-med)">محمود
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#79838B" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>
+            </div>
+            <div style="font-family:var(--mono);font-size:11px;color:var(--text-3);margin-top:8px">hover — reveals ⋮</div>
+          </div>
+          <div>
+            <div style="height:40px;background:var(--primary-subtle);border:1.5px solid var(--primary);border-radius:var(--r-md);display:flex;align-items:center;padding:0 12px;font-family:var(--font-ar);font-size:14px;font-weight:600;color:var(--primary-active);box-shadow:var(--shadow-med)">محمود</div>
+            <div style="font-family:var(--mono);font-size:11px;color:var(--text-3);margin-top:8px">selected</div>
+          </div>
+          <div>
+            <div style="height:40px;background:var(--tree-node);border:1px solid var(--tree-node-border);border-radius:var(--r-md);display:flex;align-items:center;padding:0 12px;font-family:var(--font-ar);font-size:14px;font-weight:500;outline:2px solid var(--primary);outline-offset:2px">محمود</div>
+            <div style="font-family:var(--mono);font-size:11px;color:var(--text-3);margin-top:8px">keyboard focus</div>
+          </div>
+          <div>
+            <div style="height:40px;background:var(--tree-highlight);border:1px solid #D9B36A;border-radius:var(--r-md);display:flex;align-items:center;padding:0 12px;font-family:var(--font-ar);font-size:14px;font-weight:600;color:#5E410A">محمود</div>
+            <div style="font-family:var(--mono);font-size:11px;color:var(--text-3);margin-top:8px">search match</div>
+          </div>
+          <div>
+            <div style="height:40px;background:var(--tree-node);border:1px solid var(--tree-node-border);border-radius:var(--r-md);display:flex;align-items:center;justify-content:space-between;padding:0 8px 0 12px;font-family:var(--font-ar);font-size:14px;font-weight:500">محمود
+              <span style="height:20px;min-width:20px;padding:0 6px;border-radius:var(--r-pill);background:var(--sunken);color:var(--text-2);font-family:var(--mono);font-size:11px;display:inline-flex;align-items:center;justify-content:center">7</span>
+            </div>
+            <div style="font-family:var(--mono);font-size:11px;color:var(--text-3);margin-top:8px">has children (expanded)</div>
+          </div>
+          <div>
+            <div style="height:40px;background:var(--tree-node);border:1px solid var(--tree-node-border);border-radius:var(--r-md);display:flex;align-items:center;justify-content:space-between;padding:0 8px 0 12px;font-family:var(--font-ar);font-size:14px;font-weight:500;border-bottom:3px solid var(--border-strong)">محمود
+              <span style="height:20px;min-width:20px;padding:0 6px;border-radius:var(--r-pill);background:var(--primary-subtle);color:var(--primary-hover);font-family:var(--mono);font-size:11px;display:inline-flex;align-items:center;justify-content:center">+7</span>
+            </div>
+            <div style="font-family:var(--mono);font-size:11px;color:var(--text-3);margin-top:8px">collapsed — stacked edge</div>
+          </div>
+          <div>
+            <div style="height:40px;background:var(--surface);border:1.5px dashed var(--primary);border-radius:var(--r-md);display:flex;align-items:center;padding:0 12px;font-family:var(--font-ar);font-size:14px;font-weight:500;color:var(--primary-hover);opacity:.75">محمود</div>
+            <div style="font-family:var(--mono);font-size:11px;color:var(--text-3);margin-top:8px">being moved</div>
+          </div>
+          <div>
+            <div style="height:40px;background:var(--sunken);border:1px solid var(--border);border-radius:var(--r-md);display:flex;align-items:center;padding:0 12px;font-size:14px;color:var(--text-disabled)">—</div>
+            <div style="font-family:var(--mono);font-size:11px;color:var(--text-3);margin-top:8px">skeleton / loading</div>
+          </div>
+          <div>
+            <div style="height:40px;background:var(--tree-node);border:1px solid var(--tree-node-border);border-radius:var(--r-md);display:flex;align-items:center;padding:0 12px;font-family:var(--font-ar);font-size:14px;font-weight:500;opacity:.4">محمود</div>
+            <div style="font-family:var(--mono);font-size:11px;color:var(--text-3);margin-top:8px">dimmed (out of search)</div>
+          </div>
+          <div>
+            <div style="height:40px;background:var(--primary);border:1px solid var(--primary-active);border-radius:var(--r-md);display:flex;align-items:center;padding:0 14px;font-family:var(--font-ar);font-size:14px;font-weight:600;color:#fff">عائلة السقّا</div>
+            <div style="font-family:var(--mono);font-size:11px;color:var(--text-3);margin-top:8px">root family</div>
+          </div>
+          <div>
+            <div style="height:40px;background:var(--error-subtle);border:1px solid #E0B3AC;border-radius:var(--r-md);display:flex;align-items:center;gap:8px;padding:0 12px;font-size:13px;color:var(--error)">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#AF3A2E" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="8"></circle><path d="M12 8v5M12 16h0"></path></svg>Failed to load
+            </div>
+            <div style="font-family:var(--mono);font-size:11px;color:var(--text-3);margin-top:8px">branch error</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1.15fr 1fr;gap:20px">
+        <div style="background:var(--tree-canvas);border:1px solid var(--border);border-radius:var(--r-lg);padding:28px" dir="rtl">
+          <div style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);margin-bottom:20px;direction:ltr;text-align:right">Connectors — indented lineage, RTL</div>
+          <div style="display:inline-block;min-width:280px">
+            <div style="height:40px;background:var(--primary);border-radius:var(--r-md);display:flex;align-items:center;padding:0 14px;font-family:var(--font-ar);font-size:14px;font-weight:600;color:#fff;margin-bottom:6px">عائلة السقّا</div>
+            <div style="border-inline-start:1.5px solid var(--tree-connector);margin-inline-start:20px;padding-inline-start:18px;display:flex;flex-direction:column;gap:6px;padding-top:6px">
+              <div style="height:36px;background:var(--tree-node);border:1px solid var(--tree-node-border);border-radius:var(--r-md);display:flex;align-items:center;justify-content:space-between;padding:0 10px 0 12px;font-family:var(--font-ar);font-size:14px">سليمان
+                <span style="height:18px;min-width:18px;padding:0 6px;border-radius:var(--r-pill);background:var(--sunken);color:var(--text-2);font-family:var(--mono);font-size:10px;display:inline-flex;align-items:center;justify-content:center">2</span>
+              </div>
+              <div style="border-inline-start:1.5px solid var(--tree-connector);margin-inline-start:16px;padding-inline-start:18px;display:flex;flex-direction:column;gap:6px">
+                <div style="height:36px;background:var(--tree-node);border:1px solid var(--tree-node-border);border-radius:var(--r-md);display:flex;align-items:center;padding:0 12px;font-family:var(--font-ar);font-size:14px">فارس</div>
+                <div style="height:36px;background:var(--primary-subtle);border:1.5px solid var(--primary);border-radius:var(--r-md);display:flex;align-items:center;padding:0 12px;font-family:var(--font-ar);font-size:14px;font-weight:600;color:var(--primary-active)">يوسف</div>
+              </div>
+              <div style="height:36px;background:var(--tree-node);border:1px solid var(--tree-node-border);border-radius:var(--r-md);display:flex;align-items:center;justify-content:space-between;padding:0 10px 0 12px;font-family:var(--font-ar);font-size:14px;border-bottom:3px solid var(--border-strong)">عمر
+                <span style="height:18px;min-width:18px;padding:0 6px;border-radius:var(--r-pill);background:var(--primary-subtle);color:var(--primary-hover);font-family:var(--mono);font-size:10px;display:inline-flex;align-items:center;justify-content:center">+14</span>
+              </div>
+              <div style="height:36px;background:var(--tree-node);border:1px solid var(--tree-node-border);border-radius:var(--r-md);display:flex;align-items:center;padding:0 12px;font-family:var(--font-ar);font-size:14px">أحمد</div>
+            </div>
+          </div>
+          <div style="margin-top:22px;font-size:13px;line-height:1.7;color:var(--text-2);max-width:46ch">الفروع تُرسم كخط عمودي واحد لكل أب مع وصلات أفقية للأبناء. يبدأ الخط من جهة اليمين في الواجهة العربية ومن جهة اليسار في الإنجليزية.</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:20px">
+          <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:24px">
+            <div style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);margin-bottom:16px">Tree toolbar</div>
+            <div style="display:inline-flex;flex-direction:column;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);box-shadow:var(--shadow-med);overflow:hidden">
+              <button style="width:40px;height:40px;border:none;border-bottom:1px solid var(--divider);background:var(--surface);display:flex;align-items:center;justify-content:center;cursor:pointer"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#4C555C" stroke-width="1.7" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg></button>
+              <button style="width:40px;height:40px;border:none;border-bottom:1px solid var(--divider);background:var(--surface);display:flex;align-items:center;justify-content:center;cursor:pointer"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#4C555C" stroke-width="1.7" stroke-linecap="round"><path d="M5 12h14"></path></svg></button>
+              <button style="width:40px;height:40px;border:none;border-bottom:1px solid var(--divider);background:var(--surface);display:flex;align-items:center;justify-content:center;cursor:pointer"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#4C555C" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"></path></svg></button>
+              <button style="width:40px;height:40px;border:none;background:var(--surface);display:flex;align-items:center;justify-content:center;cursor:pointer"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#4C555C" stroke-width="1.7" stroke-linecap="round"><rect x="9" y="3" width="6" height="4" rx="1"></rect><path d="M12 7v5M6 20v-4M18 20v-4M6 16h12"></path></svg></button>
+            </div>
+            <div style="margin-top:14px;font-size:13px;line-height:1.6;color:var(--text-2)">Zoom in · Zoom out · Fit to screen · Center on root. Docked bottom-inline-end, 24px inset, never over the root node. Keyboard: <span style="font-family:var(--mono);font-size:12px">+ / − / F / R</span>.</div>
+          </div>
+          <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:24px">
+            <div style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);margin-bottom:14px">Large-tree rules</div>
+            <div style="display:flex;flex-direction:column;gap:10px;font-size:13px;line-height:1.6;color:var(--text-2)">
+              <div>Below 40% zoom, node labels drop to a density block and only generation bands stay labelled.</div>
+              <div>Branches deeper than generation 3 load collapsed; a <span style="font-family:var(--mono);font-size:12px">+n</span> chip states the hidden count.</div>
+              <div>Expanding a branch of more than 200 children pages at 100 with a “Show 100 more” row.</div>
+              <div>Search always wins: selecting a result expands the ancestor chain, centers, and highlights for 2s.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="data" style="margin-bottom:72px">
+      <div style="display:flex;align-items:baseline;gap:12px;padding-bottom:12px;border-bottom:1px solid var(--border);margin-bottom:28px">
+        <span style="font-family:var(--mono);font-size:12px;color:var(--text-3)">09</span>
+        <h2 style="margin:0;font-size:22px;font-weight:600;letter-spacing:-0.015em">Data display</h2>
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px">
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:20px">
+          <div style="font-size:12px;color:var(--text-3);margin-bottom:10px">Members</div>
+          <div style="font-size:32px;font-weight:600;letter-spacing:-0.02em;line-height:1">1,248</div>
+          <div style="font-size:12px;color:var(--success);margin-top:8px">+12 this week</div>
+        </div>
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:20px">
+          <div style="font-size:12px;color:var(--text-3);margin-bottom:10px">Generations</div>
+          <div style="font-size:32px;font-weight:600;letter-spacing:-0.02em;line-height:1">7</div>
+          <div style="font-size:12px;color:var(--text-3);margin-top:8px">Deepest branch: عمر</div>
+        </div>
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:20px">
+          <div style="font-size:12px;color:var(--text-3);margin-bottom:10px">First generation</div>
+          <div style="font-size:32px;font-weight:600;letter-spacing:-0.02em;line-height:1">6</div>
+          <div style="font-size:12px;color:var(--text-3);margin-top:8px">Direct under family</div>
+        </div>
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:20px">
+          <div style="font-size:12px;color:var(--text-3);margin-bottom:10px">Public sharing</div>
+          <div style="display:flex;align-items:center;gap:8px;margin-top:6px">
+            <span style="width:8px;height:8px;border-radius:50%;background:var(--success);display:inline-block"></span>
+            <span style="font-size:20px;font-weight:600">Active</span>
+          </div>
+          <div style="font-size:12px;color:var(--text-3);margin-top:8px">Link created 4 Aug 2026</div>
+        </div>
+      </div>
+
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;margin-bottom:24px">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border)">
+          <div style="font-size:15px;font-weight:600">Users</div>
+          <div style="display:flex;gap:8px">
+            <div style="height:32px;width:220px;border:1px solid var(--border-strong);border-radius:var(--r-md);display:flex;align-items:center;gap:8px;padding:0 10px">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#79838B" stroke-width="1.7" stroke-linecap="round"><circle cx="11" cy="11" r="6"></circle><path d="M15.5 15.5 20 20"></path></svg>
+              <span style="font-size:13px;color:var(--text-3)">Search users…</span>
+            </div>
+            <button style="height:32px;padding:0 14px;border:none;border-radius:var(--r-md);background:var(--primary);color:#fff;font-family:inherit;font-size:13px;font-weight:500;cursor:pointer">Add user</button>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1.4fr 1.6fr 1fr .8fr 1fr 100px;gap:16px;padding:10px 20px;background:var(--sunken);border-bottom:1px solid var(--border);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3)">
+          <div>Name</div><div>Email</div><div>Role</div><div>Status</div><div>Last login</div><div>Actions</div>
+        </div>
+        <div style="display:grid;grid-template-columns:1.4fr 1.6fr 1fr .8fr 1fr 100px;gap:16px;padding:14px 20px;border-bottom:1px solid var(--divider);align-items:center;font-size:13px">
+          <div style="display:flex;align-items:center;gap:10px"><span style="width:28px;height:28px;border-radius:50%;background:var(--primary-subtle);color:var(--primary-hover);font-size:11px;font-weight:600;display:inline-flex;align-items:center;justify-content:center">أح</span>أحمد السقّا</div>
+          <div style="color:var(--text-2)">ahmed@saqqa.family</div>
+          <div><span style="font-size:12px;padding:3px 8px;border-radius:var(--r-sm);background:var(--primary-subtle);color:var(--primary-hover);font-weight:500">Administrator</span></div>
+          <div><span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--success)"><span style="width:6px;height:6px;border-radius:50%;background:var(--success)"></span>Active</span></div>
+          <div style="color:var(--text-2)">2 hours ago</div>
+          <div style="color:var(--text-3)">⋮</div>
+        </div>
+        <div style="display:grid;grid-template-columns:1.4fr 1.6fr 1fr .8fr 1fr 100px;gap:16px;padding:14px 20px;border-bottom:1px solid var(--divider);align-items:center;font-size:13px;background:var(--sunken)">
+          <div style="display:flex;align-items:center;gap:10px"><span style="width:28px;height:28px;border-radius:50%;background:var(--sunken);color:var(--text-2);font-size:11px;font-weight:600;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--border)">مح</span>محمود فارس</div>
+          <div style="color:var(--text-2)">mahmoud@saqqa.family</div>
+          <div><span style="font-size:12px;padding:3px 8px;border-radius:var(--r-sm);background:var(--sunken);color:var(--text-2);font-weight:500;border:1px solid var(--border)">Editor</span></div>
+          <div><span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--text-2)"><span style="width:6px;height:6px;border-radius:50%;background:var(--text-disabled)"></span>Invited</span></div>
+          <div style="color:var(--text-3)">Never</div>
+          <div style="color:var(--text-3)">⋮</div>
+        </div>
+        <div style="display:grid;grid-template-columns:1.4fr 1.6fr 1fr .8fr 1fr 100px;gap:16px;padding:14px 20px;align-items:center;font-size:13px">
+          <div style="display:flex;align-items:center;gap:10px"><span style="width:28px;height:28px;border-radius:50%;background:var(--sunken);color:var(--text-disabled);font-size:11px;font-weight:600;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--border)">يو</span><span style="color:var(--text-disabled)">يوسف عمر</span></div>
+          <div style="color:var(--text-disabled)">youssef@saqqa.family</div>
+          <div><span style="font-size:12px;padding:3px 8px;border-radius:var(--r-sm);background:var(--sunken);color:var(--text-disabled);font-weight:500;border:1px solid var(--border)">Viewer</span></div>
+          <div><span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--text-disabled)"><span style="width:6px;height:6px;border-radius:50%;border:1.5px solid var(--text-disabled)"></span>Deactivated</span></div>
+          <div style="color:var(--text-disabled)">14 Jun 2026</div>
+          <div style="color:var(--text-3)">⋮</div>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-top:1px solid var(--border);font-size:13px;color:var(--text-2)">
+          <div>1–3 of 24</div>
+          <div style="display:flex;gap:4px">
+            <button style="width:30px;height:30px;border:1px solid var(--border);border-radius:var(--r-sm);background:var(--surface);color:var(--text-disabled);cursor:not-allowed">‹</button>
+            <button style="width:30px;height:30px;border:1px solid var(--primary);border-radius:var(--r-sm);background:var(--primary-subtle);color:var(--primary-hover);font-family:inherit;font-size:13px;cursor:pointer">1</button>
+            <button style="width:30px;height:30px;border:1px solid var(--border);border-radius:var(--r-sm);background:var(--surface);font-family:inherit;font-size:13px;cursor:pointer">2</button>
+            <button style="width:30px;height:30px;border:1px solid var(--border);border-radius:var(--r-sm);background:var(--surface);font-family:inherit;font-size:13px;cursor:pointer">3</button>
+            <button style="width:30px;height:30px;border:1px solid var(--border);border-radius:var(--r-sm);background:var(--surface);font-family:inherit;font-size:13px;cursor:pointer">›</button>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px">
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:24px">
+          <div style="font-family:var(--mono);font-size:11px;color:var(--text-3);margin-bottom:16px">empty state</div>
+          <div style="text-align:center;padding:20px 8px">
+            <div style="width:44px;height:44px;border-radius:var(--r-md);background:var(--sunken);margin:0 auto 14px;display:flex;align-items:center;justify-content:center">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#79838B" stroke-width="1.6" stroke-linecap="round"><rect x="9" y="3" width="6" height="4" rx="1"></rect><path d="M12 7v5M6 20v-4M18 20v-4M6 16h12"></path></svg>
+            </div>
+            <div style="font-size:15px;font-weight:600;margin-bottom:6px">No family members yet</div>
+            <div style="font-size:13px;line-height:1.6;color:var(--text-2);margin-bottom:16px">Start building your family tree by adding the first generation.</div>
+            <button style="height:36px;padding:0 16px;border:none;border-radius:var(--r-md);background:var(--primary);color:#fff;font-family:inherit;font-size:13px;font-weight:500;cursor:pointer">Add first member</button>
+          </div>
+        </div>
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:24px">
+          <div style="font-family:var(--mono);font-size:11px;color:var(--text-3);margin-bottom:16px">skeleton</div>
+          <div style="display:flex;flex-direction:column;gap:12px">
+            <div style="height:14px;width:60%;border-radius:var(--r-sm);background:linear-gradient(90deg,#EDEFF1 0%,#F6F7F8 50%,#EDEFF1 100%);background-size:400px 100%;animation:shimmer 1.4s infinite linear"></div>
+            <div style="height:14px;width:85%;border-radius:var(--r-sm);background:linear-gradient(90deg,#EDEFF1 0%,#F6F7F8 50%,#EDEFF1 100%);background-size:400px 100%;animation:shimmer 1.4s infinite linear"></div>
+            <div style="height:14px;width:40%;border-radius:var(--r-sm);background:linear-gradient(90deg,#EDEFF1 0%,#F6F7F8 50%,#EDEFF1 100%);background-size:400px 100%;animation:shimmer 1.4s infinite linear"></div>
+            <div style="height:40px;border-radius:var(--r-md);background:linear-gradient(90deg,#EDEFF1 0%,#F6F7F8 50%,#EDEFF1 100%);background-size:400px 100%;animation:shimmer 1.4s infinite linear;margin-top:6px"></div>
+          </div>
+          <div style="font-size:12px;line-height:1.6;color:var(--text-3);margin-top:16px">Skeletons mirror the real layout box-for-box. Never a full-page spinner for a partial update.</div>
+        </div>
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:24px">
+          <div style="font-family:var(--mono);font-size:11px;color:var(--text-3);margin-bottom:16px">badges &amp; avatars</div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:18px">
+            <span style="font-size:12px;padding:3px 8px;border-radius:var(--r-sm);background:var(--primary-subtle);color:var(--primary-hover);font-weight:500">Administrator</span>
+            <span style="font-size:12px;padding:3px 8px;border-radius:var(--r-sm);background:var(--success-subtle);color:var(--success);font-weight:500">Active</span>
+            <span style="font-size:12px;padding:3px 8px;border-radius:var(--r-sm);background:var(--warning-subtle);color:var(--warning);font-weight:500">Invited</span>
+            <span style="font-size:12px;padding:3px 8px;border-radius:var(--r-sm);background:var(--error-subtle);color:var(--error);font-weight:500">Revoked</span>
+            <span style="font-size:12px;padding:3px 8px;border-radius:var(--r-sm);background:var(--sunken);color:var(--text-2);font-weight:500;border:1px solid var(--border)">Custom role</span>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <span style="width:24px;height:24px;border-radius:50%;background:var(--primary-subtle);color:var(--primary-hover);font-size:10px;font-weight:600;display:inline-flex;align-items:center;justify-content:center">أح</span>
+            <span style="width:32px;height:32px;border-radius:50%;background:var(--primary-subtle);color:var(--primary-hover);font-size:12px;font-weight:600;display:inline-flex;align-items:center;justify-content:center">أح</span>
+            <span style="width:40px;height:40px;border-radius:50%;background:var(--primary);color:#fff;font-size:14px;font-weight:600;display:inline-flex;align-items:center;justify-content:center">أح</span>
+            <span style="font-family:var(--mono);font-size:11px;color:var(--text-3);margin-inline-start:6px">24 / 32 / 40</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="overlays" style="margin-bottom:72px">
+      <div style="display:flex;align-items:baseline;gap:12px;padding-bottom:12px;border-bottom:1px solid var(--border);margin-bottom:28px">
+        <span style="font-family:var(--mono);font-size:12px;color:var(--text-3)">10</span>
+        <h2 style="margin:0;font-size:22px;font-weight:600;letter-spacing:-0.015em">Overlays</h2>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px">
+        <div style="background:var(--sunken);border:1px solid var(--border);border-radius:var(--r-lg);padding:28px;display:flex;align-items:center;justify-content:center">
+          <div style="width:100%;max-width:380px;background:var(--surface);border-radius:var(--r-lg);box-shadow:var(--shadow-high);overflow:hidden">
+            <div style="padding:20px 24px 0">
+              <div style="display:flex;gap:12px;align-items:flex-start">
+                <div style="width:36px;height:36px;border-radius:var(--r-md);background:var(--error-subtle);display:flex;align-items:center;justify-content:center;flex:0 0 36px">
+                  <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#AF3A2E" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13"></path></svg>
+                </div>
+                <div>
+                  <div style="font-size:17px;font-weight:600;margin-bottom:8px">Delete محمود?</div>
+                  <div style="font-size:14px;line-height:1.6;color:var(--text-2)">This member has no children. Deleting removes him from the family tree permanently. This action cannot be undone.</div>
+                </div>
+              </div>
+            </div>
+            <div style="display:flex;justify-content:flex-end;gap:8px;padding:20px 24px 20px">
+              <button style="height:36px;padding:0 16px;border:1px solid var(--border-strong);border-radius:var(--r-md);background:var(--surface);color:var(--text-1);font-family:inherit;font-size:13px;font-weight:500;cursor:pointer">Cancel</button>
+              <button style="height:36px;padding:0 16px;border:none;border-radius:var(--r-md);background:var(--error);color:#fff;font-family:inherit;font-size:13px;font-weight:500;cursor:pointer">Delete member</button>
+            </div>
+          </div>
+        </div>
+        <div style="background:var(--sunken);border:1px solid var(--border);border-radius:var(--r-lg);padding:28px;display:flex;align-items:center;justify-content:center">
+          <div style="width:100%;max-width:380px;background:var(--surface);border-radius:var(--r-lg);box-shadow:var(--shadow-high);overflow:hidden">
+            <div style="padding:20px 24px 0">
+              <div style="display:flex;gap:12px;align-items:flex-start">
+                <div style="width:36px;height:36px;border-radius:var(--r-md);background:var(--warning-subtle);display:flex;align-items:center;justify-content:center;flex:0 0 36px">
+                  <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#8A5D06" stroke-width="1.8" stroke-linecap="round"><rect x="5" y="11" width="14" height="9" rx="2"></rect><path d="M8 11V8a4 4 0 0 1 8 0v3"></path></svg>
+                </div>
+                <div>
+                  <div style="font-size:17px;font-weight:600;margin-bottom:8px">Can't delete محمود</div>
+                  <div style="font-size:14px;line-height:1.6;color:var(--text-2);margin-bottom:12px">He has <b>7 children</b> in the tree. Move or delete his descendants first, or move him elsewhere instead.</div>
+                  <div style="border:1px solid var(--border);border-radius:var(--r-md);padding:10px 12px;font-family:var(--font-ar);font-size:13px;line-height:1.9;color:var(--text-2);background:var(--sunken)">علي · حسن · محمود · فارس · عمر · خالد · يوسف</div>
+                </div>
+              </div>
+            </div>
+            <div style="display:flex;justify-content:flex-end;gap:8px;padding:20px 24px">
+              <button style="height:36px;padding:0 16px;border:1px solid var(--border-strong);border-radius:var(--r-md);background:var(--surface);font-family:inherit;font-size:13px;font-weight:500;cursor:pointer">Close</button>
+              <button style="height:36px;padding:0 16px;border:none;border-radius:var(--r-md);background:var(--primary);color:#fff;font-family:inherit;font-size:13px;font-weight:500;cursor:pointer">Move instead</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1.2fr 1fr;gap:20px">
+        <div style="background:var(--sunken);border:1px solid var(--border);border-radius:var(--r-lg);padding:0;overflow:hidden;display:flex;justify-content:flex-end;min-height:320px">
+          <div style="width:320px;background:var(--surface);border-inline-start:1px solid var(--border);box-shadow:var(--shadow-high);padding:20px" dir="rtl">
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:18px">
+              <div>
+                <div style="font-family:var(--font-ar);font-size:19px;font-weight:600;line-height:1.3">محمود السقّا</div>
+                <div style="font-size:12px;color:var(--text-3);margin-top:4px;font-family:var(--font-ar)">الجيل الرابع</div>
+              </div>
+              <button style="width:28px;height:28px;border:none;background:transparent;color:var(--text-3);font-size:16px;cursor:pointer">✕</button>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:14px;font-family:var(--font-ar)">
+              <div style="display:flex;justify-content:space-between;padding-bottom:12px;border-bottom:1px solid var(--divider)"><span style="font-size:13px;color:var(--text-3)">الأب</span><span style="font-size:14px">أحمد</span></div>
+              <div style="display:flex;justify-content:space-between;padding-bottom:12px;border-bottom:1px solid var(--divider)"><span style="font-size:13px;color:var(--text-3)">الأبناء</span><span style="font-size:14px">٧</span></div>
+              <div style="display:flex;justify-content:space-between;padding-bottom:12px;border-bottom:1px solid var(--divider)"><span style="font-size:13px;color:var(--text-3)">أُضيف</span><span style="font-size:14px">١٢ أغسطس ٢٠٢٦</span></div>
+              <div style="display:flex;justify-content:space-between"><span style="font-size:13px;color:var(--text-3)">آخر تعديل</span><span style="font-size:14px">١٦ أغسطس ٢٠٢٦</span></div>
+            </div>
+            <div style="display:flex;gap:8px;margin-top:22px;flex-wrap:wrap">
+              <button style="height:36px;padding:0 14px;border:none;border-radius:var(--r-md);background:var(--primary);color:#fff;font-family:var(--font-ar);font-size:13px;font-weight:500;cursor:pointer">إضافة ابن</button>
+              <button style="height:36px;padding:0 14px;border:1px solid var(--border-strong);border-radius:var(--r-md);background:var(--surface);font-family:var(--font-ar);font-size:13px;font-weight:500;cursor:pointer">تعديل</button>
+              <button style="height:36px;padding:0 14px;border:1px solid var(--border-strong);border-radius:var(--r-md);background:var(--surface);font-family:var(--font-ar);font-size:13px;font-weight:500;cursor:pointer">نقل</button>
+            </div>
+            <div style="margin-top:12px;font-family:var(--font-ar);font-size:12px;color:var(--text-3)">الحذف غير متاح — يتطلب صلاحية Member.Delete</div>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:16px">
+          <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);box-shadow:var(--shadow-med);padding:12px 14px;display:flex;gap:10px;align-items:flex-start">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1C7A4D" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="flex:0 0 18px;margin-top:1px"><circle cx="12" cy="12" r="8"></circle><path d="M8.5 12.2l2.4 2.4 4.6-4.9"></path></svg>
+            <div><div style="font-size:13px;font-weight:600">Invitation sent</div><div style="font-size:12px;color:var(--text-2);margin-top:2px">mahmoud@saqqa.family will receive an email.</div></div>
+          </div>
+          <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);box-shadow:var(--shadow-med);padding:12px 14px;display:flex;gap:10px;align-items:flex-start">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#AF3A2E" stroke-width="1.8" stroke-linecap="round" style="flex:0 0 18px;margin-top:1px"><circle cx="12" cy="12" r="8"></circle><path d="M12 8v5M12 16h0"></path></svg>
+            <div><div style="font-size:13px;font-weight:600">Couldn't move member</div><div style="font-size:12px;color:var(--text-2);margin-top:2px">We couldn't reach the server. Nothing was changed.</div><button style="margin-top:8px;height:28px;padding:0 10px;border:1px solid var(--border-strong);border-radius:var(--r-sm);background:var(--surface);font-family:inherit;font-size:12px;cursor:pointer">Try again</button></div>
+          </div>
+          <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);box-shadow:var(--shadow-med);width:180px;overflow:hidden">
+            <div style="padding:8px 12px;font-size:13px;cursor:pointer">View details</div>
+            <div style="padding:8px 12px;font-size:13px;cursor:pointer">Edit</div>
+            <div style="padding:8px 12px;font-size:13px;cursor:pointer">Add child</div>
+            <div style="padding:8px 12px;font-size:13px;cursor:pointer">Move</div>
+            <div style="height:1px;background:var(--divider)"></div>
+            <div style="padding:8px 12px;font-size:13px;color:var(--text-disabled);display:flex;align-items:center;gap:8px;cursor:not-allowed">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#A9B1B8" stroke-width="1.9" stroke-linecap="round"><rect x="5" y="11" width="14" height="9" rx="2"></rect><path d="M8 11V8a4 4 0 0 1 8 0v3"></path></svg>Delete
+            </div>
+          </div>
+          <div style="font-size:12px;line-height:1.6;color:var(--text-3)">Toasts: bottom-inline-end, 4s, dismissible, never for destructive confirmation. Menus: 180px min, med elevation, close on Escape, focus returns to trigger.</div>
+        </div>
+      </div>
+    </section>
+
+    <section id="nav" style="margin-bottom:72px">
+      <div style="display:flex;align-items:baseline;gap:12px;padding-bottom:12px;border-bottom:1px solid var(--border);margin-bottom:28px">
+        <span style="font-family:var(--mono);font-size:12px;color:var(--text-3)">11</span>
+        <h2 style="margin:0;font-size:22px;font-weight:600;letter-spacing:-0.015em">Navigation</h2>
+      </div>
+      <div style="display:grid;grid-template-columns:264px 1fr;gap:20px">
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:18px 14px" dir="rtl">
+          <div style="display:flex;align-items:center;gap:10px;padding:0 8px;margin-bottom:20px">
+            <div style="width:26px;height:26px;border-radius:var(--r-sm);background:var(--primary)"></div>
+            <div style="font-family:var(--font-ar);font-size:14px;font-weight:600">عائلة السقّا</div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:2px;font-family:var(--font-ar);font-size:14px">
+            <div style="display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:var(--r-md);color:var(--text-2)"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#4C555C" stroke-width="1.7" stroke-linecap="round"><rect x="4" y="4" width="7" height="7" rx="1.5"></rect><rect x="13" y="4" width="7" height="7" rx="1.5"></rect><rect x="4" y="13" width="7" height="7" rx="1.5"></rect><rect x="13" y="13" width="7" height="7" rx="1.5"></rect></svg>لوحة المعلومات</div>
+            <div style="display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:var(--r-md);background:var(--primary-subtle);color:var(--primary-hover);font-weight:600"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#0B4A4E" stroke-width="1.8" stroke-linecap="round"><rect x="9" y="3" width="6" height="4" rx="1"></rect><path d="M12 7v5M6 20v-4M18 20v-4M6 16h12"></path></svg>شجرة العائلة</div>
+            <div style="display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:var(--r-md);color:var(--text-2)"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#4C555C" stroke-width="1.7" stroke-linecap="round"><path d="M5 6h14M5 12h14M5 18h14"></path></svg>الأفراد</div>
+            <div style="display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:var(--r-md);color:var(--text-2)"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#4C555C" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"></circle><path d="M3 19c0-3.3 2.7-5 6-5s6 1.7 6 5M17 8h4M19 6v4"></path></svg>المستخدمون</div>
+            <div style="display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:var(--r-md);color:var(--text-2)"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#4C555C" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v6c0 4-3 7.5-7 9-4-1.5-7-5-7-9V6z"></path></svg>الأدوار والصلاحيات</div>
+            <div style="display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:var(--r-md);color:var(--text-2)"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#4C555C" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="8"></circle><path d="M12 7.5V12l3 2"></path></svg>سجل التغييرات</div>
+            <div style="display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:var(--r-md);color:var(--text-2)"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#4C555C" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="17" cy="6" r="2.5"></circle><circle cx="7" cy="12" r="2.5"></circle><circle cx="17" cy="18" r="2.5"></circle><path d="M9.2 10.8 14.8 7.2M9.2 13.2l5.6 3.6"></path></svg>المشاركة العامة<span style="margin-inline-start:auto;width:6px;height:6px;border-radius:50%;background:var(--success)"></span></div>
+            <div style="height:1px;background:var(--divider);margin:8px 0"></div>
+            <div style="display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:var(--r-md);color:var(--text-2)"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#4C555C" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="3"></circle><path d="M12 3v3M12 18v3M3 12h3M18 12h3"></path></svg>الإعدادات</div>
+          </div>
+          <div style="margin-top:16px;padding:10px;border-radius:var(--r-md);background:var(--sunken);font-family:var(--font-ar);font-size:11px;line-height:1.6;color:var(--text-3)">يظهر القسم فقط إذا كانت الصلاحية ممنوحة — «الأدوار» مخفي عن المحرّر.</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:20px">
+          <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:20px 24px">
+            <div style="font-family:var(--mono);font-size:11px;color:var(--text-3);margin-bottom:16px">app header</div>
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;padding-bottom:16px;border-bottom:1px solid var(--divider)">
+              <div style="display:flex;align-items:center;gap:12px">
+                <div style="font-size:17px;font-weight:600">Al-Saqqa Family</div>
+                <span style="font-size:12px;padding:3px 8px;border-radius:var(--r-sm);background:var(--sunken);color:var(--text-2);border:1px solid var(--border)">1,248 members</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px">
+                <div style="height:34px;width:220px;border:1px solid var(--border-strong);border-radius:var(--r-md);display:flex;align-items:center;gap:8px;padding:0 10px">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#79838B" stroke-width="1.7" stroke-linecap="round"><circle cx="11" cy="11" r="6"></circle><path d="M15.5 15.5 20 20"></path></svg>
+                  <span style="font-size:13px;color:var(--text-3)">Search members…</span>
+                  <span style="margin-inline-start:auto;font-family:var(--mono);font-size:10px;color:var(--text-3);border:1px solid var(--border);border-radius:3px;padding:1px 4px">⌘K</span>
+                </div>
+                <button style="height:34px;padding:0 12px;border:1px solid var(--border-strong);border-radius:var(--r-md);background:var(--surface);font-family:inherit;font-size:13px;cursor:pointer">العربية</button>
+                <span style="width:32px;height:32px;border-radius:50%;background:var(--primary-subtle);color:var(--primary-hover);font-size:12px;font-weight:600;display:inline-flex;align-items:center;justify-content:center">أح</span>
+              </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-2);padding-top:14px">
+              <span>Family tree</span><span style="color:var(--text-3)">/</span><span>عمر</span><span style="color:var(--text-3)">/</span><span style="color:var(--text-1);font-weight:500">محمود</span>
+            </div>
+          </div>
+          <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:20px 24px">
+            <div style="font-family:var(--mono);font-size:11px;color:var(--text-3);margin-bottom:16px">tabs</div>
+            <div style="display:flex;gap:24px;border-bottom:1px solid var(--border)">
+              <div style="padding-bottom:10px;border-bottom:2px solid var(--primary);color:var(--primary-hover);font-size:14px;font-weight:600;margin-bottom:-1px">Account</div>
+              <div style="padding-bottom:10px;color:var(--text-2);font-size:14px">Family tree</div>
+              <div style="padding-bottom:10px;color:var(--text-2);font-size:14px">Security</div>
+              <div style="padding-bottom:10px;color:var(--text-disabled);font-size:14px;display:flex;align-items:center;gap:6px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#A9B1B8" stroke-width="1.9" stroke-linecap="round"><rect x="5" y="11" width="14" height="9" rx="2"></rect><path d="M8 11V8a4 4 0 0 1 8 0v3"></path></svg>Public sharing</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="feedback" style="margin-bottom:72px">
+      <div style="display:flex;align-items:baseline;gap:12px;padding-bottom:12px;border-bottom:1px solid var(--border);margin-bottom:28px">
+        <span style="font-family:var(--mono);font-size:12px;color:var(--text-3)">13</span>
+        <h2 style="margin:0;font-size:22px;font-weight:600;letter-spacing:-0.015em">Feedback &amp; error states</h2>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">
+        <div style="background:var(--info-subtle);border:1px solid #C3D6E9;border-radius:var(--r-md);padding:14px 16px;display:flex;gap:12px">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1E5C99" stroke-width="1.8" stroke-linecap="round" style="flex:0 0 18px;margin-top:1px"><circle cx="12" cy="12" r="8"></circle><path d="M12 11v5M12 8h0"></path></svg>
+          <div style="font-size:13px;line-height:1.6;color:#153F69"><b>Read-only.</b> Your role can view the family tree but not change it.</div>
+        </div>
+        <div style="background:var(--warning-subtle);border:1px solid #E8D6AC;border-radius:var(--r-md);padding:14px 16px;display:flex;gap:12px">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8A5D06" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="flex:0 0 18px;margin-top:1px"><path d="M12 4 2.5 20h19z"></path><path d="M12 10v4M12 17h0"></path></svg>
+          <div style="font-size:13px;line-height:1.6;color:#5E410A"><b>A member named محمود already exists under أحمد.</b> Add him anyway, or pick a different name.</div>
+        </div>
+        <div style="background:var(--error-subtle);border:1px solid #E0B3AC;border-radius:var(--r-md);padding:14px 16px;display:flex;gap:12px">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#AF3A2E" stroke-width="1.8" stroke-linecap="round" style="flex:0 0 18px;margin-top:1px"><circle cx="12" cy="12" r="8"></circle><path d="M12 8v5M12 16h0"></path></svg>
+          <div style="font-size:13px;line-height:1.6;color:#7A281F"><b>We couldn't save this member.</b> Check your connection and try again — nothing was lost.</div>
+        </div>
+        <div style="background:var(--success-subtle);border:1px solid #B9DDC8;border-radius:var(--r-md);padding:14px 16px;display:flex;gap:12px">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1C7A4D" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="flex:0 0 18px;margin-top:1px"><circle cx="12" cy="12" r="8"></circle><path d="M8.5 12.2l2.4 2.4 4.6-4.9"></path></svg>
+          <div style="font-size:13px;line-height:1.6;color:#145234"><b>محمود was moved to خالد.</b> 7 descendants moved with him.</div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px">
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:28px 24px;text-align:center">
+          <div style="font-size:15px;font-weight:600;margin-bottom:8px">Something went wrong</div>
+          <div style="font-size:13px;line-height:1.6;color:var(--text-2);margin-bottom:16px">We couldn't load the family tree. Try again in a moment.</div>
+          <button style="height:36px;padding:0 16px;border:1px solid var(--border-strong);border-radius:var(--r-md);background:var(--surface);font-family:inherit;font-size:13px;font-weight:500;cursor:pointer">Reload tree</button>
+          <div style="font-family:var(--mono);font-size:11px;color:var(--text-3);margin-top:14px">Ref: 8f21c4</div>
+        </div>
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:28px 24px;text-align:center">
+          <div style="font-size:15px;font-weight:600;margin-bottom:8px">You don't have access</div>
+          <div style="font-size:13px;line-height:1.6;color:var(--text-2);margin-bottom:16px">Your role doesn't include <span style="font-family:var(--mono);font-size:12px">User.View</span>. Ask an administrator if you need it.</div>
+          <button style="height:36px;padding:0 16px;border:1px solid var(--border-strong);border-radius:var(--r-md);background:var(--surface);font-family:inherit;font-size:13px;font-weight:500;cursor:pointer">Back to tree</button>
+        </div>
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:28px 24px;text-align:center">
+          <div style="font-size:15px;font-weight:600;margin-bottom:8px">Your session expired</div>
+          <div style="font-size:13px;line-height:1.6;color:var(--text-2);margin-bottom:16px">Sign in again to keep working. Unsaved changes in this form are kept.</div>
+          <button style="height:36px;padding:0 16px;border:none;border-radius:var(--r-md);background:var(--primary);color:#fff;font-family:inherit;font-size:13px;font-weight:500;cursor:pointer">Sign in</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="rtl" style="margin-bottom:72px">
+      <div style="display:flex;align-items:baseline;gap:12px;padding-bottom:12px;border-bottom:1px solid var(--border);margin-bottom:28px">
+        <span style="font-family:var(--mono);font-size:12px;color:var(--text-3)">14</span>
+        <h2 style="margin:0;font-size:22px;font-weight:600;letter-spacing:-0.015em">RTL &amp; internationalization</h2>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px">
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:22px">
+          <div style="font-family:var(--mono);font-size:11px;color:var(--text-3);margin-bottom:16px">dir="ltr" · en</div>
+          <div style="border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden">
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:1px solid var(--divider)">
+              <div style="font-size:14px;font-weight:600">Move member</div>
+              <span style="color:var(--text-3)">✕</span>
+            </div>
+            <div style="padding:14px">
+              <div style="font-size:13px;color:var(--text-2);margin-bottom:10px">Mahmoud → new parent</div>
+              <div style="height:36px;border:1px solid var(--border-strong);border-radius:var(--r-md);display:flex;align-items:center;gap:8px;padding:0 10px;font-size:13px;color:var(--text-3)">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#79838B" stroke-width="1.7" stroke-linecap="round"><circle cx="11" cy="11" r="6"></circle><path d="M15.5 15.5 20 20"></path></svg>Search family members…
+              </div>
+              <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px">
+                <button style="height:32px;padding:0 12px;border:1px solid var(--border-strong);border-radius:var(--r-md);background:var(--surface);font-family:inherit;font-size:13px;cursor:pointer">Cancel</button>
+                <button style="height:32px;padding:0 12px;border:none;border-radius:var(--r-md);background:var(--primary);color:#fff;font-family:inherit;font-size:13px;cursor:pointer">Review move</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:22px" dir="rtl">
+          <div style="font-family:var(--mono);font-size:11px;color:var(--text-3);margin-bottom:16px;direction:ltr;text-align:right">dir="rtl" · ar</div>
+          <div style="border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;font-family:var(--font-ar)">
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:1px solid var(--divider)">
+              <div style="font-size:14px;font-weight:600">نقل فرد</div>
+              <span style="color:var(--text-3)">✕</span>
+            </div>
+            <div style="padding:14px">
+              <div style="font-size:13px;color:var(--text-2);margin-bottom:10px">محمود ← الأب الجديد</div>
+              <div style="height:36px;border:1px solid var(--border-strong);border-radius:var(--r-md);display:flex;align-items:center;gap:8px;padding:0 10px;font-size:13px;color:var(--text-3)">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#79838B" stroke-width="1.7" stroke-linecap="round"><circle cx="11" cy="11" r="6"></circle><path d="M15.5 15.5 20 20"></path></svg>ابحث في أفراد العائلة…
+              </div>
+              <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px">
+                <button style="height:32px;padding:0 12px;border:1px solid var(--border-strong);border-radius:var(--r-md);background:var(--surface);font-family:var(--font-ar);font-size:13px;cursor:pointer">إلغاء</button>
+                <button style="height:32px;padding:0 12px;border:none;border-radius:var(--r-md);background:var(--primary);color:#fff;font-family:var(--font-ar);font-size:13px;cursor:pointer">مراجعة النقل</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:24px;display:grid;grid-template-columns:1fr 1fr;gap:24px">
+        <div>
+          <div style="font-size:13px;font-weight:600;margin-bottom:10px">Mirrors</div>
+          <div style="font-size:13px;line-height:1.8;color:var(--text-2)">Layout axis · sidebar side · table column order · drawer edge · chevrons and arrows · progress and breadcrumb direction · tree growth direction · toolbar inset.</div>
+        </div>
+        <div>
+          <div style="font-size:13px;font-weight:600;margin-bottom:10px">Does not mirror</div>
+          <div style="font-size:13px;line-height:1.8;color:var(--text-2)">Search glass · clock · trash · media controls · logos · phone numbers and email addresses · code and URLs (always LTR-isolated with <span style="font-family:var(--mono);font-size:12px">bdi</span>).</div>
+        </div>
+        <div style="grid-column:1/-1;padding-top:16px;border-top:1px solid var(--divider);font-size:13px;line-height:1.7;color:var(--text-2)">Every label is a translation key; no layout depends on a string's length. Buttons size to content with a min-width, tables use fractional columns, and numerals follow locale (Arabic-Indic in Arabic UI, Latin in English) while IDs and timestamps stay Latin.</div>
+      </div>
+    </section>
+
+    <section id="a11y" style="margin-bottom:72px">
+      <div style="display:flex;align-items:baseline;gap:12px;padding-bottom:12px;border-bottom:1px solid var(--border);margin-bottom:28px">
+        <span style="font-family:var(--mono);font-size:12px;color:var(--text-3)">15</span>
+        <h2 style="margin:0;font-size:22px;font-weight:600;letter-spacing:-0.015em">Accessibility</h2>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:24px">
+          <div style="font-size:13px;font-weight:600;margin-bottom:12px">Tree as a real widget</div>
+          <div style="font-size:13px;line-height:1.75;color:var(--text-2)">The canvas is a <span style="font-family:var(--mono);font-size:12px">role="tree"</span> with <span style="font-family:var(--mono);font-size:12px">treeitem</span> nodes carrying <span style="font-family:var(--mono);font-size:12px">aria-expanded</span>, <span style="font-family:var(--mono);font-size:12px">aria-level</span> and <span style="font-family:var(--mono);font-size:12px">aria-setsize</span>. Arrow keys walk siblings and generations, <span style="font-family:var(--mono);font-size:12px">Enter</span> opens the member panel, <span style="font-family:var(--mono);font-size:12px">Space</span> toggles a branch, and a live region announces “محمود, generation 4, 7 children, collapsed”.</div>
+        </div>
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:24px">
+          <div style="font-size:13px;font-weight:600;margin-bottom:12px">Rules that hold everywhere</div>
+          <div style="font-size:13px;line-height:1.75;color:var(--text-2)">Focus is always visible at 2px with a 3:1 contrast against both surface and background. Dialogs trap focus and return it on close. Status is never color-only — it always pairs with a glyph or word. Errors are tied to inputs with <span style="font-family:var(--mono);font-size:12px">aria-describedby</span>. Every icon-only control has an accessible name in the active locale.</div>
+        </div>
+      </div>
+    </section>
+
+    <section id="motion" style="margin-bottom:72px">
+      <div style="display:flex;align-items:baseline;gap:12px;padding-bottom:12px;border-bottom:1px solid var(--border);margin-bottom:28px">
+        <span style="font-family:var(--mono);font-size:12px;color:var(--text-3)">16</span>
+        <h2 style="margin:0;font-size:22px;font-weight:600;letter-spacing:-0.015em">Motion</h2>
+      </div>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden">
+        <div style="display:grid;grid-template-columns:1.2fr 1fr 1fr 1.6fr;gap:16px;padding:12px 20px;background:var(--sunken);border-bottom:1px solid var(--border);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3)">
+          <div>Event</div><div>Duration</div><div>Easing</div><div>Property</div>
+        </div>
+        <div style="display:grid;grid-template-columns:1.2fr 1fr 1fr 1.6fr;gap:16px;padding:12px 20px;border-bottom:1px solid var(--divider);font-size:13px;color:var(--text-2)"><div style="color:var(--text-1)">Node selection</div><div style="font-family:var(--mono);font-size:12px">120ms</div><div style="font-family:var(--mono);font-size:12px">standard</div><div>border-color, background</div></div>
+        <div style="display:grid;grid-template-columns:1.2fr 1fr 1fr 1.6fr;gap:16px;padding:12px 20px;border-bottom:1px solid var(--divider);font-size:13px;color:var(--text-2)"><div style="color:var(--text-1)">Branch expand</div><div style="font-family:var(--mono);font-size:12px">180ms</div><div style="font-family:var(--mono);font-size:12px">standard</div><div>opacity + 4px translate, staggered 12ms</div></div>
+        <div style="display:grid;grid-template-columns:1.2fr 1fr 1fr 1.6fr;gap:16px;padding:12px 20px;border-bottom:1px solid var(--divider);font-size:13px;color:var(--text-2)"><div style="color:var(--text-1)">Search focus fly-to</div><div style="font-family:var(--mono);font-size:12px">260ms</div><div style="font-family:var(--mono);font-size:12px">standard</div><div>canvas transform, then 2s highlight hold</div></div>
+        <div style="display:grid;grid-template-columns:1.2fr 1fr 1fr 1.6fr;gap:16px;padding:12px 20px;border-bottom:1px solid var(--divider);font-size:13px;color:var(--text-2)"><div style="color:var(--text-1)">Drawer / panel</div><div style="font-family:var(--mono);font-size:12px">180ms</div><div style="font-family:var(--mono);font-size:12px">standard</div><div>inline-end translate + backdrop fade</div></div>
+        <div style="display:grid;grid-template-columns:1.2fr 1fr 1fr 1.6fr;gap:16px;padding:12px 20px;font-size:13px;color:var(--text-2)"><div style="color:var(--text-1)">Toast</div><div style="font-family:var(--mono);font-size:12px">180ms in / 120ms out</div><div style="font-family:var(--mono);font-size:12px">standard</div><div>opacity + 8px rise</div></div>
+      </div>
+      <div style="margin-top:16px;font-size:13px;line-height:1.6;color:var(--text-2)">Under <span style="font-family:var(--mono);font-size:12px">prefers-reduced-motion</span> every transition collapses to an instant state change; the search fly-to jumps rather than pans, and the highlight hold remains so the result is still findable.</div>
+    </section>
+
+    <section id="handoff" style="margin-bottom:24px">
+      <div style="display:flex;align-items:baseline;gap:12px;padding-bottom:12px;border-bottom:1px solid var(--border);margin-bottom:28px">
+        <span style="font-family:var(--mono);font-size:12px;color:var(--text-3)">17</span>
+        <h2 style="margin:0;font-size:22px;font-weight:600;letter-spacing:-0.015em">Handoff — token export</h2>
+      </div>
+      <div style="background:#101416;border-radius:var(--r-lg);padding:24px 28px;overflow-x:auto">
+        <pre style="margin:0;font-family:var(--mono);font-size:12px;line-height:1.85;color:#C9D4D6">:root {
+  --color-primary: #0E5C60;      --color-primary-hover: #0B4A4E;
+  --color-primary-active: #083A3D; --color-primary-subtle: #E5EFEF;
+  --color-background: #F6F7F8;   --color-surface: #FFFFFF;
+  --color-surface-sunken: #F0F2F4;
+  --color-border: #E0E4E7;       --color-border-strong: #C9CFD4;
+  --color-text-primary: #15181B; --color-text-secondary: #4C555C;
+  --color-text-muted: #79838B;   --color-text-disabled: #A9B1B8;
+  --color-success: #1C7A4D;      --color-warning: #8A5D06;
+  --color-error: #AF3A2E;        --color-info: #1E5C99;
+  --color-tree-canvas: #FAFBFB;  --color-tree-connector: #C4CBD1;
+  --color-tree-highlight: #F5D9A0;
+
+  --space-1: 4px;  --space-2: 8px;  --space-3: 12px; --space-4: 16px;
+  --space-5: 20px; --space-6: 24px; --space-8: 32px; --space-10: 40px;
+  --space-12: 48px; --space-16: 64px;
+
+  --radius-sm: 4px; --radius-md: 8px; --radius-lg: 12px;
+  --radius-xl: 16px; --radius-pill: 999px;
+
+  --shadow-low: 0 1px 2px rgb(21 24 27 / .06), 0 1px 1px rgb(21 24 27 / .04);
+  --shadow-med: 0 2px 4px rgb(21 24 27 / .05), 0 8px 16px -6px rgb(21 24 27 / .10);
+  --shadow-high: 0 4px 8px rgb(21 24 27 / .05), 0 24px 48px -12px rgb(21 24 27 / .16);
+
+  --z-canvas: 0; --z-sticky: 100; --z-drawer: 300;
+  --z-modal: 400; --z-popover: 500; --z-toast: 600;
+
+  --motion-fast: 120ms; --motion-base: 180ms; --motion-slow: 260ms;
+  --ease-standard: cubic-bezier(.2, 0, 0, 1);
+
+  --control-h-sm: 32px; --control-h-md: 36px; --control-h-lg: 44px;
+  --node-h: 40px; --node-min-w: 120px; --node-max-w: 240px;
+}</pre>
+      </div>
+      <div style="margin-top:20px;background:var(--primary-subtle);border:1px solid var(--primary-border);border-radius:var(--r-md);padding:16px 20px;font-size:13px;line-height:1.7;color:#0A3E41">
+        Direction handling: never use <span style="font-family:var(--mono);font-size:12px">left/right</span> in component CSS. Use <span style="font-family:var(--mono);font-size:12px">margin-inline-start</span>, <span style="font-family:var(--mono);font-size:12px">padding-inline-end</span>, <span style="font-family:var(--mono);font-size:12px">inset-inline-*</span> and logical border properties throughout, and set <span style="font-family:var(--mono);font-size:12px">dir</span> once on <span style="font-family:var(--mono);font-size:12px">&lt;html&gt;</span>. The tree canvas mirrors by negating its x-axis transform, not by re-laying-out nodes.
+      </div>
+    </section>
+
+  </main>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;accent&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;default&quot;:&quot;#0E5C60&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;options&quot;:[&quot;#0E5C60&quot;,&quot;#2C4A63&quot;,&quot;#4A4438&quot;,&quot;#3A5140&quot;],&quot;section&quot;:&quot;Theme&quot;}}">
+class Component extends DCLogic {
+  componentDidMount() { this.apply(); }
+  componentDidUpdate() { this.apply(); }
+  apply() {
+    const r = document.documentElement.style;
+    if (this.props.accent) {
+      r.setProperty('--primary', this.props.accent);
+    }
+  }
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

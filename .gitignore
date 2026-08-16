@@ -36,3 +36,9 @@ Thumbs.db
 
 # SDD workspace (scratch, not source)
 .superpowers/
+
+# Playwright MCP session artifacts
+.playwright-mcp/
+
+# Design handoff archive (the extracted bundle in design/ is the tracked copy)
+*-handoff.zip

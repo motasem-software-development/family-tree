@@ -1,21 +1,12 @@
-import { useTranslation } from 'react-i18next'
-import { LanguageSwitcher } from '../components/LanguageSwitcher'
 import { useDirection } from '../i18n/useDirection'
 import { AppRoutes } from '../routes/AppRoutes'
 
+/**
+ * Chrome lives in AppShell, which each authenticated screen wraps itself in — the login screen
+ * deliberately has none. App's only jobs are keeping <html dir> in step and rendering routes.
+ */
 export const App = () => {
-  const { t } = useTranslation()
   useDirection()
 
-  return (
-    <>
-      <header>
-        <h1>{t('app.title')}</h1>
-        <LanguageSwitcher />
-      </header>
-      <main>
-        <AppRoutes />
-      </main>
-    </>
-  )
+  return <AppRoutes />
 }
