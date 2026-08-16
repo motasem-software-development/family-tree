@@ -188,6 +188,13 @@ JWT access token (15 minutes) plus a refresh token stored **hashed** in `refresh
 with rotation on use and a revocation flag. One row per device, so "sign out everywhere" and
 forced revocation on account deactivation both work.
 
+**No email in V1** — a consequence of having no signup and no background job system. This
+makes user provisioning and password recovery administrator-driven: a user with
+`User.Create` creates the account and sets an initial password, which the new user changes at
+first login; password reset is likewise performed by an administrator. Identity's
+token-based email flows are left unwired rather than removed, so adding SMTP later is a
+configuration and endpoint change, not a redesign.
+
 ### 4.3 Authorization
 
 Permission-based, never role-name-based. Each permission code from SRS §21 is registered as
