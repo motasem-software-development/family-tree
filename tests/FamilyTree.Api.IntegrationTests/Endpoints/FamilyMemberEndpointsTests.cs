@@ -54,11 +54,16 @@ public sealed class FamilyMemberEndpointsTests(PostgresFixture fixture) : IAsync
     [Theory]
     [InlineData("GET", "/api/v1/family-members")]
     [InlineData("POST", "/api/v1/family-members")]
+    [InlineData("GET", "/api/v1/family-members/0199a0b1-0000-7000-8000-000000000001")]
+    [InlineData("PUT", "/api/v1/family-members/0199a0b1-0000-7000-8000-000000000001")]
+    [InlineData("DELETE", "/api/v1/family-members/0199a0b1-0000-7000-8000-000000000001")]
     public async Task Endpoints_require_authentication(string method, string path)
     {
         var request = new HttpRequestMessage(new HttpMethod(method), path);
         if (method == "POST")
             request.Content = JsonContent.Create(new CreateFamilyMemberRequest("فارس", null));
+        if (method == "PUT")
+            request.Content = JsonContent.Create(new UpdateFamilyMemberRequest("فارس", 1));
 
         var response = await _client.SendAsync(request);
 
