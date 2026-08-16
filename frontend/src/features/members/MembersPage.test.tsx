@@ -163,6 +163,22 @@ describe('MembersPage', () => {
     await waitFor(() => expect(membersApi.list).toHaveBeenCalledTimes(2))
   })
 
+  it('keeps the edit form open with the user input intact on a validation error', async () => {
+    const user = userEvent.setup()
+    vi.mocked(membersApi.update).mockRejectedValue(new ApiError('MEMBER_NAME_TOO_LONG', 400))
+    renderPage()
+    await screen.findByText('سليمان')
+
+    await user.click(screen.getByRole('button', { name: i18n.t('members.edit') }))
+    const nameField = screen.getByLabelText(i18n.t('members.name'))
+    await user.clear(nameField)
+    await user.type(nameField, 'سليمان أحمد')
+    await user.click(screen.getByRole('button', { name: i18n.t('members.save') }))
+
+    expect(await screen.findByText(i18n.t('errors.MEMBER_NAME_TOO_LONG'))).toBeInTheDocument()
+    expect(screen.getByLabelText(i18n.t('members.name'))).toBeInTheDocument()
+  })
+
   it('hides add, edit, and delete controls without permission', async () => {
     permissive = false
     renderPage()

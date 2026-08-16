@@ -40,12 +40,17 @@ export function MembersPage() {
       {
         onSuccess: close,
         onError: (error) => {
-          setErrorCode(codeOf(error))
+          const code = codeOf(error)
+          setErrorCode(code)
           // A CONCURRENCY_CONFLICT means the form is holding a stale version — retrying
-          // against it just reproduces the same 409. Refetch so the next open gets the
-          // current version, and close the form so the user re-opens it against fresh data.
-          void queryClient.invalidateQueries({ queryKey: memberKeys.all })
-          close()
+          // against it just reproduces the same 409, so refetch and close so the next open
+          // gets the current version. Any other error (e.g. a validation failure) means the
+          // form is holding input the user still needs to fix — closing it would discard
+          // their edit for no benefit, so leave it open.
+          if (code === 'CONCURRENCY_CONFLICT') {
+            void queryClient.invalidateQueries({ queryKey: memberKeys.all })
+            close()
+          }
         },
       },
     )
