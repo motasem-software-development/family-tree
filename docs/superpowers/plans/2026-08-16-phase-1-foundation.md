@@ -1528,4 +1528,523 @@ git commit -m "feat: add DbContext, entity configurations, and initial migration
 
 ---
 
-*Tasks 6–12 are appended in the sections that follow.*
+### Task 6: Integration test harness and the tenant isolation proof
+
+This is the most important test in Phase 1. Everything else in the system assumes it holds.
+
+**Files:**
+- Create: `tests/FamilyTree.Api.IntegrationTests/Fixtures/PostgresFixture.cs`, `Fixtures/StubTenantContext.cs`, `Fixtures/DatabaseTestBase.cs`
+- Test: `tests/FamilyTree.Api.IntegrationTests/Persistence/TenantIsolationTests.cs`
+
+**Interfaces:**
+- Consumes: `ApplicationDbContext`, `ITenantContext`, `Tenant`, `FamilyTreeAggregate`, `Role` from Tasks 2–5.
+- Produces:
+  - `PostgresFixture : IAsyncLifetime` — `string ConnectionString { get; }`, registered as an xUnit collection fixture named `"postgres"`.
+  - `StubTenantContext(Guid tenantId, Guid userId) : ITenantContext` — lets a test act as a specific tenant.
+  - `DatabaseTestBase` — `ApplicationDbContext ContextFor(Guid tenantId)` and `Task ResetAsync()`.
+
+- [ ] **Step 1: Add the integration test packages**
+
+```bash
+dotnet add tests/FamilyTree.Api.IntegrationTests package Testcontainers.PostgreSql
+dotnet add tests/FamilyTree.Api.IntegrationTests package Microsoft.AspNetCore.Mvc.Testing
+dotnet add tests/FamilyTree.Api.IntegrationTests package Microsoft.EntityFrameworkCore.Design
+dotnet add tests/FamilyTree.Api.IntegrationTests reference src/FamilyTree.Infrastructure
+```
+
+- [ ] **Step 2: Write the container fixture**
+
+Create `tests/FamilyTree.Api.IntegrationTests/Fixtures/PostgresFixture.cs`:
+
+```csharp
+using Testcontainers.PostgreSql;
+
+namespace FamilyTree.Api.IntegrationTests.Fixtures;
+
+/// <summary>
+/// One real PostgreSQL container shared by the whole test collection. Real Postgres, never the
+/// in-memory provider — recursive CTEs, composite foreign keys, and transaction behavior do not
+/// exist in a fake, and those are exactly what these tests verify.
+/// </summary>
+public sealed class PostgresFixture : IAsyncLifetime
+{
+    private readonly PostgreSqlContainer _container = new PostgreSqlBuilder()
+        .WithImage("postgres:17-alpine")
+        .WithDatabase("familytree_test")
+        .WithUsername("test")
+        .WithPassword("test")
+        .Build();
+
+    public string ConnectionString => _container.GetConnectionString();
+
+    public async ValueTask InitializeAsync() => await _container.StartAsync();
+
+    public async ValueTask DisposeAsync() => await _container.DisposeAsync();
+}
+
+[CollectionDefinition("postgres")]
+public sealed class PostgresCollection : ICollectionFixture<PostgresFixture>;
+```
+
+- [ ] **Step 3: Write the tenant context stub and the test base**
+
+Create `tests/FamilyTree.Api.IntegrationTests/Fixtures/StubTenantContext.cs`:
+
+```csharp
+using FamilyTree.Application.Common;
+
+namespace FamilyTree.Api.IntegrationTests.Fixtures;
+
+public sealed class StubTenantContext(Guid tenantId, Guid userId) : ITenantContext
+{
+    public Guid TenantId { get; } = tenantId;
+    public Guid UserId { get; } = userId;
+    public bool IsAuthenticated => TenantId != Guid.Empty;
+}
+```
+
+Create `tests/FamilyTree.Api.IntegrationTests/Fixtures/DatabaseTestBase.cs`:
+
+```csharp
+using FamilyTree.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
+
+namespace FamilyTree.Api.IntegrationTests.Fixtures;
+
+[Collection("postgres")]
+public abstract class DatabaseTestBase(PostgresFixture fixture) : IAsyncLifetime
+{
+    protected static readonly DateTimeOffset Now = new(2026, 8, 16, 12, 0, 0, TimeSpan.Zero);
+
+    /// <summary>
+    /// A context scoped to one tenant. Passing Guid.Empty models an unauthenticated caller,
+    /// which must see nothing.
+    /// </summary>
+    protected ApplicationDbContext ContextFor(Guid tenantId)
+    {
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseNpgsql(fixture.ConnectionString)
+            .UseSnakeCaseNamingConvention()
+            .Options;
+
+        return new ApplicationDbContext(options, new StubTenantContext(tenantId, Guid.CreateVersion7()));
+    }
+
+    public async ValueTask InitializeAsync()
+    {
+        await using var context = ContextFor(Guid.Empty);
+        await context.Database.EnsureDeletedAsync();
+        await context.Database.MigrateAsync();
+    }
+
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+}
+```
+
+Each test class gets a freshly migrated database. That is slower than truncating tables, but it also verifies the migration applies cleanly on every run — worth the seconds at this size.
+
+- [ ] **Step 4: Write the failing isolation tests**
+
+Create `tests/FamilyTree.Api.IntegrationTests/Persistence/TenantIsolationTests.cs`:
+
+```csharp
+using FluentAssertions;
+using FamilyTree.Api.IntegrationTests.Fixtures;
+using FamilyTree.Domain.Authorization;
+using FamilyTree.Domain.FamilyTrees;
+using FamilyTree.Domain.Tenants;
+using Microsoft.EntityFrameworkCore;
+
+namespace FamilyTree.Api.IntegrationTests.Persistence;
+
+public sealed class TenantIsolationTests(PostgresFixture fixture) : DatabaseTestBase(fixture)
+{
+    private async Task<(Guid TenantA, Guid TenantB)> SeedTwoTenantsAsync()
+    {
+        // Seeding runs through an unfiltered context; production seeds exactly one tenant,
+        // but the isolation guarantee is untestable with fewer than two (spec §6).
+        await using var context = ContextFor(Guid.Empty);
+
+        var a = Tenant.Create("Al-Saqqa Family", "al-saqqa", Now);
+        var b = Tenant.Create("Al-Hassan Family", "al-hassan", Now);
+        context.Tenants.AddRange(a, b);
+
+        context.FamilyTrees.AddRange(
+            FamilyTreeAggregate.Create(a.Id, "عائلة السقا", Now),
+            FamilyTreeAggregate.Create(b.Id, "عائلة الحسن", Now));
+
+        context.Roles.AddRange(
+            Role.CreateSystem(a.Id, "Super Admin", null, Now),
+            Role.CreateSystem(b.Id, "Super Admin", null, Now));
+
+        await context.SaveChangesAsync();
+        return (a.Id, b.Id);
+    }
+
+    [Fact]
+    public async Task A_tenant_sees_only_its_own_family_tree()
+    {
+        var (tenantA, _) = await SeedTwoTenantsAsync();
+
+        await using var context = ContextFor(tenantA);
+        var trees = await context.FamilyTrees.ToListAsync();
+
+        trees.Should().ContainSingle();
+        trees[0].TenantId.Should().Be(tenantA);
+        trees[0].Name.Should().Be("عائلة السقا");
+    }
+
+    [Fact]
+    public async Task Fetching_another_tenants_tree_by_its_exact_id_returns_null()
+    {
+        var (tenantA, tenantB) = await SeedTwoTenantsAsync();
+
+        Guid foreignTreeId;
+        await using (var unfiltered = ContextFor(Guid.Empty))
+        {
+            foreignTreeId = await unfiltered.FamilyTrees
+                .IgnoreQueryFilters()
+                .Where(x => x.TenantId == tenantB)
+                .Select(x => x.Id)
+                .SingleAsync();
+        }
+
+        await using var context = ContextFor(tenantA);
+        var found = await context.FamilyTrees.FirstOrDefaultAsync(x => x.Id == foreignTreeId);
+
+        // Null is what lets the endpoint layer answer 404 rather than 403 — a 403 would
+        // confirm the id exists, which is itself a disclosure.
+        found.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Roles_are_scoped_to_the_requesting_tenant()
+    {
+        var (tenantA, _) = await SeedTwoTenantsAsync();
+
+        await using var context = ContextFor(tenantA);
+        var roles = await context.Roles.ToListAsync();
+
+        roles.Should().ContainSingle().Which.TenantId.Should().Be(tenantA);
+    }
+
+    [Fact]
+    public async Task An_unauthenticated_context_sees_no_tenant_owned_rows()
+    {
+        await SeedTwoTenantsAsync();
+
+        await using var context = ContextFor(Guid.Empty);
+
+        // Fails closed: an empty tenant id matches no row rather than matching every row.
+        (await context.FamilyTrees.CountAsync()).Should().Be(0);
+        (await context.Roles.CountAsync()).Should().Be(0);
+    }
+
+    [Fact]
+    public async Task The_permission_catalog_is_visible_regardless_of_tenant()
+    {
+        await SeedTwoTenantsAsync();
+
+        await using (var seed = ContextFor(Guid.Empty))
+        {
+            seed.Permissions.Add(Permission.Create(Permissions.Member.View, "View members", Now));
+            await seed.SaveChangesAsync();
+        }
+
+        await using var context = ContextFor(Guid.CreateVersion7());
+        (await context.Permissions.CountAsync()).Should().Be(1);
+    }
+
+    [Fact]
+    public async Task One_tenant_cannot_own_two_family_trees()
+    {
+        var (tenantA, _) = await SeedTwoTenantsAsync();
+
+        await using var context = ContextFor(Guid.Empty);
+        context.FamilyTrees.Add(FamilyTreeAggregate.Create(tenantA, "A Second Tree", Now));
+
+        var act = () => context.SaveChangesAsync();
+
+        // BR-001 enforced by the unique index on tenant_id, not by service code.
+        await act.Should().ThrowAsync<DbUpdateException>();
+    }
+}
+```
+
+- [ ] **Step 5: Run the tests to verify they fail**
+
+Run: `dotnet test tests/FamilyTree.Api.IntegrationTests`
+Expected: compilation failure — the fixtures do not exist yet if steps 2–3 were skipped; otherwise all six tests run and any missing filter shows up as a specific assertion failure.
+
+Docker must be running. If the container cannot start, fix that before continuing — falling back to a local database or an in-memory provider defeats the purpose of these tests.
+
+- [ ] **Step 6: Run the tests to verify they pass**
+
+Run: `dotnet test tests/FamilyTree.Api.IntegrationTests`
+Expected: PASS — 6 tests. First run pulls the `postgres:17-alpine` image and takes noticeably longer.
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add tests/FamilyTree.Api.IntegrationTests
+git commit -m "test: prove tenant isolation against real postgres"
+```
+
+---
+
+### Task 7: JWT issuance and refresh token rotation
+
+**Files:**
+- Create: `src/FamilyTree.Infrastructure/Auth/JwtOptions.cs`, `Auth/JwtTokenService.cs`
+- Create: `src/FamilyTree.Application/Auth/ITokenService.cs`
+- Test: `tests/FamilyTree.Application.Tests/Auth/JwtTokenServiceTests.cs`
+
+**Interfaces:**
+- Consumes: `ApplicationUser` (Task 5), `HttpTenantContext.TenantIdClaim` (Task 5).
+- Produces:
+  - `record AccessToken(string Value, DateTimeOffset ExpiresAt)`
+  - `record RefreshTokenPair(string RawToken, string TokenHash)`
+  - `interface ITokenService` — `AccessToken CreateAccessToken(Guid userId, Guid tenantId, string email, IReadOnlyCollection<string> permissions)`, `RefreshTokenPair CreateRefreshToken()`, `string HashRefreshToken(string rawToken)`.
+
+- [ ] **Step 1: Add the JWT packages**
+
+```bash
+dotnet add src/FamilyTree.Infrastructure package Microsoft.IdentityModel.JsonWebTokens
+dotnet add src/FamilyTree.Api package Microsoft.AspNetCore.Authentication.JwtBearer
+dotnet add tests/FamilyTree.Application.Tests reference src/FamilyTree.Infrastructure
+dotnet add tests/FamilyTree.Application.Tests package Microsoft.IdentityModel.JsonWebTokens
+dotnet add tests/FamilyTree.Application.Tests package Microsoft.Extensions.Options
+```
+
+- [ ] **Step 2: Write the failing tests**
+
+Create `tests/FamilyTree.Application.Tests/Auth/JwtTokenServiceTests.cs`:
+
+```csharp
+using System.Security.Claims;
+using FluentAssertions;
+using FamilyTree.Application.Auth;
+using FamilyTree.Infrastructure.Auth;
+using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.JsonWebTokens;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
+
+namespace FamilyTree.Application.Tests.Auth;
+
+public class JwtTokenServiceTests
+{
+    private const string SigningKey = "test-signing-key-that-is-at-least-32-bytes-long!!";
+    private static readonly DateTimeOffset Now = new(2026, 8, 16, 12, 0, 0, TimeSpan.Zero);
+    private static readonly Guid UserId = Guid.CreateVersion7();
+    private static readonly Guid TenantId = Guid.CreateVersion7();
+
+    private static JwtTokenService CreateService() =>
+        new(Options.Create(new JwtOptions
+        {
+            Issuer = "https://localhost:5001",
+            Audience = "familytree-api",
+            SigningKey = SigningKey,
+            AccessTokenLifetimeMinutes = 15,
+            RefreshTokenLifetimeDays = 14
+        }), TimeProvider.System);
+
+    private static JsonWebToken Parse(string token) => new JsonWebTokenHandler().ReadJsonWebToken(token);
+
+    [Fact]
+    public void CreateAccessToken_embeds_the_user_tenant_and_permissions()
+    {
+        var token = CreateService().CreateAccessToken(
+            UserId, TenantId, "admin@example.com", ["Member.View", "Member.Create"]);
+
+        var jwt = Parse(token.Value);
+
+        jwt.GetClaim(ClaimTypes.NameIdentifier).Value.Should().Be(UserId.ToString());
+        jwt.GetClaim("tenant_id").Value.Should().Be(TenantId.ToString());
+        jwt.Claims.Where(c => c.Type == "permission").Select(c => c.Value)
+           .Should().BeEquivalentTo("Member.View", "Member.Create");
+    }
+
+    [Fact]
+    public void CreateAccessToken_expires_in_fifteen_minutes()
+    {
+        var token = CreateService().CreateAccessToken(UserId, TenantId, "admin@example.com", []);
+
+        token.ExpiresAt.Should().BeCloseTo(DateTimeOffset.UtcNow.AddMinutes(15), TimeSpan.FromSeconds(5));
+    }
+
+    [Fact]
+    public void CreateAccessToken_produces_a_token_that_validates_against_the_signing_key()
+    {
+        var token = CreateService().CreateAccessToken(UserId, TenantId, "admin@example.com", []);
+
+        var result = new JsonWebTokenHandler().ValidateTokenAsync(token.Value, new TokenValidationParameters
+        {
+            ValidIssuer = "https://localhost:5001",
+            ValidAudience = "familytree-api",
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(SigningKey)),
+            ValidateIssuerSigningKey = true
+        }).GetAwaiter().GetResult();
+
+        result.IsValid.Should().BeTrue();
+    }
+
+    [Fact]
+    public void CreateRefreshToken_returns_a_raw_token_and_its_hash_which_differ()
+    {
+        var pair = CreateService().CreateRefreshToken();
+
+        pair.RawToken.Should().NotBeNullOrWhiteSpace();
+        pair.TokenHash.Should().NotBeNullOrWhiteSpace();
+        pair.TokenHash.Should().NotBe(pair.RawToken, "only the hash is ever persisted");
+    }
+
+    [Fact]
+    public void CreateRefreshToken_never_repeats_a_value()
+    {
+        var service = CreateService();
+
+        var tokens = Enumerable.Range(0, 100).Select(_ => service.CreateRefreshToken().RawToken).ToArray();
+
+        tokens.Should().OnlyHaveUniqueItems();
+    }
+
+    [Fact]
+    public void HashRefreshToken_is_deterministic_so_a_presented_token_can_be_looked_up()
+    {
+        var service = CreateService();
+        var pair = service.CreateRefreshToken();
+
+        service.HashRefreshToken(pair.RawToken).Should().Be(pair.TokenHash);
+    }
+}
+```
+
+- [ ] **Step 3: Run the tests to verify they fail**
+
+Run: `dotnet test tests/FamilyTree.Application.Tests`
+Expected: compilation failure — `JwtOptions`, `JwtTokenService`, and `ITokenService` do not exist.
+
+- [ ] **Step 4: Write the token service contract**
+
+Create `src/FamilyTree.Application/Auth/ITokenService.cs`:
+
+```csharp
+namespace FamilyTree.Application.Auth;
+
+public sealed record AccessToken(string Value, DateTimeOffset ExpiresAt);
+
+/// <summary>The raw token goes to the client exactly once; only the hash is persisted.</summary>
+public sealed record RefreshTokenPair(string RawToken, string TokenHash);
+
+public interface ITokenService
+{
+    AccessToken CreateAccessToken(
+        Guid userId, Guid tenantId, string email, IReadOnlyCollection<string> permissions);
+
+    RefreshTokenPair CreateRefreshToken();
+
+    string HashRefreshToken(string rawToken);
+}
+```
+
+- [ ] **Step 5: Write the implementation**
+
+Create `src/FamilyTree.Infrastructure/Auth/JwtOptions.cs`:
+
+```csharp
+namespace FamilyTree.Infrastructure.Auth;
+
+public sealed class JwtOptions
+{
+    public const string SectionName = "Jwt";
+
+    public string Issuer { get; init; } = null!;
+    public string Audience { get; init; } = null!;
+    public string SigningKey { get; init; } = null!;
+    public int AccessTokenLifetimeMinutes { get; init; } = 15;
+    public int RefreshTokenLifetimeDays { get; init; } = 14;
+}
+```
+
+Create `src/FamilyTree.Infrastructure/Auth/JwtTokenService.cs`:
+
+```csharp
+using System.Security.Claims;
+using System.Security.Cryptography;
+using System.Text;
+using FamilyTree.Application.Auth;
+using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.JsonWebTokens;
+using Microsoft.IdentityModel.Tokens;
+
+namespace FamilyTree.Infrastructure.Auth;
+
+public sealed class JwtTokenService(IOptions<JwtOptions> options, TimeProvider timeProvider) : ITokenService
+{
+    public const string TenantIdClaim = "tenant_id";
+    public const string PermissionClaim = "permission";
+
+    private readonly JwtOptions _options = options.Value;
+
+    public AccessToken CreateAccessToken(
+        Guid userId, Guid tenantId, string email, IReadOnlyCollection<string> permissions)
+    {
+        var now = timeProvider.GetUtcNow();
+        var expires = now.AddMinutes(_options.AccessTokenLifetimeMinutes);
+
+        var claims = new List<Claim>
+        {
+            new(ClaimTypes.NameIdentifier, userId.ToString()),
+            new(ClaimTypes.Email, email),
+            new(TenantIdClaim, tenantId.ToString())
+        };
+        claims.AddRange(permissions.Select(p => new Claim(PermissionClaim, p)));
+
+        var credentials = new SigningCredentials(
+            new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_options.SigningKey)),
+            SecurityAlgorithms.HmacSha256);
+
+        var descriptor = new SecurityTokenDescriptor
+        {
+            Issuer = _options.Issuer,
+            Audience = _options.Audience,
+            Subject = new ClaimsIdentity(claims),
+            Expires = expires.UtcDateTime,
+            SigningCredentials = credentials
+        };
+
+        return new AccessToken(new JsonWebTokenHandler().CreateToken(descriptor), expires);
+    }
+
+    public RefreshTokenPair CreateRefreshToken()
+    {
+        var raw = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
+        return new RefreshTokenPair(raw, HashRefreshToken(raw));
+    }
+
+    /// <summary>
+    /// SHA-256, not a password hash. The token is 256 bits of cryptographic randomness, so it
+    /// is not brute-forceable and needs no work factor — but hashing still means a database
+    /// leak yields no usable tokens. It must stay deterministic so a presented token is findable.
+    /// </summary>
+    public string HashRefreshToken(string rawToken) =>
+        Convert.ToBase64String(SHA256.HashData(Encoding.UTF8.GetBytes(rawToken)));
+}
+```
+
+- [ ] **Step 6: Run the tests to verify they pass**
+
+Run: `dotnet test tests/FamilyTree.Application.Tests`
+Expected: PASS — 6 tests.
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add src/FamilyTree.Application src/FamilyTree.Infrastructure tests/FamilyTree.Application.Tests
+git commit -m "feat: add JWT issuance and refresh token hashing"
+```
+
+---
+
+*Tasks 8–12 are appended in the sections that follow.*
