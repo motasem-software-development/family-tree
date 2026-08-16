@@ -18,6 +18,12 @@ public sealed class AuthService(
     IOptions<JwtOptions> jwtOptions,
     TimeProvider timeProvider) : IAuthService
 {
+    // A real, well-formed Identity hash for a throwaway password, generated once at class-init
+    // time. Used to equalize the timing of the "unknown email" and "wrong password" branches
+    // below — see the comment at its use site. Never used to authenticate anything.
+    private static readonly string DummyPasswordHash =
+        new PasswordHasher<ApplicationUser>().HashPassword(new ApplicationUser(), "not-a-real-password");
+
     private readonly JwtOptions _jwt = jwtOptions.Value;
 
     public async Task<AuthResult> LoginAsync(LoginRequest request, CancellationToken ct = default)
@@ -30,7 +36,16 @@ public sealed class AuthService(
             .FirstOrDefaultAsync(u => u.NormalizedEmail == normalizedEmail, ct);
 
         if (user?.PasswordHash is null)
+        {
+            // Deliberate wasted work: run a full password verification against a dummy hash
+            // even though we already know this login will fail. If we returned immediately
+            // here instead, an unknown email would respond faster than a known one with a
+            // wrong password (which pays the full PBKDF2 cost below), and that timing gap is
+            // measurable — an attacker could use it to enumerate which emails have accounts.
+            // Do not "optimize" this away; the wasted call is the point.
+            passwordHasher.VerifyHashedPassword(new ApplicationUser(), DummyPasswordHash, request.Password);
             return AuthResult.Failure("INVALID_CREDENTIALS");
+        }
 
         var verification = passwordHasher.VerifyHashedPassword(user, user.PasswordHash, request.Password);
         if (verification == PasswordVerificationResult.Failed)
