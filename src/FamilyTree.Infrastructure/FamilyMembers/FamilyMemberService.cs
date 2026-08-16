@@ -62,6 +62,39 @@ public sealed class FamilyMemberService(
         return members.Select(Map).ToList();
     }
 
+    public async Task<FamilyMemberResponse> UpdateAsync(
+        Guid id, UpdateFamilyMemberRequest request, CancellationToken ct = default)
+    {
+        if (request.ParentId is not null || request.TenantId is not null || request.FamilyTreeId is not null)
+            throw new DomainException(
+                "MEMBER_FIELD_NOT_UPDATABLE",
+                "Parent, tenant, and family tree cannot be changed through this endpoint.");
+
+        // Tracked (not AsNoTracking): SaveChanges needs the entity in the change tracker.
+        var member = await context.FamilyMembers.FirstOrDefaultAsync(m => m.Id == id, ct)
+            ?? throw new NotFoundException("MEMBER_NOT_FOUND", "Member not found.");
+
+        member.Rename(request.Name, timeProvider.GetUtcNow());
+
+        // Load-bearing. EF builds `UPDATE ... WHERE id = @id AND version = @original`, and
+        // `@original` defaults to the value it just READ — which always matches, making the
+        // concurrency token inert. Substituting the version the CLIENT held is what turns a
+        // stale write into a conflict instead of a silent overwrite.
+        context.Entry(member).Property(m => m.Version).OriginalValue = request.Version;
+
+        try
+        {
+            await context.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            throw new ConflictException(
+                "CONCURRENCY_CONFLICT", "This member was changed by someone else. Reload and try again.");
+        }
+
+        return Map(member);
+    }
+
     internal static FamilyMemberResponse Map(FamilyMember member) => new(
         member.Id, member.Name, member.ParentId, member.Version, member.CreatedAt, member.UpdatedAt);
 }

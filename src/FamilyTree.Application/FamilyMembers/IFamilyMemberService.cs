@@ -10,4 +10,7 @@ public interface IFamilyMemberService
     Task<FamilyMemberResponse?> GetAsync(Guid id, CancellationToken ct = default);
 
     Task<IReadOnlyList<FamilyMemberResponse>> ListAsync(CancellationToken ct = default);
+
+    Task<FamilyMemberResponse> UpdateAsync(
+        Guid id, UpdateFamilyMemberRequest request, CancellationToken ct = default);
 }
