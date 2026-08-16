@@ -3595,4 +3595,969 @@ git commit -m "feat: add permission policies, /me endpoint, and startup seeding"
 
 ---
 
-*Tasks 11–13 are appended in the sections that follow.*
+### Task 11: React application shell with bilingual i18n and RTL
+
+**Files:**
+- Create: `frontend/` (Vite scaffold), `vite.config.ts`, `vitest.setup.ts`
+- Create: `frontend/src/i18n/index.ts`, `i18n/locales/en.json`, `i18n/locales/ar.json`, `i18n/useDirection.ts`
+- Create: `frontend/src/components/LanguageSwitcher.tsx`
+- Create: `frontend/src/app/App.tsx`, `app/providers.tsx`, `src/main.tsx`
+- Test: `frontend/src/i18n/useDirection.test.ts`, `src/components/LanguageSwitcher.test.tsx`, `src/i18n/locales.test.ts`
+
+**Interfaces:**
+- Consumes: nothing from the backend yet.
+- Produces:
+  - `i18n` — configured `i18next` instance, default language `ar`, fallback `en`.
+  - `useDirection(): 'rtl' | 'ltr'` — derives direction from the active language and applies `dir`/`lang` to `<html>`.
+  - `<LanguageSwitcher />` — toggles between `ar` and `en`.
+  - `<Providers>` — wraps children in `QueryClientProvider`, `I18nextProvider`, and `BrowserRouter`.
+
+- [ ] **Step 1: Scaffold the frontend**
+
+```bash
+npm create vite@latest frontend -- --template react-ts
+cd frontend
+npm install
+npm install react-router-dom @tanstack/react-query i18next react-i18next i18next-browser-languagedetector
+npm install -D vitest @testing-library/react @testing-library/user-event @testing-library/jest-dom jsdom
+cd ..
+```
+
+- [ ] **Step 2: Configure Vitest**
+
+Replace `frontend/vite.config.ts`:
+
+```typescript
+/// <reference types="vitest/config" />
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+
+export default defineConfig({
+  plugins: [react()],
+  server: {
+    proxy: {
+      '/api': { target: 'http://localhost:5000', changeOrigin: true },
+    },
+  },
+  test: {
+    environment: 'jsdom',
+    globals: true,
+    setupFiles: ['./vitest.setup.ts'],
+  },
+})
+```
+
+Create `frontend/vitest.setup.ts`:
+
+```typescript
+import '@testing-library/jest-dom/vitest'
+```
+
+Add to `frontend/package.json` scripts: `"test": "vitest run"`, `"test:watch": "vitest"`.
+
+- [ ] **Step 3: Write the failing i18n tests**
+
+Create `frontend/src/i18n/locales.test.ts`:
+
+```typescript
+import { describe, expect, it } from 'vitest'
+import ar from './locales/ar.json'
+import en from './locales/en.json'
+
+const flatten = (obj: Record<string, unknown>, prefix = ''): string[] =>
+  Object.entries(obj).flatMap(([key, value]) =>
+    typeof value === 'object' && value !== null
+      ? flatten(value as Record<string, unknown>, `${prefix}${key}.`)
+      : [`${prefix}${key}`],
+  )
+
+describe('locale resources', () => {
+  it('define exactly the same keys in both languages', () => {
+    // A key present in one language and missing in the other renders as a raw key
+    // in production. Catching it here is far cheaper than catching it in review.
+    expect(flatten(ar).sort()).toEqual(flatten(en).sort())
+  })
+
+  it('leave no value blank', () => {
+    const blanks = [
+      ...Object.entries(ar).filter(([, v]) => v === ''),
+      ...Object.entries(en).filter(([, v]) => v === ''),
+    ]
+    expect(blanks).toHaveLength(0)
+  })
+})
+```
+
+Create `frontend/src/i18n/useDirection.test.ts`:
+
+```typescript
+import { renderHook } from '@testing-library/react'
+import { beforeEach, describe, expect, it } from 'vitest'
+import i18n from './index'
+import { useDirection } from './useDirection'
+
+describe('useDirection', () => {
+  beforeEach(async () => {
+    await i18n.changeLanguage('ar')
+  })
+
+  it('reports rtl for Arabic and stamps the document', () => {
+    const { result } = renderHook(() => useDirection())
+
+    expect(result.current).toBe('rtl')
+    expect(document.documentElement.dir).toBe('rtl')
+    expect(document.documentElement.lang).toBe('ar')
+  })
+
+  it('reports ltr for English and restamps the document', async () => {
+    await i18n.changeLanguage('en')
+    const { result } = renderHook(() => useDirection())
+
+    expect(result.current).toBe('ltr')
+    expect(document.documentElement.dir).toBe('ltr')
+    expect(document.documentElement.lang).toBe('en')
+  })
+})
+```
+
+Create `frontend/src/components/LanguageSwitcher.test.tsx`:
+
+```tsx
+import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { beforeEach, describe, expect, it } from 'vitest'
+import { I18nextProvider } from 'react-i18next'
+import i18n from '../i18n'
+import { LanguageSwitcher } from './LanguageSwitcher'
+
+const renderSwitcher = () =>
+  render(
+    <I18nextProvider i18n={i18n}>
+      <LanguageSwitcher />
+    </I18nextProvider>,
+  )
+
+describe('LanguageSwitcher', () => {
+  beforeEach(async () => {
+    await i18n.changeLanguage('ar')
+  })
+
+  it('offers the other language while Arabic is active', () => {
+    renderSwitcher()
+    expect(screen.getByRole('button', { name: 'English' })).toBeInTheDocument()
+  })
+
+  it('switches the active language and the document direction', async () => {
+    renderSwitcher()
+
+    await userEvent.click(screen.getByRole('button', { name: 'English' }))
+
+    expect(i18n.language).toBe('en')
+    expect(document.documentElement.dir).toBe('ltr')
+    expect(screen.getByRole('button', { name: 'العربية' })).toBeInTheDocument()
+  })
+})
+```
+
+- [ ] **Step 4: Run the tests to verify they fail**
+
+Run: `cd frontend && npm test`
+Expected: failure — the `i18n`, `useDirection`, and `LanguageSwitcher` modules do not exist.
+
+- [ ] **Step 5: Write the locale resources**
+
+Create `frontend/src/i18n/locales/en.json`:
+
+```json
+{
+  "app": { "title": "Family Tree" },
+  "language": { "ar": "العربية", "en": "English" },
+  "auth": {
+    "signIn": "Sign in",
+    "email": "Email",
+    "password": "Password",
+    "signOut": "Sign out",
+    "signingIn": "Signing in…"
+  },
+  "errors": {
+    "INVALID_CREDENTIALS": "The email or password is incorrect.",
+    "ACCOUNT_INACTIVE": "This account has been deactivated.",
+    "TENANT_INACTIVE": "This account's subscription is inactive.",
+    "VALIDATION_FAILED": "Please check the highlighted fields.",
+    "NETWORK": "Could not reach the server. Please try again.",
+    "UNKNOWN": "Something went wrong. Please try again."
+  }
+}
+```
+
+Create `frontend/src/i18n/locales/ar.json`:
+
+```json
+{
+  "app": { "title": "شجرة العائلة" },
+  "language": { "ar": "العربية", "en": "English" },
+  "auth": {
+    "signIn": "تسجيل الدخول",
+    "email": "البريد الإلكتروني",
+    "password": "كلمة المرور",
+    "signOut": "تسجيل الخروج",
+    "signingIn": "جارٍ تسجيل الدخول…"
+  },
+  "errors": {
+    "INVALID_CREDENTIALS": "البريد الإلكتروني أو كلمة المرور غير صحيحة.",
+    "ACCOUNT_INACTIVE": "تم تعطيل هذا الحساب.",
+    "TENANT_INACTIVE": "اشتراك هذا الحساب غير مفعّل.",
+    "VALIDATION_FAILED": "يرجى مراجعة الحقول المحددة.",
+    "NETWORK": "تعذّر الوصول إلى الخادم. يرجى المحاولة مرة أخرى.",
+    "UNKNOWN": "حدث خطأ ما. يرجى المحاولة مرة أخرى."
+  }
+}
+```
+
+The `errors` keys are the backend's stable `code` values — this is the translation layer spec §4.8 requires, and the reason message text is never part of the API contract.
+
+- [ ] **Step 6: Write the i18n instance and direction hook**
+
+Create `frontend/src/i18n/index.ts`:
+
+```typescript
+import i18n from 'i18next'
+import { initReactI18next } from 'react-i18next'
+import ar from './locales/ar.json'
+import en from './locales/en.json'
+
+export const SUPPORTED_LANGUAGES = ['ar', 'en'] as const
+export type Language = (typeof SUPPORTED_LANGUAGES)[number]
+
+void i18n.use(initReactI18next).init({
+  resources: {
+    ar: { translation: ar },
+    en: { translation: en },
+  },
+  lng: 'ar',
+  fallbackLng: 'en',
+  interpolation: { escapeValue: false },
+})
+
+export default i18n
+```
+
+Arabic is the default because the family this is built for is Arabic-speaking. English is the fallback so a missing key degrades to readable text rather than a raw key.
+
+Create `frontend/src/i18n/useDirection.ts`:
+
+```typescript
+import { useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
+import type { Language } from './index'
+
+export type Direction = 'rtl' | 'ltr'
+
+export const directionFor = (language: string): Direction =>
+  language.startsWith('ar') ? 'rtl' : 'ltr'
+
+/**
+ * Keeps <html dir> and <html lang> in step with the active language.
+ * Layout follows the document direction, so no component needs its own RTL branch.
+ */
+export const useDirection = (): Direction => {
+  const { i18n } = useTranslation()
+  const direction = directionFor(i18n.language as Language)
+
+  useEffect(() => {
+    document.documentElement.dir = direction
+    document.documentElement.lang = i18n.language
+  }, [direction, i18n.language])
+
+  return direction
+}
+```
+
+- [ ] **Step 7: Write the language switcher and app shell**
+
+Create `frontend/src/components/LanguageSwitcher.tsx`:
+
+```tsx
+import { useTranslation } from 'react-i18next'
+import { useDirection } from '../i18n/useDirection'
+
+export const LanguageSwitcher = () => {
+  const { i18n, t } = useTranslation()
+  useDirection()
+
+  const next = i18n.language.startsWith('ar') ? 'en' : 'ar'
+
+  return (
+    <button type="button" onClick={() => void i18n.changeLanguage(next)}>
+      {t(`language.${next}`)}
+    </button>
+  )
+}
+```
+
+Create `frontend/src/app/providers.tsx`:
+
+```tsx
+import type { PropsWithChildren } from 'react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { I18nextProvider } from 'react-i18next'
+import { BrowserRouter } from 'react-router-dom'
+import i18n from '../i18n'
+
+const queryClient = new QueryClient({
+  defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } },
+})
+
+export const Providers = ({ children }: PropsWithChildren) => (
+  <I18nextProvider i18n={i18n}>
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>{children}</BrowserRouter>
+    </QueryClientProvider>
+  </I18nextProvider>
+)
+```
+
+Create `frontend/src/app/App.tsx`:
+
+```tsx
+import { useTranslation } from 'react-i18next'
+import { LanguageSwitcher } from '../components/LanguageSwitcher'
+import { useDirection } from '../i18n/useDirection'
+
+export const App = () => {
+  const { t } = useTranslation()
+  useDirection()
+
+  return (
+    <>
+      <header>
+        <h1>{t('app.title')}</h1>
+        <LanguageSwitcher />
+      </header>
+      <main />
+    </>
+  )
+}
+```
+
+Replace `frontend/src/main.tsx`:
+
+```tsx
+import { StrictMode } from 'react'
+import { createRoot } from 'react-dom/client'
+import { App } from './app/App'
+import { Providers } from './app/providers'
+import './index.css'
+
+createRoot(document.getElementById('root')!).render(
+  <StrictMode>
+    <Providers>
+      <App />
+    </Providers>
+  </StrictMode>,
+)
+```
+
+- [ ] **Step 8: Run the tests to verify they pass**
+
+Run: `cd frontend && npm test`
+Expected: PASS — 6 tests.
+
+- [ ] **Step 9: Verify the app renders in Arabic and flips to English**
+
+```bash
+cd frontend && npm run dev
+```
+
+Open the printed URL. Expected: the heading reads شجرة العائلة, the page is right-aligned, and clicking `English` flips the layout to left-aligned with the heading `Family Tree`.
+
+- [ ] **Step 10: Commit**
+
+```bash
+git add frontend
+git commit -m "feat: add React shell with bilingual i18n and RTL support"
+```
+
+---
+
+### Task 12: Frontend authentication
+
+**Files:**
+- Create: `frontend/src/services/apiClient.ts`, `services/tokenStorage.ts`
+- Create: `frontend/src/features/auth/AuthContext.tsx`, `auth/LoginPage.tsx`, `auth/useLogin.ts`
+- Create: `frontend/src/routes/ProtectedRoute.tsx`, `routes/AppRoutes.tsx`
+- Modify: `frontend/src/app/App.tsx`, `app/providers.tsx`
+- Test: `frontend/src/services/apiClient.test.ts`, `features/auth/LoginPage.test.tsx`, `routes/ProtectedRoute.test.tsx`
+
+**Interfaces:**
+- Consumes: `POST /api/v1/auth/login`, `POST /api/v1/auth/refresh`, `POST /api/v1/auth/logout`, `GET /api/v1/me`.
+- Produces:
+  - `tokenStorage` — `read(): Tokens | null`, `write(tokens: Tokens): void`, `clear(): void`.
+  - `apiFetch<T>(path: string, init?: RequestInit): Promise<T>` — attaches the bearer token, retries once through refresh on 401, throws `ApiError` carrying `code` and `status`.
+  - `useAuth(): { user: CurrentUser | null; isLoading: boolean; login(email, password): Promise<void>; logout(): Promise<void> }`
+  - `<ProtectedRoute>` — renders children when authenticated, otherwise redirects to `/login`.
+
+- [ ] **Step 1: Write the failing API client tests**
+
+Create `frontend/src/services/apiClient.test.ts`:
+
+```typescript
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { ApiError, apiFetch } from './apiClient'
+import { tokenStorage } from './tokenStorage'
+
+const jsonResponse = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: { 'Content-Type': 'application/json' },
+  })
+
+describe('apiFetch', () => {
+  beforeEach(() => {
+    tokenStorage.clear()
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('attaches the bearer token when one is stored', async () => {
+    tokenStorage.write({ accessToken: 'token-abc', refreshToken: 'refresh-abc' })
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ ok: true }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await apiFetch('/api/v1/me')
+
+    const headers = new Headers(fetchMock.mock.calls[0][1].headers)
+    expect(headers.get('Authorization')).toBe('Bearer token-abc')
+  })
+
+  it('sends no Authorization header when no token is stored', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ ok: true }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await apiFetch('/api/v1/me')
+
+    const headers = new Headers(fetchMock.mock.calls[0][1].headers)
+    expect(headers.get('Authorization')).toBeNull()
+  })
+
+  it('throws an ApiError carrying the backend code', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse({ code: 'INVALID_CREDENTIALS', title: 'Authentication failed.' }, 401),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(apiFetch('/api/v1/auth/login', { method: 'POST' })).rejects.toMatchObject({
+      code: 'INVALID_CREDENTIALS',
+      status: 401,
+    })
+  })
+
+  it('refreshes once on 401 and replays the original request', async () => {
+    tokenStorage.write({ accessToken: 'expired', refreshToken: 'refresh-abc' })
+
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ code: 'UNAUTHORIZED' }, 401))
+      .mockResolvedValueOnce(
+        jsonResponse({ accessToken: 'fresh', expiresAt: new Date().toISOString(), refreshToken: 'refresh-def' }),
+      )
+      .mockResolvedValueOnce(jsonResponse({ email: 'admin@example.com' }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = await apiFetch<{ email: string }>('/api/v1/me')
+
+    expect(result.email).toBe('admin@example.com')
+    expect(fetchMock).toHaveBeenCalledTimes(3)
+    expect(tokenStorage.read()?.accessToken).toBe('fresh')
+  })
+
+  it('clears the stored tokens and gives up when the refresh itself fails', async () => {
+    tokenStorage.write({ accessToken: 'expired', refreshToken: 'stale' })
+
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ code: 'UNAUTHORIZED' }, 401))
+      .mockResolvedValueOnce(jsonResponse({ code: 'INVALID_REFRESH_TOKEN' }, 401))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(apiFetch('/api/v1/me')).rejects.toBeInstanceOf(ApiError)
+    expect(tokenStorage.read()).toBeNull()
+  })
+
+  it('does not attempt a refresh loop on the refresh endpoint itself', async () => {
+    tokenStorage.write({ accessToken: 'expired', refreshToken: 'stale' })
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ code: 'INVALID_REFRESH_TOKEN' }, 401))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(apiFetch('/api/v1/auth/refresh', { method: 'POST' })).rejects.toBeInstanceOf(ApiError)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+})
+```
+
+- [ ] **Step 2: Run the tests to verify they fail**
+
+Run: `cd frontend && npm test -- apiClient`
+Expected: failure — `apiClient` and `tokenStorage` do not exist.
+
+- [ ] **Step 3: Write token storage and the API client**
+
+Create `frontend/src/services/tokenStorage.ts`:
+
+```typescript
+export interface Tokens {
+  accessToken: string
+  refreshToken: string
+}
+
+const STORAGE_KEY = 'familytree.tokens'
+
+/**
+ * sessionStorage rather than localStorage: tokens die with the tab, which limits the
+ * blast radius on a shared machine. Hardening this further (httpOnly cookies) is a
+ * Phase 7 decision that would change the API surface, so it is not made here.
+ */
+export const tokenStorage = {
+  read(): Tokens | null {
+    const raw = sessionStorage.getItem(STORAGE_KEY)
+    if (!raw) return null
+    try {
+      return JSON.parse(raw) as Tokens
+    } catch {
+      return null
+    }
+  },
+
+  write(tokens: Tokens): void {
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(tokens))
+  },
+
+  clear(): void {
+    sessionStorage.removeItem(STORAGE_KEY)
+  },
+}
+```
+
+Create `frontend/src/services/apiClient.ts`:
+
+```typescript
+import { tokenStorage } from './tokenStorage'
+
+export class ApiError extends Error {
+  constructor(
+    readonly code: string,
+    readonly status: number,
+  ) {
+    super(code)
+    this.name = 'ApiError'
+  }
+}
+
+const REFRESH_PATH = '/api/v1/auth/refresh'
+
+const withAuth = (init: RequestInit, accessToken?: string): RequestInit => {
+  const headers = new Headers(init.headers)
+  headers.set('Content-Type', 'application/json')
+  if (accessToken) headers.set('Authorization', `Bearer ${accessToken}`)
+  return { ...init, headers }
+}
+
+const errorFrom = async (response: Response): Promise<ApiError> => {
+  try {
+    const body = (await response.json()) as { code?: string }
+    return new ApiError(body.code ?? 'UNKNOWN', response.status)
+  } catch {
+    return new ApiError('UNKNOWN', response.status)
+  }
+}
+
+const tryRefresh = async (): Promise<boolean> => {
+  const tokens = tokenStorage.read()
+  if (!tokens?.refreshToken) return false
+
+  const response = await fetch(REFRESH_PATH, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ refreshToken: tokens.refreshToken }),
+  })
+
+  if (!response.ok) {
+    tokenStorage.clear()
+    return false
+  }
+
+  const body = (await response.json()) as { accessToken: string; refreshToken: string }
+  tokenStorage.write({ accessToken: body.accessToken, refreshToken: body.refreshToken })
+  return true
+}
+
+/**
+ * Single entry point for every API call. On 401 it refreshes once and replays the request;
+ * a second failure surfaces to the caller. The refresh endpoint is excluded so a stale
+ * refresh token cannot start a loop.
+ */
+export const apiFetch = async <T>(path: string, init: RequestInit = {}): Promise<T> => {
+  const attempt = async (): Promise<Response> =>
+    fetch(path, withAuth(init, tokenStorage.read()?.accessToken))
+
+  let response = await attempt()
+
+  if (response.status === 401 && path !== REFRESH_PATH) {
+    if (await tryRefresh()) {
+      response = await attempt()
+    }
+  }
+
+  if (!response.ok) throw await errorFrom(response)
+
+  if (response.status === 204) return undefined as T
+  return (await response.json()) as T
+}
+```
+
+- [ ] **Step 4: Write the failing auth UI tests**
+
+Create `frontend/src/features/auth/LoginPage.test.tsx`:
+
+```tsx
+import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { Providers } from '../../app/providers'
+import i18n from '../../i18n'
+import { tokenStorage } from '../../services/tokenStorage'
+import { LoginPage } from './LoginPage'
+
+const jsonResponse = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
+
+const renderPage = () => render(<Providers><LoginPage /></Providers>)
+
+describe('LoginPage', () => {
+  beforeEach(async () => {
+    tokenStorage.clear()
+    await i18n.changeLanguage('en')
+  })
+
+  afterEach(() => vi.restoreAllMocks())
+
+  it('stores the tokens returned by a successful sign-in', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(
+      jsonResponse({ accessToken: 'abc', expiresAt: new Date().toISOString(), refreshToken: 'def' }),
+    ))
+
+    renderPage()
+    await userEvent.type(screen.getByLabelText('Email'), 'admin@example.com')
+    await userEvent.type(screen.getByLabelText('Password'), 'Str0ng!Password')
+    await userEvent.click(screen.getByRole('button', { name: 'Sign in' }))
+
+    await waitFor(() => expect(tokenStorage.read()?.accessToken).toBe('abc'))
+  })
+
+  it('translates the backend error code rather than showing it raw', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(
+      jsonResponse({ code: 'INVALID_CREDENTIALS' }, 401),
+    ))
+
+    renderPage()
+    await userEvent.type(screen.getByLabelText('Email'), 'admin@example.com')
+    await userEvent.type(screen.getByLabelText('Password'), 'wrong')
+    await userEvent.click(screen.getByRole('button', { name: 'Sign in' }))
+
+    expect(await screen.findByRole('alert'))
+      .toHaveTextContent('The email or password is incorrect.')
+    expect(tokenStorage.read()).toBeNull()
+  })
+
+  it('shows the Arabic message for the same code when Arabic is active', async () => {
+    await i18n.changeLanguage('ar')
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(
+      jsonResponse({ code: 'INVALID_CREDENTIALS' }, 401),
+    ))
+
+    renderPage()
+    await userEvent.type(screen.getByLabelText('البريد الإلكتروني'), 'admin@example.com')
+    await userEvent.type(screen.getByLabelText('كلمة المرور'), 'wrong')
+    await userEvent.click(screen.getByRole('button', { name: 'تسجيل الدخول' }))
+
+    expect(await screen.findByRole('alert'))
+      .toHaveTextContent('البريد الإلكتروني أو كلمة المرور غير صحيحة.')
+  })
+})
+```
+
+Create `frontend/src/routes/ProtectedRoute.test.tsx`:
+
+```tsx
+import { render, screen, waitFor } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { Route, Routes } from 'react-router-dom'
+import { Providers } from '../app/providers'
+import { tokenStorage } from '../services/tokenStorage'
+import { ProtectedRoute } from './ProtectedRoute'
+
+const jsonResponse = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
+
+const renderRoutes = () =>
+  render(
+    <Providers>
+      <Routes>
+        <Route path="/login" element={<p>login screen</p>} />
+        <Route path="/" element={<ProtectedRoute><p>protected content</p></ProtectedRoute>} />
+      </Routes>
+    </Providers>,
+  )
+
+describe('ProtectedRoute', () => {
+  beforeEach(() => tokenStorage.clear())
+  afterEach(() => vi.restoreAllMocks())
+
+  it('redirects to the login screen when no token is stored', async () => {
+    renderRoutes()
+
+    expect(await screen.findByText('login screen')).toBeInTheDocument()
+  })
+
+  it('renders the protected content once the session resolves', async () => {
+    tokenStorage.write({ accessToken: 'abc', refreshToken: 'def' })
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(
+      jsonResponse({
+        id: '0193...', email: 'admin@example.com', tenantId: '0193...',
+        familyTreeName: 'عائلة السقا', permissions: ['FamilyTree.View'],
+      }),
+    ))
+
+    renderRoutes()
+
+    await waitFor(() => expect(screen.getByText('protected content')).toBeInTheDocument())
+  })
+
+  it('redirects to login when the stored token is rejected', async () => {
+    tokenStorage.write({ accessToken: 'expired', refreshToken: 'stale' })
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ code: 'UNAUTHORIZED' }, 401)))
+
+    renderRoutes()
+
+    expect(await screen.findByText('login screen')).toBeInTheDocument()
+  })
+})
+```
+
+- [ ] **Step 5: Run the tests to verify they fail**
+
+Run: `cd frontend && npm test`
+Expected: failure — `LoginPage`, `ProtectedRoute`, and `AuthContext` do not exist.
+
+- [ ] **Step 6: Write the auth context**
+
+Create `frontend/src/features/auth/AuthContext.tsx`:
+
+```tsx
+import { createContext, useCallback, useContext, useMemo, type PropsWithChildren } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { apiFetch } from '../../services/apiClient'
+import { tokenStorage } from '../../services/tokenStorage'
+
+export interface CurrentUser {
+  id: string
+  email: string
+  tenantId: string
+  familyTreeName: string
+  permissions: string[]
+}
+
+interface AuthContextValue {
+  user: CurrentUser | null
+  isLoading: boolean
+  hasPermission: (permission: string) => boolean
+  login: (email: string, password: string) => Promise<void>
+  logout: () => Promise<void>
+}
+
+const AuthContext = createContext<AuthContextValue | null>(null)
+
+export const AuthProvider = ({ children }: PropsWithChildren) => {
+  const queryClient = useQueryClient()
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['me'],
+    queryFn: () => apiFetch<CurrentUser>('/api/v1/me'),
+    enabled: tokenStorage.read() !== null,
+    retry: false,
+  })
+
+  const loginMutation = useMutation({
+    mutationFn: async ({ email, password }: { email: string; password: string }) => {
+      const tokens = await apiFetch<{ accessToken: string; refreshToken: string }>(
+        '/api/v1/auth/login',
+        { method: 'POST', body: JSON.stringify({ email, password }) },
+      )
+      tokenStorage.write(tokens)
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['me'] }),
+  })
+
+  const login = useCallback(
+    async (email: string, password: string) => {
+      await loginMutation.mutateAsync({ email, password })
+    },
+    [loginMutation],
+  )
+
+  const logout = useCallback(async () => {
+    const tokens = tokenStorage.read()
+    if (tokens) {
+      // Best-effort revocation; the local session ends either way.
+      await apiFetch('/api/v1/auth/logout', {
+        method: 'POST',
+        body: JSON.stringify({ refreshToken: tokens.refreshToken }),
+      }).catch(() => undefined)
+    }
+    tokenStorage.clear()
+    queryClient.clear()
+  }, [queryClient])
+
+  const value = useMemo<AuthContextValue>(
+    () => ({
+      user: data ?? null,
+      isLoading: tokenStorage.read() !== null && isLoading,
+      hasPermission: (permission) => data?.permissions.includes(permission) ?? false,
+      login,
+      logout,
+    }),
+    [data, isLoading, login, logout],
+  )
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
+}
+
+export const useAuth = (): AuthContextValue => {
+  const context = useContext(AuthContext)
+  if (!context) throw new Error('useAuth must be used inside AuthProvider')
+  return context
+}
+```
+
+`hasPermission` drives which actions the UI offers. The server enforces the same permissions independently — the client copy is convenience, never the control.
+
+- [ ] **Step 7: Write the login page and protected route**
+
+Create `frontend/src/features/auth/LoginPage.tsx`:
+
+```tsx
+import { useState, type FormEvent } from 'react'
+import { useTranslation } from 'react-i18next'
+import { ApiError } from '../../services/apiClient'
+import { useAuth } from './AuthContext'
+
+export const LoginPage = () => {
+  const { t } = useTranslation()
+  const { login } = useAuth()
+
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [errorCode, setErrorCode] = useState<string | null>(null)
+  const [submitting, setSubmitting] = useState(false)
+
+  const onSubmit = async (event: FormEvent) => {
+    event.preventDefault()
+    setErrorCode(null)
+    setSubmitting(true)
+    try {
+      await login(email, password)
+    } catch (error) {
+      // Translate the stable code; never render a server-supplied string.
+      setErrorCode(error instanceof ApiError ? error.code : 'NETWORK')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <form onSubmit={onSubmit}>
+      <h1>{t('auth.signIn')}</h1>
+
+      <label htmlFor="email">{t('auth.email')}</label>
+      <input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+
+      <label htmlFor="password">{t('auth.password')}</label>
+      <input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+
+      {errorCode && <p role="alert">{t(`errors.${errorCode}`, { defaultValue: t('errors.UNKNOWN') })}</p>}
+
+      <button type="submit" disabled={submitting}>
+        {submitting ? t('auth.signingIn') : t('auth.signIn')}
+      </button>
+    </form>
+  )
+}
+```
+
+Create `frontend/src/routes/ProtectedRoute.tsx`:
+
+```tsx
+import type { PropsWithChildren } from 'react'
+import { Navigate } from 'react-router-dom'
+import { useAuth } from '../features/auth/AuthContext'
+
+export const ProtectedRoute = ({ children }: PropsWithChildren) => {
+  const { user, isLoading } = useAuth()
+
+  if (isLoading) return null
+  if (!user) return <Navigate to="/login" replace />
+
+  return <>{children}</>
+}
+```
+
+Create `frontend/src/routes/AppRoutes.tsx`:
+
+```tsx
+import { Navigate, Route, Routes } from 'react-router-dom'
+import { LoginPage } from '../features/auth/LoginPage'
+import { ProtectedRoute } from './ProtectedRoute'
+
+/** Phase 2 replaces the placeholder dashboard with the family tree page. */
+const Dashboard = () => <p>Dashboard</p>
+
+export const AppRoutes = () => (
+  <Routes>
+    <Route path="/login" element={<LoginPage />} />
+    <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+    <Route path="*" element={<Navigate to="/" replace />} />
+  </Routes>
+)
+```
+
+- [ ] **Step 8: Wire the provider and routes into the shell**
+
+In `frontend/src/app/providers.tsx`, wrap `children` with `AuthProvider` **inside** `BrowserRouter` (it uses query hooks and must sit under `QueryClientProvider`):
+
+```tsx
+<BrowserRouter>
+  <AuthProvider>{children}</AuthProvider>
+</BrowserRouter>
+```
+
+Add the import: `import { AuthProvider } from '../features/auth/AuthContext'`.
+
+In `frontend/src/app/App.tsx`, replace `<main />` with `<main><AppRoutes /></main>` and import `AppRoutes` from `../routes/AppRoutes`.
+
+- [ ] **Step 9: Run the tests to verify they pass**
+
+Run: `cd frontend && npm test`
+Expected: PASS — 18 tests.
+
+- [ ] **Step 10: Commit**
+
+```bash
+git add frontend
+git commit -m "feat: add frontend authentication with token refresh and protected routes"
+```
+
+---
+
+*Task 13 is appended in the section that follows.*
