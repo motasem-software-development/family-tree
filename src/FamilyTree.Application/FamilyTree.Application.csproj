@@ -1,0 +1,8 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\FamilyTree.Domain\FamilyTree.Domain.csproj" />
+    <ProjectReference Include="..\FamilyTree.Contracts\FamilyTree.Contracts.csproj" />
+  </ItemGroup>
+
+</Project>
