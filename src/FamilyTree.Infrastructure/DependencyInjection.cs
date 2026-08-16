@@ -1,7 +1,11 @@
 using FamilyTree.Application.Auth;
 using FamilyTree.Application.Authorization;
+using FamilyTree.Application.FamilyMembers;
+using FamilyTree.Application.FamilyTrees;
 using FamilyTree.Infrastructure.Auth;
 using FamilyTree.Infrastructure.Authorization;
+using FamilyTree.Infrastructure.FamilyMembers;
+using FamilyTree.Infrastructure.FamilyTrees;
 using FamilyTree.Infrastructure.Identity;
 using FamilyTree.Infrastructure.Persistence;
 using FamilyTree.Infrastructure.Persistence.Seed;
@@ -30,6 +34,8 @@ public static class DependencyInjection
         services.AddScoped<ITokenService, JwtTokenService>();
         services.AddScoped<IPermissionResolver, PermissionResolver>();
         services.AddScoped<IAuthService, AuthService>();
+        services.AddScoped<IFamilyMemberService, FamilyMemberService>();
+        services.AddScoped<IFamilyTreeService, FamilyTreeService>();
         services.AddScoped<DatabaseSeeder>();
 
         return services;

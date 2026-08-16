@@ -21,15 +21,23 @@ public sealed class QueryFilterInvariantTests(PostgresFixture fixture) : Databas
         var model = context.Model;
 
         var offenders = new StringBuilder();
+        var inspected = 0;
 
         foreach (var entityType in model.GetEntityTypes())
         {
             var clrType = entityType.ClrType;
             if (!typeof(ITenantOwned).IsAssignableFrom(clrType)) continue;
 
+            inspected++;
+
             if (entityType.GetDeclaredQueryFilters().Count == 0)
                 offenders.AppendLine($"{clrType.FullName} implements ITenantOwned but has no HasQueryFilter().");
         }
+
+        // Without this assertion the test passes vacuously if the reflection above ever stops
+        // matching anything — the failure mode would be silence, exactly when it matters most.
+        inspected.Should().BeGreaterThanOrEqualTo(5,
+            "FamilyTreeAggregate, Role, RefreshToken, ApplicationUser and FamilyMember are all ITenantOwned");
 
         offenders.Length.Should().Be(0, offenders.ToString());
     }

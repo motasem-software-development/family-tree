@@ -13,5 +13,8 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./vitest.setup.ts'],
+    // Mock call history otherwise persists across tests in a file, so a
+    // `not.toHaveBeenCalled()` assertion can fail because of an EARLIER test.
+    clearMocks: true,
   },
 })

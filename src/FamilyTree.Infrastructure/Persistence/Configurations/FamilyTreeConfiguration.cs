@@ -16,6 +16,15 @@ public sealed class FamilyTreeConfiguration : IEntityTypeConfiguration<FamilyTre
         // BR-001: one customer owns exactly one family tree in V1.
         builder.HasIndex(x => x.TenantId).IsUnique();
 
+        // Design spec §3.3 applied to the tenant axis (finding raised in Task 2 review): anchors
+        // family_members' composite (family_tree_id, tenant_id) foreign key, so a member's
+        // tenant_id and family_tree_id cannot independently satisfy their single-column FKs
+        // while still pointing at a tree that belongs to a different tenant. Without this, a
+        // bug that writes the wrong tenant_id on a member would only be caught by application
+        // code, and the query filter (keyed off member.tenant_id) would expose the row to the
+        // wrong tenant.
+        builder.HasAlternateKey(x => new { x.Id, x.TenantId });
+
         builder.HasOne<Tenant>()
                .WithMany()
                .HasForeignKey(x => x.TenantId)
