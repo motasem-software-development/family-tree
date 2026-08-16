@@ -1,4 +1,5 @@
 using FamilyTree.Domain.Authentication;
+using FamilyTree.Domain.Tenants;
 using FamilyTree.Infrastructure.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -16,7 +17,9 @@ public sealed class RefreshTokenConfiguration : IEntityTypeConfiguration<Refresh
 
         builder.HasIndex(x => x.TokenHash).IsUnique();
         builder.HasIndex(x => new { x.UserId, x.RevokedAt });
+        builder.HasIndex(x => x.TenantId);
 
         builder.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+        builder.HasOne<Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
     }
 }

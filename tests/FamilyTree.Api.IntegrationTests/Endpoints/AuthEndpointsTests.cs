@@ -3,6 +3,9 @@ using System.Net.Http.Json;
 using FluentAssertions;
 using FamilyTree.Api.IntegrationTests.Fixtures;
 using FamilyTree.Contracts.Auth;
+using FamilyTree.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace FamilyTree.Api.IntegrationTests.Endpoints;
 
@@ -103,6 +106,30 @@ public sealed class AuthEndpointsTests(PostgresFixture fixture) : IAsyncLifetime
 
         replay.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
         var problem = await replay.Content.ReadFromJsonAsync<Dictionary<string, object>>();
+        problem!["code"].ToString().Should().Be("INVALID_REFRESH_TOKEN");
+    }
+
+    [Fact]
+    public async Task Refresh_after_the_tenant_is_deactivated_returns_401()
+    {
+        var login = await LoginAsync();
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var tenant = await context.Tenants.IgnoreQueryFilters().SingleAsync();
+            tenant.Deactivate(DateTimeOffset.UtcNow);
+            await context.SaveChangesAsync();
+        }
+
+        var response = await _client.PostAsJsonAsync("/api/v1/auth/refresh",
+            new RefreshRequest(login.RefreshToken));
+
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+
+        // Same generic code as any other refresh failure: the endpoint must not disclose
+        // that the reason is specifically a deactivated tenant.
+        var problem = await response.Content.ReadFromJsonAsync<Dictionary<string, object>>();
         problem!["code"].ToString().Should().Be("INVALID_REFRESH_TOKEN");
     }
 

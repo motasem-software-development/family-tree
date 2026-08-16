@@ -26,7 +26,10 @@ public sealed class DomainExceptionHandler(ILogger<DomainExceptionHandler> logge
         };
 
         httpContext.Response.StatusCode = problem.Status.Value;
-        await httpContext.Response.WriteAsJsonAsync(problem, ct);
+        // Match the content type Results.Problem (used by ProblemResults.Coded) produces, so
+        // the API never emits two different Problem Details content types (spec §4.8).
+        await httpContext.Response.WriteAsJsonAsync(
+            problem, options: null, contentType: "application/problem+json", ct);
         return true;
     }
 }

@@ -84,6 +84,15 @@ public sealed class AuthService(
         if (user is null || !user.IsActive)
             return AuthResult.Failure("INVALID_REFRESH_TOKEN");
 
+        // The refresh endpoint maps every failure to 401 without a reason, so we must not
+        // disclose TENANT_INACTIVE here the way LoginAsync does — a generic refresh-token
+        // failure is returned instead, but the tenant-active gate itself must still apply,
+        // otherwise a deactivated tenant could keep minting fresh access tokens for the
+        // full refresh-token lifetime.
+        var tenantActive = await context.Tenants.AnyAsync(t => t.Id == user.TenantId && t.IsActive, ct);
+        if (!tenantActive)
+            return AuthResult.Failure("INVALID_REFRESH_TOKEN");
+
         var response = await IssueTokensAsync(user, now, ct);
 
         // Rotation: the old token is revoked and records its successor, so replaying it fails

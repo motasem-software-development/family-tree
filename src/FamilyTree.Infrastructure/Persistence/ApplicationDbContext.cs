@@ -47,8 +47,13 @@ public sealed class ApplicationDbContext(
         builder.Entity<ApplicationUser>(b =>
         {
             b.ToTable("asp_net_users");
-            b.HasIndex(u => u.NormalizedEmail).HasDatabaseName("email_index");
+            // Unique: LoginAsync looks users up globally by NormalizedEmail (IgnoreQueryFilters,
+            // no tenant in scope yet), so two tenants sharing an email would otherwise make
+            // login pick a tenant nondeterministically.
+            b.HasIndex(u => u.NormalizedEmail).HasDatabaseName("email_index").IsUnique();
             b.HasIndex(u => u.NormalizedUserName).HasDatabaseName("user_name_index");
+            b.HasIndex(u => u.TenantId);
+            b.HasOne<Tenant>().WithMany().HasForeignKey(u => u.TenantId).OnDelete(DeleteBehavior.Restrict);
         });
         builder.Entity<IdentityRole<Guid>>(b =>
         {

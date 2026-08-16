@@ -1,3 +1,4 @@
+using FamilyTree.Domain.Common;
 using Microsoft.AspNetCore.Identity;
 
 namespace FamilyTree.Infrastructure.Identity;
@@ -6,7 +7,7 @@ namespace FamilyTree.Infrastructure.Identity;
 /// Identity supplies the credential store. Roles are NOT Identity roles — they are
 /// tenant-scoped and permission-backed, which Identity's global roles cannot express.
 /// </summary>
-public sealed class ApplicationUser : IdentityUser<Guid>
+public sealed class ApplicationUser : IdentityUser<Guid>, ITenantOwned
 {
     public Guid TenantId { get; set; }
     public bool IsActive { get; set; } = true;
