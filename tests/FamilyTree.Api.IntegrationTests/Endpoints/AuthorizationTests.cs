@@ -72,4 +72,16 @@ public sealed class AuthorizationTests(PostgresFixture fixture) : IAsyncLifetime
         // so the endpoint answers 404 — never 403, and never another tenant's data.
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
+
+    [Fact]
+    public async Task Delete_member_returns_403_for_a_caller_lacking_the_delete_permission()
+    {
+        // Authenticated, and permitted to view members, but not to delete them.
+        _client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", TokenWith(Permissions.Member.View));
+
+        var response = await _client.DeleteAsync($"/api/v1/family-members/{Guid.CreateVersion7()}");
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
 }

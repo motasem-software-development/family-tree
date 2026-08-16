@@ -61,6 +61,15 @@ public sealed class FamilyTreeEndpointsTests(PostgresFixture fixture) : IAsyncLi
     }
 
     [Fact]
+    public async Task Put_requires_authentication()
+    {
+        var response = await _client.PutAsJsonAsync(
+            "/api/v1/family-tree", new RenameFamilyTreeRequest("عائلة السقا الكرام"));
+
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
     public async Task Get_returns_the_seeded_root_family()
     {
         await AuthenticateAsync();
