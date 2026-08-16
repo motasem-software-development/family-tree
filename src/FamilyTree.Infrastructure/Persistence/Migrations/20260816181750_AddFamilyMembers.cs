@@ -11,6 +11,11 @@ namespace FamilyTree.Infrastructure.Persistence.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.AddUniqueConstraint(
+                name: "ak_family_trees_id_tenant_id",
+                table: "family_trees",
+                columns: new[] { "id", "tenant_id" });
+
             migrationBuilder.CreateTable(
                 name: "family_members",
                 columns: table => new
@@ -29,10 +34,10 @@ namespace FamilyTree.Infrastructure.Persistence.Migrations
                     table.PrimaryKey("pk_family_members", x => x.id);
                     table.UniqueConstraint("ak_family_members_id_family_tree_id", x => new { x.id, x.family_tree_id });
                     table.ForeignKey(
-                        name: "fk_family_members_family_trees_family_tree_id",
-                        column: x => x.family_tree_id,
+                        name: "fk_family_members_family_trees_family_tree_id_tenant_id",
+                        columns: x => new { x.family_tree_id, x.tenant_id },
                         principalTable: "family_trees",
-                        principalColumn: "id",
+                        principalColumns: new[] { "id", "tenant_id" },
                         onDelete: ReferentialAction.Restrict);
                     table.ForeignKey(
                         name: "fk_family_members_tenants_tenant_id",
@@ -56,6 +61,11 @@ namespace FamilyTree.Infrastructure.Persistence.Migrations
                 name: "ix_family_members_family_tree_id_parent_id",
                 table: "family_members",
                 columns: new[] { "family_tree_id", "parent_id" });
+
+            migrationBuilder.CreateIndex(
+                name: "ix_family_members_family_tree_id_tenant_id",
+                table: "family_members",
+                columns: new[] { "family_tree_id", "tenant_id" });
 
             migrationBuilder.CreateIndex(
                 name: "ix_family_members_parent_id",
@@ -91,6 +101,10 @@ namespace FamilyTree.Infrastructure.Persistence.Migrations
 
             migrationBuilder.DropTable(
                 name: "family_members");
+
+            migrationBuilder.DropUniqueConstraint(
+                name: "ak_family_trees_id_tenant_id",
+                table: "family_trees");
         }
     }
 }

@@ -256,6 +256,9 @@ namespace FamilyTree.Infrastructure.Persistence.Migrations
                     b.HasIndex("FamilyTreeId", "ParentId")
                         .HasDatabaseName("ix_family_members_family_tree_id_parent_id");
 
+                    b.HasIndex("FamilyTreeId", "TenantId")
+                        .HasDatabaseName("ix_family_members_family_tree_id_tenant_id");
+
                     b.ToTable("family_members", (string)null);
                 });
 
@@ -290,6 +293,9 @@ namespace FamilyTree.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id")
                         .HasName("pk_family_trees");
+
+                    b.HasAlternateKey("Id", "TenantId")
+                        .HasName("ak_family_trees_id_tenant_id");
 
                     b.HasIndex("TenantId")
                         .IsUnique()
@@ -665,19 +671,20 @@ namespace FamilyTree.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("FamilyTree.Domain.FamilyMembers.FamilyMember", b =>
                 {
-                    b.HasOne("FamilyTree.Domain.FamilyTrees.FamilyTreeAggregate", null)
-                        .WithMany()
-                        .HasForeignKey("FamilyTreeId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_family_members_family_trees_family_tree_id");
-
                     b.HasOne("FamilyTree.Domain.Tenants.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_family_members_tenants_tenant_id");
+
+                    b.HasOne("FamilyTree.Domain.FamilyTrees.FamilyTreeAggregate", null)
+                        .WithMany()
+                        .HasForeignKey("FamilyTreeId", "TenantId")
+                        .HasPrincipalKey("Id", "TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_family_members_family_trees_family_tree_id_tenant_id");
                 });
 
             modelBuilder.Entity("FamilyTree.Domain.FamilyTrees.FamilyTreeAggregate", b =>

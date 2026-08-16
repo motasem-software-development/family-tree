@@ -98,6 +98,24 @@ public sealed class FamilyMemberConstraintTests(PostgresFixture fixture) : Datab
     }
 
     [Fact]
+    public async Task The_database_rejects_a_member_whose_tenant_does_not_own_its_tree()
+    {
+        // Design spec §3.3 applied to the tenant axis (Task 2 review, Important finding 2). The
+        // domain factory does not reject this combination — tenantA and treeB are each valid on
+        // their own — so only the composite (family_tree_id, tenant_id) foreign key can catch
+        // a member whose tenant does not own the tree it claims to belong to.
+        var (tenantA, _) = await SeedTenantWithTreeAsync("mu");
+        var (_, treeB) = await SeedTenantWithTreeAsync("nu");
+
+        await using var context = ContextFor(tenantA);
+        context.FamilyMembers.Add(FamilyMember.Create(tenantA, treeB, null, "مخالف", Now));
+
+        var act = async () => await context.SaveChangesAsync();
+
+        await act.Should().ThrowAsync<DbUpdateException>();
+    }
+
+    [Fact]
     public async Task The_database_refuses_to_delete_a_member_that_still_has_children()
     {
         // OnDelete(Restrict) makes "a parent with children cannot be deleted" a database
