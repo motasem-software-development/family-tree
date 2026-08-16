@@ -146,6 +146,23 @@ describe('MembersPage', () => {
     expect(await screen.findByText(i18n.t('errors.MEMBER_HAS_CHILDREN'))).toBeInTheDocument()
   })
 
+  it('closes the edit form and refreshes data on a concurrency conflict', async () => {
+    const user = userEvent.setup()
+    vi.mocked(membersApi.update).mockRejectedValue(new ApiError('CONCURRENCY_CONFLICT', 409))
+    renderPage()
+    await screen.findByText('سليمان')
+
+    await user.click(screen.getByRole('button', { name: i18n.t('members.edit') }))
+    const nameField = screen.getByLabelText(i18n.t('members.name'))
+    await user.clear(nameField)
+    await user.type(nameField, 'سليمان أحمد')
+    await user.click(screen.getByRole('button', { name: i18n.t('members.save') }))
+
+    expect(await screen.findByText(i18n.t('errors.CONCURRENCY_CONFLICT'))).toBeInTheDocument()
+    expect(screen.queryByLabelText(i18n.t('members.name'))).not.toBeInTheDocument()
+    await waitFor(() => expect(membersApi.list).toHaveBeenCalledTimes(2))
+  })
+
   it('hides add, edit, and delete controls without permission', async () => {
     permissive = false
     renderPage()

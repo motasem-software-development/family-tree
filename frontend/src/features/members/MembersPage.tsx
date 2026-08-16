@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '../auth/AuthContext'
 import { ApiError } from '../../services/apiClient'
 import { MemberForm } from './MemberForm'
-import { useCreateMember, useDeleteMember, useMembersQuery, useUpdateMember } from './useMembers'
+import { memberKeys, useCreateMember, useDeleteMember, useMembersQuery, useUpdateMember } from './useMembers'
 import type { FamilyMember } from './types'
 
 type Editing = { mode: 'none' } | { mode: 'add' } | { mode: 'edit'; member: FamilyMember }
@@ -13,6 +14,7 @@ const codeOf = (error: unknown): string => (error instanceof ApiError ? error.co
 export function MembersPage() {
   const { t } = useTranslation()
   const { hasPermission } = useAuth()
+  const queryClient = useQueryClient()
   const { data: members, isLoading } = useMembersQuery()
   const createMember = useCreateMember()
   const updateMember = useUpdateMember()
@@ -35,7 +37,17 @@ export function MembersPage() {
     setErrorCode(null)
     updateMember.mutate(
       { id: target.id, name, version: target.version },
-      { onSuccess: close, onError: (error) => setErrorCode(codeOf(error)) },
+      {
+        onSuccess: close,
+        onError: (error) => {
+          setErrorCode(codeOf(error))
+          // A CONCURRENCY_CONFLICT means the form is holding a stale version — retrying
+          // against it just reproduces the same 409. Refetch so the next open gets the
+          // current version, and close the form so the user re-opens it against fresh data.
+          void queryClient.invalidateQueries({ queryKey: memberKeys.all })
+          close()
+        },
+      },
     )
   }
 
