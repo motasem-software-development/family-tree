@@ -1,6 +1,7 @@
 using FamilyTree.Application.Common;
 using FamilyTree.Domain.Authentication;
 using FamilyTree.Domain.Authorization;
+using FamilyTree.Domain.FamilyMembers;
 using FamilyTree.Domain.FamilyTrees;
 using FamilyTree.Domain.Tenants;
 using FamilyTree.Infrastructure.Identity;
@@ -24,6 +25,7 @@ public sealed class ApplicationDbContext(
 
     public DbSet<Tenant> Tenants => Set<Tenant>();
     public DbSet<FamilyTreeAggregate> FamilyTrees => Set<FamilyTreeAggregate>();
+    public DbSet<FamilyMember> FamilyMembers => Set<FamilyMember>();
     public DbSet<Permission> Permissions => Set<Permission>();
     // `new` is required: IdentityDbContext already declares Roles (DbSet&lt;IdentityRole&lt;Guid&gt;&gt;)
     // and UserRoles (DbSet&lt;IdentityUserRole&lt;Guid&gt;&gt;). Ours are deliberately different,
@@ -71,6 +73,7 @@ public sealed class ApplicationDbContext(
         builder.Entity<Role>().HasQueryFilter(x => x.TenantId == _tenantId);
         builder.Entity<RefreshToken>().HasQueryFilter(x => x.TenantId == _tenantId);
         builder.Entity<ApplicationUser>().HasQueryFilter(x => x.TenantId == _tenantId);
+        builder.Entity<FamilyMember>().HasQueryFilter(x => x.TenantId == _tenantId);
 
         // Tenant and Permission are deliberately unfiltered: Tenant is the filter's own subject,
         // and the permission catalog is system-level rather than tenant-owned.
