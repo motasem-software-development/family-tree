@@ -2576,4 +2576,647 @@ git commit -m "feat: add permission resolution and idempotent database seeder"
 
 ---
 
-*Tasks 9–12 are appended in the sections that follow.*
+### Task 9: Authentication service and endpoints
+
+**Files:**
+- Create: `src/FamilyTree.Contracts/Auth/{LoginRequest,LoginResponse,RefreshRequest,CurrentUserResponse}.cs`
+- Create: `src/FamilyTree.Application/Auth/IAuthService.cs`
+- Create: `src/FamilyTree.Infrastructure/Auth/AuthService.cs`
+- Create: `src/FamilyTree.Api/Errors/ExceptionHandler.cs`, `Endpoints/Auth/AuthEndpoints.cs`
+- Modify: `src/FamilyTree.Api/Program.cs`, `src/FamilyTree.Infrastructure/DependencyInjection.cs`
+- Test: `tests/FamilyTree.Api.IntegrationTests/Fixtures/ApiFactory.cs`, `Endpoints/AuthEndpointsTests.cs`
+
+**Interfaces:**
+- Consumes: `ITokenService`, `IPermissionResolver`, `RefreshToken`, `ApplicationUser`, `ApplicationDbContext`.
+- Produces:
+  - `record LoginRequest(string Email, string Password)`, `record LoginResponse(string AccessToken, DateTimeOffset ExpiresAt, string RefreshToken)`, `record RefreshRequest(string RefreshToken)`, `record CurrentUserResponse(Guid Id, string Email, Guid TenantId, string FamilyTreeName, IReadOnlyCollection<string> Permissions)`.
+  - `record AuthResult(LoginResponse? Response, string? ErrorCode)` with `bool Succeeded => ErrorCode is null`.
+  - `interface IAuthService` — `Task<AuthResult> LoginAsync(LoginRequest, CancellationToken)`, `Task<AuthResult> RefreshAsync(string rawRefreshToken, CancellationToken)`, `Task LogoutAsync(string rawRefreshToken, CancellationToken)`.
+
+- [ ] **Step 1: Write the contracts**
+
+Create the four files under `src/FamilyTree.Contracts/Auth/`:
+
+```csharp
+// LoginRequest.cs
+namespace FamilyTree.Contracts.Auth;
+public sealed record LoginRequest(string Email, string Password);
+```
+
+```csharp
+// LoginResponse.cs
+namespace FamilyTree.Contracts.Auth;
+public sealed record LoginResponse(string AccessToken, DateTimeOffset ExpiresAt, string RefreshToken);
+```
+
+```csharp
+// RefreshRequest.cs
+namespace FamilyTree.Contracts.Auth;
+public sealed record RefreshRequest(string RefreshToken);
+```
+
+```csharp
+// CurrentUserResponse.cs
+namespace FamilyTree.Contracts.Auth;
+
+public sealed record CurrentUserResponse(
+    Guid Id,
+    string Email,
+    Guid TenantId,
+    string FamilyTreeName,
+    IReadOnlyCollection<string> Permissions);
+```
+
+- [ ] **Step 2: Write the failing endpoint tests**
+
+Create `tests/FamilyTree.Api.IntegrationTests/Fixtures/ApiFactory.cs`:
+
+```csharp
+using FamilyTree.Infrastructure.Persistence;
+using FamilyTree.Infrastructure.Persistence.Seed;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+
+namespace FamilyTree.Api.IntegrationTests.Fixtures;
+
+public sealed class ApiFactory(string connectionString) : WebApplicationFactory<Program>
+{
+    public const string AdminEmail = "admin@example.com";
+    public const string AdminPassword = "Str0ng!Seed#Password";
+
+    protected override void ConfigureWebHost(IWebHostBuilder builder)
+    {
+        builder.UseEnvironment("Testing");
+
+        builder.UseSetting("ConnectionStrings:DefaultConnection", connectionString);
+        builder.UseSetting("Jwt:Issuer", "https://localhost:5001");
+        builder.UseSetting("Jwt:Audience", "familytree-api");
+        builder.UseSetting("Jwt:SigningKey", "test-signing-key-that-is-at-least-32-bytes-long!!");
+        builder.UseSetting("Seed:TenantName", "Al-Saqqa Family");
+        builder.UseSetting("Seed:TenantSlug", "al-saqqa");
+        builder.UseSetting("Seed:FamilyTreeName", "عائلة السقا");
+        builder.UseSetting("Seed:AdminEmail", AdminEmail);
+        builder.UseSetting("Seed:AdminPassword", AdminPassword);
+    }
+
+    /// <summary>Migrates and seeds a clean database for the test class.</summary>
+    public async Task ResetAndSeedAsync()
+    {
+        using var scope = Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        await context.Database.EnsureDeletedAsync();
+        await context.Database.MigrateAsync();
+        await scope.ServiceProvider.GetRequiredService<DatabaseSeeder>().SeedAsync();
+    }
+}
+```
+
+Create `tests/FamilyTree.Api.IntegrationTests/Endpoints/AuthEndpointsTests.cs`:
+
+```csharp
+using System.Net;
+using System.Net.Http.Json;
+using FluentAssertions;
+using FamilyTree.Api.IntegrationTests.Fixtures;
+using FamilyTree.Contracts.Auth;
+
+namespace FamilyTree.Api.IntegrationTests.Endpoints;
+
+[Collection("postgres")]
+public sealed class AuthEndpointsTests(PostgresFixture fixture) : IAsyncLifetime
+{
+    private ApiFactory _factory = null!;
+    private HttpClient _client = null!;
+
+    public async ValueTask InitializeAsync()
+    {
+        _factory = new ApiFactory(fixture.ConnectionString);
+        await _factory.ResetAndSeedAsync();
+        _client = _factory.CreateClient();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _client.Dispose();
+        await _factory.DisposeAsync();
+    }
+
+    private async Task<LoginResponse> LoginAsync()
+    {
+        var response = await _client.PostAsJsonAsync("/api/v1/auth/login",
+            new LoginRequest(ApiFactory.AdminEmail, ApiFactory.AdminPassword));
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        return (await response.Content.ReadFromJsonAsync<LoginResponse>())!;
+    }
+
+    [Fact]
+    public async Task Login_with_valid_credentials_returns_an_access_token_and_a_refresh_token()
+    {
+        var login = await LoginAsync();
+
+        login.AccessToken.Should().NotBeNullOrWhiteSpace();
+        login.RefreshToken.Should().NotBeNullOrWhiteSpace();
+        login.ExpiresAt.Should().BeAfter(DateTimeOffset.UtcNow);
+    }
+
+    [Fact]
+    public async Task Login_with_a_wrong_password_returns_401_with_a_stable_code()
+    {
+        var response = await _client.PostAsJsonAsync("/api/v1/auth/login",
+            new LoginRequest(ApiFactory.AdminEmail, "not-the-password"));
+
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+
+        var problem = await response.Content.ReadFromJsonAsync<Dictionary<string, object>>();
+        problem!["code"].ToString().Should().Be("INVALID_CREDENTIALS");
+    }
+
+    [Fact]
+    public async Task Login_with_an_unknown_email_returns_the_same_401_and_code()
+    {
+        var response = await _client.PostAsJsonAsync("/api/v1/auth/login",
+            new LoginRequest("nobody@example.com", "whatever"));
+
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+
+        // Identical to the wrong-password response: the API must not reveal which emails exist.
+        var problem = await response.Content.ReadFromJsonAsync<Dictionary<string, object>>();
+        problem!["code"].ToString().Should().Be("INVALID_CREDENTIALS");
+    }
+
+    [Fact]
+    public async Task Login_with_a_blank_email_returns_400()
+    {
+        var response = await _client.PostAsJsonAsync("/api/v1/auth/login",
+            new LoginRequest("", "whatever"));
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task Refresh_returns_a_new_token_pair()
+    {
+        var login = await LoginAsync();
+
+        var response = await _client.PostAsJsonAsync("/api/v1/auth/refresh",
+            new RefreshRequest(login.RefreshToken));
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var refreshed = (await response.Content.ReadFromJsonAsync<LoginResponse>())!;
+
+        refreshed.RefreshToken.Should().NotBe(login.RefreshToken, "tokens rotate on use");
+        refreshed.AccessToken.Should().NotBeNullOrWhiteSpace();
+    }
+
+    [Fact]
+    public async Task A_refresh_token_cannot_be_used_twice()
+    {
+        var login = await LoginAsync();
+
+        await _client.PostAsJsonAsync("/api/v1/auth/refresh", new RefreshRequest(login.RefreshToken));
+        var replay = await _client.PostAsJsonAsync("/api/v1/auth/refresh", new RefreshRequest(login.RefreshToken));
+
+        replay.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        var problem = await replay.Content.ReadFromJsonAsync<Dictionary<string, object>>();
+        problem!["code"].ToString().Should().Be("INVALID_REFRESH_TOKEN");
+    }
+
+    [Fact]
+    public async Task Refresh_with_a_fabricated_token_returns_401()
+    {
+        var response = await _client.PostAsJsonAsync("/api/v1/auth/refresh",
+            new RefreshRequest("this-was-never-issued"));
+
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task Logout_revokes_the_refresh_token()
+    {
+        var login = await LoginAsync();
+
+        var logout = await _client.PostAsJsonAsync("/api/v1/auth/logout",
+            new RefreshRequest(login.RefreshToken));
+        logout.StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        var afterLogout = await _client.PostAsJsonAsync("/api/v1/auth/refresh",
+            new RefreshRequest(login.RefreshToken));
+        afterLogout.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task Logout_with_an_unknown_token_still_returns_204()
+    {
+        var response = await _client.PostAsJsonAsync("/api/v1/auth/logout",
+            new RefreshRequest("never-issued"));
+
+        // Logout is idempotent and must not become an oracle for which tokens exist.
+        response.StatusCode.Should().Be(HttpStatusCode.NoContent);
+    }
+}
+```
+
+- [ ] **Step 3: Run the tests to verify they fail**
+
+Run: `dotnet test tests/FamilyTree.Api.IntegrationTests --filter FullyQualifiedName~AuthEndpointsTests`
+Expected: failure — `/api/v1/auth/login` does not exist, so responses are 404.
+
+- [ ] **Step 4: Write the auth service contract and implementation**
+
+Create `src/FamilyTree.Application/Auth/IAuthService.cs`:
+
+```csharp
+using FamilyTree.Contracts.Auth;
+
+namespace FamilyTree.Application.Auth;
+
+public sealed record AuthResult(LoginResponse? Response, string? ErrorCode)
+{
+    public bool Succeeded => ErrorCode is null;
+
+    public static AuthResult Success(LoginResponse response) => new(response, null);
+    public static AuthResult Failure(string errorCode) => new(null, errorCode);
+}
+
+public interface IAuthService
+{
+    Task<AuthResult> LoginAsync(LoginRequest request, CancellationToken ct = default);
+    Task<AuthResult> RefreshAsync(string rawRefreshToken, CancellationToken ct = default);
+    Task LogoutAsync(string rawRefreshToken, CancellationToken ct = default);
+}
+```
+
+Create `src/FamilyTree.Infrastructure/Auth/AuthService.cs`:
+
+```csharp
+using FamilyTree.Application.Auth;
+using FamilyTree.Application.Authorization;
+using FamilyTree.Contracts.Auth;
+using FamilyTree.Domain.Authentication;
+using FamilyTree.Infrastructure.Identity;
+using FamilyTree.Infrastructure.Persistence;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+
+namespace FamilyTree.Infrastructure.Auth;
+
+public sealed class AuthService(
+    ApplicationDbContext context,
+    IPasswordHasher<ApplicationUser> passwordHasher,
+    ITokenService tokenService,
+    IPermissionResolver permissionResolver,
+    IOptions<JwtOptions> jwtOptions,
+    TimeProvider timeProvider) : IAuthService
+{
+    private readonly JwtOptions _jwt = jwtOptions.Value;
+
+    public async Task<AuthResult> LoginAsync(LoginRequest request, CancellationToken ct = default)
+    {
+        var normalizedEmail = request.Email.ToUpperInvariant();
+
+        // IgnoreQueryFilters: at login time there is no authenticated principal yet, so the
+        // tenant filter would exclude every user. This is the one place that is legitimate.
+        var user = await context.Users.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(u => u.NormalizedEmail == normalizedEmail, ct);
+
+        if (user?.PasswordHash is null)
+            return AuthResult.Failure("INVALID_CREDENTIALS");
+
+        var verification = passwordHasher.VerifyHashedPassword(user, user.PasswordHash, request.Password);
+        if (verification == PasswordVerificationResult.Failed)
+            return AuthResult.Failure("INVALID_CREDENTIALS");
+
+        if (!user.IsActive)
+            return AuthResult.Failure("ACCOUNT_INACTIVE");
+
+        var tenantActive = await context.Tenants.AnyAsync(t => t.Id == user.TenantId && t.IsActive, ct);
+        if (!tenantActive)
+            return AuthResult.Failure("TENANT_INACTIVE");
+
+        var now = timeProvider.GetUtcNow();
+        user.LastLoginAt = now;
+
+        var response = await IssueTokensAsync(user, now, ct);
+        await context.SaveChangesAsync(ct);
+
+        return AuthResult.Success(response);
+    }
+
+    public async Task<AuthResult> RefreshAsync(string rawRefreshToken, CancellationToken ct = default)
+    {
+        var hash = tokenService.HashRefreshToken(rawRefreshToken);
+        var now = timeProvider.GetUtcNow();
+
+        var stored = await context.RefreshTokens.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(t => t.TokenHash == hash, ct);
+
+        if (stored is null || !stored.IsActive(now))
+            return AuthResult.Failure("INVALID_REFRESH_TOKEN");
+
+        var user = await context.Users.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(u => u.Id == stored.UserId, ct);
+
+        if (user is null || !user.IsActive)
+            return AuthResult.Failure("INVALID_REFRESH_TOKEN");
+
+        var response = await IssueTokensAsync(user, now, ct);
+
+        // Rotation: the old token is revoked and records its successor, so replaying it fails
+        // and the chain is auditable.
+        stored.Revoke(now, tokenService.HashRefreshToken(response.RefreshToken));
+
+        await context.SaveChangesAsync(ct);
+        return AuthResult.Success(response);
+    }
+
+    public async Task LogoutAsync(string rawRefreshToken, CancellationToken ct = default)
+    {
+        var hash = tokenService.HashRefreshToken(rawRefreshToken);
+
+        var stored = await context.RefreshTokens.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(t => t.TokenHash == hash, ct);
+
+        // Silent no-op when unknown: logout must not reveal which tokens exist.
+        if (stored is null) return;
+
+        stored.Revoke(timeProvider.GetUtcNow(), replacedByTokenHash: null);
+        await context.SaveChangesAsync(ct);
+    }
+
+    private async Task<LoginResponse> IssueTokensAsync(
+        ApplicationUser user, DateTimeOffset now, CancellationToken ct)
+    {
+        var permissions = await permissionResolver.GetPermissionsAsync(user.Id, ct);
+
+        var access = tokenService.CreateAccessToken(
+            user.Id, user.TenantId, user.Email!, permissions);
+
+        var refresh = tokenService.CreateRefreshToken();
+
+        context.RefreshTokens.Add(RefreshToken.Issue(
+            user.Id, user.TenantId, refresh.TokenHash, now,
+            TimeSpan.FromDays(_jwt.RefreshTokenLifetimeDays)));
+
+        return new LoginResponse(access.Value, access.ExpiresAt, refresh.RawToken);
+    }
+}
+```
+
+`PermissionResolver` reads through the tenant-filtered context. During login the principal is not yet set, so the filter would return nothing — pass the resolver a context that has the user's tenant. Handle this by resolving permissions with an explicit unfiltered join in `PermissionResolver`; change its query to `context.Roles.IgnoreQueryFilters().Where(r => r.TenantId == <user's tenant>)`. To keep the resolver signature honest, add an overload:
+
+```csharp
+// Add to IPermissionResolver and PermissionResolver
+Task<IReadOnlyCollection<string>> GetPermissionsAsync(
+    Guid userId, Guid tenantId, CancellationToken ct = default);
+```
+
+The two-argument overload bypasses the filter and constrains by the supplied tenant explicitly; the one-argument overload delegates to it using `ITenantContext.TenantId`. Call the two-argument form from `AuthService`. Update `PermissionResolverTests` to cover both, asserting the two-argument form returns empty when the tenant does not match the user's roles.
+
+- [ ] **Step 5: Write the error handler**
+
+Create `src/FamilyTree.Api/Errors/ExceptionHandler.cs`:
+
+```csharp
+using FamilyTree.Domain.Common;
+using Microsoft.AspNetCore.Diagnostics;
+using Microsoft.AspNetCore.Mvc;
+
+namespace FamilyTree.Api.Errors;
+
+/// <summary>
+/// Turns domain rule violations into Problem Details carrying the stable machine-readable
+/// code. Message text is never the contract — clients translate from `code` (spec §4.8).
+/// </summary>
+public sealed class DomainExceptionHandler(ILogger<DomainExceptionHandler> logger) : IExceptionHandler
+{
+    public async ValueTask<bool> TryHandleAsync(
+        HttpContext httpContext, Exception exception, CancellationToken ct)
+    {
+        if (exception is not DomainException domainException) return false;
+
+        logger.LogWarning("Domain rule violated: {Code}", domainException.Code);
+
+        var problem = new ProblemDetails
+        {
+            Status = StatusCodes.Status400BadRequest,
+            Title = "Request violates a business rule",
+            Detail = domainException.Message,
+            Extensions = { ["code"] = domainException.Code }
+        };
+
+        httpContext.Response.StatusCode = problem.Status.Value;
+        await httpContext.Response.WriteAsJsonAsync(problem, ct);
+        return true;
+    }
+}
+
+public static class ProblemResults
+{
+    /// <summary>Problem Details with a stable `code` extension, used by every failing endpoint.</summary>
+    public static IResult Coded(int status, string code, string title) =>
+        Results.Problem(statusCode: status, title: title, extensions: new Dictionary<string, object?>
+        {
+            ["code"] = code
+        });
+}
+```
+
+- [ ] **Step 6: Write the auth endpoints**
+
+Create `src/FamilyTree.Api/Endpoints/Auth/AuthEndpoints.cs`:
+
+```csharp
+using FamilyTree.Api.Errors;
+using FamilyTree.Application.Auth;
+using FamilyTree.Contracts.Auth;
+
+namespace FamilyTree.Api.Endpoints.Auth;
+
+public static class AuthEndpoints
+{
+    public static IEndpointRouteBuilder MapAuthEndpoints(this IEndpointRouteBuilder app)
+    {
+        var group = app.MapGroup("/api/v1/auth").AllowAnonymous().WithTags("Auth");
+
+        group.MapPost("/login", async (LoginRequest request, IAuthService auth, CancellationToken ct) =>
+        {
+            if (string.IsNullOrWhiteSpace(request.Email) || string.IsNullOrWhiteSpace(request.Password))
+                return ProblemResults.Coded(StatusCodes.Status400BadRequest,
+                    "VALIDATION_FAILED", "Email and password are required.");
+
+            var result = await auth.LoginAsync(request, ct);
+
+            return result.Succeeded
+                ? Results.Ok(result.Response)
+                : ProblemResults.Coded(StatusForCode(result.ErrorCode!), result.ErrorCode!, "Authentication failed.");
+        });
+
+        group.MapPost("/refresh", async (RefreshRequest request, IAuthService auth, CancellationToken ct) =>
+        {
+            if (string.IsNullOrWhiteSpace(request.RefreshToken))
+                return ProblemResults.Coded(StatusCodes.Status400BadRequest,
+                    "VALIDATION_FAILED", "Refresh token is required.");
+
+            var result = await auth.RefreshAsync(request.RefreshToken, ct);
+
+            return result.Succeeded
+                ? Results.Ok(result.Response)
+                : ProblemResults.Coded(StatusCodes.Status401Unauthorized,
+                    result.ErrorCode!, "Authentication failed.");
+        });
+
+        group.MapPost("/logout", async (RefreshRequest request, IAuthService auth, CancellationToken ct) =>
+        {
+            await auth.LogoutAsync(request.RefreshToken ?? string.Empty, ct);
+            return Results.NoContent();
+        });
+
+        return app;
+    }
+
+    private static int StatusForCode(string code) => code switch
+    {
+        "ACCOUNT_INACTIVE" or "TENANT_INACTIVE" => StatusCodes.Status403Forbidden,
+        _ => StatusCodes.Status401Unauthorized
+    };
+}
+```
+
+- [ ] **Step 7: Compose the application host**
+
+Replace `src/FamilyTree.Api/Program.cs`:
+
+```csharp
+using System.Text;
+using FamilyTree.Api.Endpoints.Auth;
+using FamilyTree.Api.Errors;
+using FamilyTree.Api.Middleware;
+using FamilyTree.Application.Common;
+using FamilyTree.Infrastructure;
+using FamilyTree.Infrastructure.Auth;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using Serilog;
+
+var builder = WebApplication.CreateBuilder(args);
+
+builder.Host.UseSerilog((context, config) =>
+    config.ReadFrom.Configuration(context.Configuration).WriteTo.Console());
+
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddScoped<ITenantContext, HttpTenantContext>();
+builder.Services.AddInfrastructure(builder.Configuration);
+
+builder.Services.AddProblemDetails();
+builder.Services.AddExceptionHandler<DomainExceptionHandler>();
+builder.Services.AddOpenApi();
+
+var jwt = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>()
+          ?? throw new InvalidOperationException("Jwt configuration section is missing.");
+
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            ValidIssuer = jwt.Issuer,
+            ValidAudience = jwt.Audience,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwt.SigningKey)),
+            ClockSkew = TimeSpan.FromSeconds(30)
+        };
+    });
+
+builder.Services.AddAuthorization();
+
+var app = builder.Build();
+
+app.UseExceptionHandler();
+app.UseSerilogRequestLogging();
+app.UseAuthentication();
+app.UseAuthorization();
+
+if (app.Environment.IsDevelopment())
+    app.MapOpenApi();
+
+app.MapGet("/health", () => Results.Ok(new { status = "ok" })).AllowAnonymous();
+app.MapAuthEndpoints();
+
+app.Run();
+
+public partial class Program;
+```
+
+Extend `src/FamilyTree.Infrastructure/DependencyInjection.cs`:
+
+```csharp
+using FamilyTree.Application.Auth;
+using FamilyTree.Application.Authorization;
+using FamilyTree.Infrastructure.Auth;
+using FamilyTree.Infrastructure.Authorization;
+using FamilyTree.Infrastructure.Identity;
+using FamilyTree.Infrastructure.Persistence;
+using FamilyTree.Infrastructure.Persistence.Seed;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+
+namespace FamilyTree.Infrastructure;
+
+public static class DependencyInjection
+{
+    public static IServiceCollection AddInfrastructure(
+        this IServiceCollection services, IConfiguration configuration)
+    {
+        // AddDbContext, not AddDbContextPool: the context holds per-request tenant state,
+        // and a pooled instance reused across requests would leak tenant scope. See plan header.
+        services.AddDbContext<ApplicationDbContext>(options =>
+            options.UseNpgsql(configuration.GetConnectionString("DefaultConnection"))
+                   .UseSnakeCaseNamingConvention());
+
+        services.Configure<JwtOptions>(configuration.GetSection(JwtOptions.SectionName));
+        services.Configure<SeedOptions>(configuration.GetSection(SeedOptions.SectionName));
+
+        services.AddScoped<IPasswordHasher<ApplicationUser>, PasswordHasher<ApplicationUser>>();
+        services.AddScoped<ITokenService, JwtTokenService>();
+        services.AddScoped<IPermissionResolver, PermissionResolver>();
+        services.AddScoped<IAuthService, AuthService>();
+        services.AddScoped<DatabaseSeeder>();
+
+        return services;
+    }
+}
+```
+
+Add the remaining packages:
+
+```bash
+dotnet add src/FamilyTree.Api package Serilog.AspNetCore
+dotnet add src/FamilyTree.Api package Microsoft.AspNetCore.OpenApi
+```
+
+- [ ] **Step 8: Run the tests to verify they pass**
+
+Run: `dotnet test tests/FamilyTree.Api.IntegrationTests`
+Expected: PASS — 24 tests.
+
+- [ ] **Step 9: Commit**
+
+```bash
+git add src tests
+git commit -m "feat: add authentication service, endpoints, and problem details"
+```
+
+---
+
+*Tasks 10–12 are appended in the sections that follow.*
