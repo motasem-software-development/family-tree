@@ -1,0 +1,7 @@
+**/bin/
+**/obj/
+.git/
+.superpowers/
+docs/
+frontend/
+tests/

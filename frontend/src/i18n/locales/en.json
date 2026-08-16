@@ -1,0 +1,19 @@
+{
+  "app": { "title": "Family Tree" },
+  "language": { "ar": "العربية", "en": "English" },
+  "auth": {
+    "signIn": "Sign in",
+    "email": "Email",
+    "password": "Password",
+    "signOut": "Sign out",
+    "signingIn": "Signing in…"
+  },
+  "errors": {
+    "INVALID_CREDENTIALS": "The email or password is incorrect.",
+    "ACCOUNT_INACTIVE": "This account has been deactivated.",
+    "TENANT_INACTIVE": "This account's subscription is inactive.",
+    "VALIDATION_FAILED": "Please check the highlighted fields.",
+    "NETWORK": "Could not reach the server. Please try again.",
+    "UNKNOWN": "Something went wrong. Please try again."
+  }
+}
