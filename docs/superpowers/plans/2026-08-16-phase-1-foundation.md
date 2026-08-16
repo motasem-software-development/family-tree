@@ -3596,8 +3596,15 @@ app.MapMeEndpoints();
 
 // Seeding is idempotent and runs on startup. Schema migration is NOT run here — per the
 // technical specification §48, production schema changes belong to CI/CD, never to app startup.
-using (var scope = app.Services.CreateScope())
+//
+// The Testing guard is load-bearing, not tidiness: WebApplicationFactory builds and starts the
+// host the moment a test touches .Services, which happens BEFORE the test's own MigrateAsync().
+// Without the guard, SeedAsync would query tables that do not exist yet on a fresh Testcontainers
+// database and every ApiFactory-based test class would die at host startup. ApiFactory sets
+// UseEnvironment("Testing") and seeds explicitly after migrating. Do not remove this.
+if (!app.Environment.IsEnvironment("Testing"))
 {
+    using var scope = app.Services.CreateScope();
     await scope.ServiceProvider.GetRequiredService<DatabaseSeeder>().SeedAsync();
 }
 ```
