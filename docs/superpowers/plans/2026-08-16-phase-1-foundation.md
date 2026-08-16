@@ -3219,4 +3219,380 @@ git commit -m "feat: add authentication service, endpoints, and problem details"
 
 ---
 
-*Tasks 10–12 are appended in the sections that follow.*
+### Task 10: Permission-based authorization and the `/me` endpoint
+
+**Files:**
+- Create: `src/FamilyTree.Api/Authorization/PermissionRequirement.cs`, `PermissionAuthorizationHandler.cs`, `EndpointExtensions.cs`
+- Create: `src/FamilyTree.Api/Endpoints/Me/MeEndpoints.cs`
+- Modify: `src/FamilyTree.Api/Program.cs` (register policies, map `/me`, seed on startup)
+- Test: `tests/FamilyTree.Api.IntegrationTests/Endpoints/MeEndpointsTests.cs`, `Endpoints/AuthorizationTests.cs`
+
+**Interfaces:**
+- Consumes: `Permissions` (Task 4), `JwtTokenService.PermissionClaim` (Task 7), `ITenantContext`, `ApplicationDbContext`.
+- Produces:
+  - `PermissionRequirement(string Permission) : IAuthorizationRequirement`
+  - `RouteHandlerBuilder RequirePermission(this RouteHandlerBuilder builder, string permission)`
+  - `GET /api/v1/me` returning `CurrentUserResponse`, requiring `FamilyTree.View`.
+
+- [ ] **Step 1: Write the failing tests**
+
+Create `tests/FamilyTree.Api.IntegrationTests/Endpoints/MeEndpointsTests.cs`:
+
+```csharp
+using System.Net;
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
+using FluentAssertions;
+using FamilyTree.Api.IntegrationTests.Fixtures;
+using FamilyTree.Contracts.Auth;
+
+namespace FamilyTree.Api.IntegrationTests.Endpoints;
+
+[Collection("postgres")]
+public sealed class MeEndpointsTests(PostgresFixture fixture) : IAsyncLifetime
+{
+    private ApiFactory _factory = null!;
+    private HttpClient _client = null!;
+
+    public async ValueTask InitializeAsync()
+    {
+        _factory = new ApiFactory(fixture.ConnectionString);
+        await _factory.ResetAndSeedAsync();
+        _client = _factory.CreateClient();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _client.Dispose();
+        await _factory.DisposeAsync();
+    }
+
+    private async Task AuthenticateAsync()
+    {
+        var response = await _client.PostAsJsonAsync("/api/v1/auth/login",
+            new LoginRequest(ApiFactory.AdminEmail, ApiFactory.AdminPassword));
+        var login = (await response.Content.ReadFromJsonAsync<LoginResponse>())!;
+
+        _client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", login.AccessToken);
+    }
+
+    [Fact]
+    public async Task Me_without_a_token_returns_401()
+    {
+        var response = await _client.GetAsync("/api/v1/me");
+
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task Me_with_a_malformed_token_returns_401()
+    {
+        _client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", "not.a.jwt");
+
+        var response = await _client.GetAsync("/api/v1/me");
+
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task Me_returns_the_seeded_super_admin_with_the_full_permission_set()
+    {
+        await AuthenticateAsync();
+
+        var response = await _client.GetAsync("/api/v1/me");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var me = (await response.Content.ReadFromJsonAsync<CurrentUserResponse>())!;
+
+        me.Email.Should().Be(ApiFactory.AdminEmail);
+        me.TenantId.Should().NotBeEmpty();
+        me.FamilyTreeName.Should().Be("عائلة السقا");
+        me.Permissions.Should().Contain("Member.Create").And.Contain("Role.Delete");
+    }
+
+    [Fact]
+    public async Task Me_resolves_the_tenant_from_the_token_and_ignores_a_spoofed_header()
+    {
+        await AuthenticateAsync();
+        _client.DefaultRequestHeaders.Add("X-Tenant-Id", Guid.CreateVersion7().ToString());
+
+        var response = await _client.GetAsync("/api/v1/me");
+        var me = (await response.Content.ReadFromJsonAsync<CurrentUserResponse>())!;
+
+        // The family tree name proves the tenant came from the token, not the header.
+        me.FamilyTreeName.Should().Be("عائلة السقا");
+    }
+}
+```
+
+Create `tests/FamilyTree.Api.IntegrationTests/Endpoints/AuthorizationTests.cs`:
+
+```csharp
+using System.Net;
+using System.Net.Http.Headers;
+using FluentAssertions;
+using FamilyTree.Api.IntegrationTests.Fixtures;
+using FamilyTree.Domain.Authorization;
+using FamilyTree.Infrastructure.Auth;
+using FamilyTree.Application.Auth;
+using Microsoft.Extensions.DependencyInjection;
+
+namespace FamilyTree.Api.IntegrationTests.Endpoints;
+
+[Collection("postgres")]
+public sealed class AuthorizationTests(PostgresFixture fixture) : IAsyncLifetime
+{
+    private ApiFactory _factory = null!;
+    private HttpClient _client = null!;
+
+    public async ValueTask InitializeAsync()
+    {
+        _factory = new ApiFactory(fixture.ConnectionString);
+        await _factory.ResetAndSeedAsync();
+        _client = _factory.CreateClient();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _client.Dispose();
+        await _factory.DisposeAsync();
+    }
+
+    /// <summary>Mints a token directly so a permission set can be varied without seeding users.</summary>
+    private string TokenWith(params string[] permissions)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var tokens = scope.ServiceProvider.GetRequiredService<ITokenService>();
+
+        return tokens.CreateAccessToken(
+            Guid.CreateVersion7(), Guid.CreateVersion7(), "someone@example.com", permissions).Value;
+    }
+
+    [Fact]
+    public async Task A_token_without_the_required_permission_returns_403()
+    {
+        _client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", TokenWith(Permissions.Audit.View));
+
+        var response = await _client.GetAsync("/api/v1/me");
+
+        // Authenticated but not permitted — 403, distinct from the 401 of no token at all.
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task A_token_with_no_permissions_at_all_returns_403()
+    {
+        _client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", TokenWith());
+
+        var response = await _client.GetAsync("/api/v1/me");
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task A_token_carrying_the_required_permission_is_admitted_by_the_policy()
+    {
+        _client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", TokenWith(Permissions.FamilyTree.View));
+
+        var response = await _client.GetAsync("/api/v1/me");
+
+        // The policy admits the request. The tenant in this hand-minted token owns no tree,
+        // so the endpoint answers 404 — never 403, and never another tenant's data.
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+}
+```
+
+- [ ] **Step 2: Run the tests to verify they fail**
+
+Run: `dotnet test tests/FamilyTree.Api.IntegrationTests --filter FullyQualifiedName~Endpoints`
+Expected: failure — `/api/v1/me` returns 404 for every case because it is not mapped.
+
+- [ ] **Step 3: Write the authorization primitives**
+
+Create `src/FamilyTree.Api/Authorization/PermissionRequirement.cs`:
+
+```csharp
+using Microsoft.AspNetCore.Authorization;
+
+namespace FamilyTree.Api.Authorization;
+
+public sealed class PermissionRequirement(string permission) : IAuthorizationRequirement
+{
+    public string Permission { get; } = permission;
+}
+```
+
+Create `src/FamilyTree.Api/Authorization/PermissionAuthorizationHandler.cs`:
+
+```csharp
+using FamilyTree.Infrastructure.Auth;
+using Microsoft.AspNetCore.Authorization;
+
+namespace FamilyTree.Api.Authorization;
+
+/// <summary>
+/// Evaluates permission claims carried by the access token. One handler serves every
+/// permission — adding a capability means adding a constant and a seed row, never a new handler.
+/// </summary>
+public sealed class PermissionAuthorizationHandler : AuthorizationHandler<PermissionRequirement>
+{
+    protected override Task HandleRequirementAsync(
+        AuthorizationHandlerContext context, PermissionRequirement requirement)
+    {
+        var granted = context.User.FindAll(JwtTokenService.PermissionClaim)
+            .Any(c => c.Value == requirement.Permission);
+
+        if (granted) context.Succeed(requirement);
+
+        return Task.CompletedTask;
+    }
+}
+```
+
+Permissions ride in the token, so evaluation costs no database round trip. The tradeoff is that a permission change takes effect at the next token refresh — at most 15 minutes. Revoking a user outright is immediate, because refresh is rejected once the account is inactive.
+
+Create `src/FamilyTree.Api/Authorization/EndpointExtensions.cs`:
+
+```csharp
+using FamilyTree.Domain.Authorization;
+using Microsoft.AspNetCore.Authorization;
+
+namespace FamilyTree.Api.Authorization;
+
+public static class EndpointExtensions
+{
+    /// <summary>Registers one policy per permission code, named after the code itself.</summary>
+    public static AuthorizationBuilder AddPermissionPolicies(this AuthorizationBuilder builder)
+    {
+        foreach (var permission in Permissions.All)
+            builder.AddPolicy(permission, policy => policy.AddRequirements(new PermissionRequirement(permission)));
+
+        return builder;
+    }
+
+    public static RouteHandlerBuilder RequirePermission(this RouteHandlerBuilder builder, string permission) =>
+        builder.RequireAuthorization(permission);
+}
+```
+
+- [ ] **Step 4: Write the `/me` endpoint**
+
+Create `src/FamilyTree.Api/Endpoints/Me/MeEndpoints.cs`:
+
+```csharp
+using FamilyTree.Api.Authorization;
+using FamilyTree.Application.Common;
+using FamilyTree.Contracts.Auth;
+using FamilyTree.Domain.Authorization;
+using FamilyTree.Infrastructure.Auth;
+using FamilyTree.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
+
+namespace FamilyTree.Api.Endpoints.Me;
+
+public static class MeEndpoints
+{
+    public static IEndpointRouteBuilder MapMeEndpoints(this IEndpointRouteBuilder app)
+    {
+        app.MapGet("/api/v1/me", async (
+            ITenantContext tenant,
+            ApplicationDbContext context,
+            HttpContext http,
+            CancellationToken ct) =>
+        {
+            // Filtered query: a tenant with no tree of its own simply finds nothing.
+            var tree = await context.FamilyTrees.FirstOrDefaultAsync(ct);
+            if (tree is null) return Results.NotFound();
+
+            var email = http.User.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value ?? string.Empty;
+
+            var permissions = http.User.FindAll(JwtTokenService.PermissionClaim)
+                .Select(c => c.Value)
+                .ToArray();
+
+            return Results.Ok(new CurrentUserResponse(
+                tenant.UserId, email, tenant.TenantId, tree.Name, permissions));
+        })
+        .RequirePermission(Permissions.FamilyTree.View)
+        .WithTags("Me");
+
+        return app;
+    }
+}
+```
+
+Returning 404 rather than 403 when the tree is absent is the uniform non-disclosure rule from spec §4.4.
+
+- [ ] **Step 5: Wire policies, the handler, `/me`, and startup seeding into Program.cs**
+
+In `src/FamilyTree.Api/Program.cs`, replace `builder.Services.AddAuthorization();` with:
+
+```csharp
+builder.Services.AddSingleton<IAuthorizationHandler, PermissionAuthorizationHandler>();
+builder.Services.AddAuthorizationBuilder().AddPermissionPolicies();
+```
+
+Add the matching usings:
+
+```csharp
+using FamilyTree.Api.Authorization;
+using FamilyTree.Api.Endpoints.Me;
+using FamilyTree.Infrastructure.Persistence.Seed;
+using Microsoft.AspNetCore.Authorization;
+```
+
+After `app.MapAuthEndpoints();` add:
+
+```csharp
+app.MapMeEndpoints();
+
+// Seeding is idempotent and runs on startup. Schema migration is NOT run here — per the
+// technical specification §48, production schema changes belong to CI/CD, never to app startup.
+using (var scope = app.Services.CreateScope())
+{
+    await scope.ServiceProvider.GetRequiredService<DatabaseSeeder>().SeedAsync();
+}
+```
+
+- [ ] **Step 6: Run the full backend test suite**
+
+Run: `dotnet test`
+Expected: PASS — 57 tests (26 domain, 6 application, 25 integration).
+
+- [ ] **Step 7: Verify the running API end to end by hand**
+
+```bash
+docker compose up -d postgres
+export ConnectionStrings__DefaultConnection="Host=localhost;Port=5432;Database=familytree;Username=familytree;Password=devpassword"
+export Jwt__Issuer="https://localhost:5001" Jwt__Audience="familytree-api"
+export Jwt__SigningKey="local-dev-signing-key-at-least-32-bytes-long!!"
+export Seed__TenantName="Al-Saqqa Family" Seed__TenantSlug="al-saqqa"
+export Seed__FamilyTreeName="عائلة السقا"
+export Seed__AdminEmail="admin@example.com" Seed__AdminPassword="Str0ng!Local#Password"
+
+dotnet ef database update --project src/FamilyTree.Infrastructure --startup-project src/FamilyTree.Api
+dotnet run --project src/FamilyTree.Api &
+
+curl -s -X POST http://localhost:5000/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@example.com","password":"Str0ng!Local#Password"}'
+```
+
+Expected: a JSON body containing `accessToken`, `expiresAt`, and `refreshToken`. Then call `/api/v1/me` with `Authorization: Bearer <accessToken>` and expect the Arabic family tree name in the response.
+
+- [ ] **Step 8: Commit**
+
+```bash
+git add src tests
+git commit -m "feat: add permission policies, /me endpoint, and startup seeding"
+```
+
+---
+
+*Tasks 11–13 are appended in the sections that follow.*
