@@ -10,8 +10,12 @@ import type { FamilyMember } from './types'
 import { ApiError } from '../../services/apiClient'
 
 vi.mock('./membersApi')
+
+// A mutable flag lets a single test flip permissions off; beforeEach resets it to the
+// permissive default so the other tests are unaffected.
+let permissive = true
 vi.mock('../auth/AuthContext', () => ({
-  useAuth: () => ({ hasPermission: () => true }),
+  useAuth: () => ({ hasPermission: () => permissive }),
 }))
 
 const member = (over: Partial<FamilyMember> = {}): FamilyMember => ({
@@ -37,10 +41,9 @@ const renderPage = () => {
 
 describe('MembersPage', () => {
   beforeEach(() => {
-    // vi.mock auto-mocks do not clear call history between tests by default, so a call
-    // recorded in one test (e.g. "deletes a member") would otherwise leak into the next
-    // test's assertions (e.g. "does not delete when declined" seeing a stale call count).
-    vi.clearAllMocks()
+    // Mock call history is cleared globally between tests (vite.config.ts `clearMocks: true`),
+    // so no per-file vi.clearAllMocks() is needed here.
+    permissive = true
     vi.mocked(membersApi.list).mockResolvedValue([member()])
     vi.mocked(membersApi.create).mockResolvedValue(member({ id: 'b', name: 'فارس' }))
     vi.mocked(membersApi.update).mockResolvedValue(member({ name: 'سليمان أحمد', version: 2 }))
@@ -141,5 +144,15 @@ describe('MembersPage', () => {
     await user.click(screen.getByRole('button', { name: i18n.t('members.delete') }))
 
     expect(await screen.findByText(i18n.t('errors.MEMBER_HAS_CHILDREN'))).toBeInTheDocument()
+  })
+
+  it('hides add, edit, and delete controls without permission', async () => {
+    permissive = false
+    renderPage()
+
+    expect(await screen.findByText('سليمان')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: i18n.t('members.add') })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: i18n.t('members.edit') })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: i18n.t('members.delete') })).not.toBeInTheDocument()
   })
 })
