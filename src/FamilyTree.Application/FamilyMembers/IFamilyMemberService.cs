@@ -13,4 +13,6 @@ public interface IFamilyMemberService
 
     Task<FamilyMemberResponse> UpdateAsync(
         Guid id, UpdateFamilyMemberRequest request, CancellationToken ct = default);
+
+    Task DeleteAsync(Guid id, CancellationToken ct = default);
 }

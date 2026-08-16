@@ -95,6 +95,23 @@ public sealed class FamilyMemberService(
         return Map(member);
     }
 
+    public async Task DeleteAsync(Guid id, CancellationToken ct = default)
+    {
+        var member = await context.FamilyMembers.FirstOrDefaultAsync(m => m.Id == id, ct)
+            ?? throw new NotFoundException("MEMBER_NOT_FOUND", "Member not found.");
+
+        // The FK's OnDelete(Restrict) would also stop this, but a DbUpdateException carries no
+        // stable code for the client. Checking first is what makes the 409 contractual
+        // (technical specification §26).
+        var hasChildren = await context.FamilyMembers.AnyAsync(m => m.ParentId == id, ct);
+        if (hasChildren)
+            throw new ConflictException(
+                "MEMBER_HAS_CHILDREN", "This member cannot be deleted because they have children.");
+
+        context.FamilyMembers.Remove(member);
+        await context.SaveChangesAsync(ct);
+    }
+
     internal static FamilyMemberResponse Map(FamilyMember member) => new(
         member.Id, member.Name, member.ParentId, member.Version, member.CreatedAt, member.UpdatedAt);
 }

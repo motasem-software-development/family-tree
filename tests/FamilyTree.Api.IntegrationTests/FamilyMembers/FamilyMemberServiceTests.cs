@@ -294,4 +294,83 @@ public sealed class FamilyMemberServiceTests(PostgresFixture fixture) : Database
 
         (await act.Should().ThrowAsync<DomainException>()).Which.Code.Should().Be("MEMBER_NAME_REQUIRED");
     }
+
+    [Fact]
+    public async Task DeleteAsync_removes_a_leaf_member()
+    {
+        var (tenantId, _) = await SeedTenantWithTreeAsync("del-alpha");
+        await using var context = ContextFor(tenantId);
+        var service = ServiceFor(context, tenantId);
+        var created = await service.CreateAsync(new CreateFamilyMemberRequest("فارس", null), default);
+
+        await service.DeleteAsync(created.Id, default);
+
+        (await service.GetAsync(created.Id, default)).Should().BeNull();
+    }
+
+    [Fact]
+    public async Task DeleteAsync_refuses_a_member_that_has_children()
+    {
+        var (tenantId, _) = await SeedTenantWithTreeAsync("del-beta");
+        await using var context = ContextFor(tenantId);
+        var service = ServiceFor(context, tenantId);
+        var parent = await service.CreateAsync(new CreateFamilyMemberRequest("سليمان", null), default);
+        await service.CreateAsync(new CreateFamilyMemberRequest("فارس", parent.Id), default);
+
+        var act = async () => await service.DeleteAsync(parent.Id, default);
+
+        (await act.Should().ThrowAsync<ConflictException>()).Which.Code.Should().Be("MEMBER_HAS_CHILDREN");
+
+        // And nothing was removed.
+        (await service.GetAsync(parent.Id, default)).Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task DeleteAsync_reports_a_missing_member_as_not_found()
+    {
+        var (tenantId, _) = await SeedTenantWithTreeAsync("del-gamma");
+        await using var context = ContextFor(tenantId);
+
+        var act = async () => await ServiceFor(context, tenantId).DeleteAsync(Guid.CreateVersion7(), default);
+
+        (await act.Should().ThrowAsync<NotFoundException>()).Which.Code.Should().Be("MEMBER_NOT_FOUND");
+    }
+
+    [Fact]
+    public async Task DeleteAsync_reports_another_tenants_member_as_not_found_and_leaves_it_intact()
+    {
+        var (tenantA, _) = await SeedTenantWithTreeAsync("del-delta");
+        var (tenantB, _) = await SeedTenantWithTreeAsync("del-epsilon");
+
+        Guid foreignId;
+        await using (var contextB = ContextFor(tenantB))
+        {
+            foreignId = (await ServiceFor(contextB, tenantB)
+                .CreateAsync(new CreateFamilyMemberRequest("غريب", null), default)).Id;
+        }
+
+        await using (var contextA = ContextFor(tenantA))
+        {
+            var act = async () => await ServiceFor(contextA, tenantA).DeleteAsync(foreignId, default);
+            (await act.Should().ThrowAsync<NotFoundException>()).Which.Code.Should().Be("MEMBER_NOT_FOUND");
+        }
+
+        await using var contextBAgain = ContextFor(tenantB);
+        (await ServiceFor(contextBAgain, tenantB).GetAsync(foreignId, default)).Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task DeleteAsync_allows_a_parent_once_its_children_are_gone()
+    {
+        var (tenantId, _) = await SeedTenantWithTreeAsync("del-zeta");
+        await using var context = ContextFor(tenantId);
+        var service = ServiceFor(context, tenantId);
+        var parent = await service.CreateAsync(new CreateFamilyMemberRequest("سليمان", null), default);
+        var child = await service.CreateAsync(new CreateFamilyMemberRequest("فارس", parent.Id), default);
+
+        await service.DeleteAsync(child.Id, default);
+        await service.DeleteAsync(parent.Id, default);
+
+        (await service.ListAsync(default)).Should().BeEmpty();
+    }
 }
