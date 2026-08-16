@@ -140,6 +140,7 @@ public sealed class FamilyMemberEndpointsTests(PostgresFixture fixture) : IAsync
         var response = await _client.GetAsync($"/api/v1/family-members/{Guid.CreateVersion7()}");
 
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        (await CodeOf(response)).Should().Be("MEMBER_NOT_FOUND");
     }
 
     [Fact]

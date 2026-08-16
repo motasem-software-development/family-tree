@@ -2,6 +2,7 @@ using FamilyTree.Api.Authorization;
 using FamilyTree.Application.FamilyMembers;
 using FamilyTree.Contracts.FamilyMembers;
 using FamilyTree.Domain.Authorization;
+using FamilyTree.Domain.Common;
 
 namespace FamilyTree.Api.Endpoints.FamilyMembers;
 
@@ -19,8 +20,15 @@ public static class FamilyMemberEndpoints
         {
             var member = await members.GetAsync(id, ct);
             // Null covers both "no such member" and "belongs to another tenant" — the query
-            // filter has already made them the same thing (design spec §4.4).
-            return member is null ? Results.NotFound() : Results.Ok(member);
+            // filter has already made them the same thing (design spec §4.4). Throwing here
+            // (rather than calling ProblemResults.Coded / Results.Problem directly) routes the
+            // response through DomainExceptionHandler, the same path PUT and DELETE use, so
+            // the body is byte-identical for any unknown id — Results.Problem's own
+            // IProblemDetailsService pipeline stamps a per-request traceId that would break
+            // that guarantee (design spec §4.4).
+            return member is null
+                ? throw new NotFoundException("MEMBER_NOT_FOUND", "Member not found.")
+                : Results.Ok(member);
         })
             .RequirePermission(Permissions.Member.View);
 
