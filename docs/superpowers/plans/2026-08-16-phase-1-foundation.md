@@ -2047,4 +2047,533 @@ git commit -m "feat: add JWT issuance and refresh token hashing"
 
 ---
 
-*Tasks 8–12 are appended in the sections that follow.*
+### Task 8: Permission resolution and the database seeder
+
+**Files:**
+- Create: `src/FamilyTree.Application/Authorization/IPermissionResolver.cs`
+- Create: `src/FamilyTree.Infrastructure/Authorization/PermissionResolver.cs`
+- Create: `src/FamilyTree.Infrastructure/Persistence/Seed/SeedOptions.cs`, `Seed/SystemRoles.cs`, `Seed/DatabaseSeeder.cs`
+- Test: `tests/FamilyTree.Api.IntegrationTests/Authorization/PermissionResolverTests.cs`, `Persistence/DatabaseSeederTests.cs`
+
+**Interfaces:**
+- Consumes: `ApplicationDbContext`, `Permissions`, `Role`, `RolePermission`, `UserRole`, `ApplicationUser`, `Tenant`, `FamilyTreeAggregate`.
+- Produces:
+  - `interface IPermissionResolver { Task<IReadOnlyCollection<string>> GetPermissionsAsync(Guid userId, CancellationToken ct = default); }`
+  - `static class SystemRoles` — `const string SuperAdmin/Administrator/Editor/Viewer`, and `IReadOnlyDictionary<string, IReadOnlyList<string>> Definitions`.
+  - `DatabaseSeeder.SeedAsync(CancellationToken)` — idempotent.
+
+- [ ] **Step 1: Write the failing permission resolver test**
+
+Create `tests/FamilyTree.Api.IntegrationTests/Authorization/PermissionResolverTests.cs`:
+
+```csharp
+using FluentAssertions;
+using FamilyTree.Api.IntegrationTests.Fixtures;
+using FamilyTree.Domain.Authorization;
+using FamilyTree.Domain.Tenants;
+using FamilyTree.Infrastructure.Authorization;
+using FamilyTree.Infrastructure.Identity;
+
+namespace FamilyTree.Api.IntegrationTests.Authorization;
+
+public sealed class PermissionResolverTests(PostgresFixture fixture) : DatabaseTestBase(fixture)
+{
+    private async Task<(Guid TenantId, Guid UserId)> SeedUserWithRolesAsync(
+        params (string RoleName, string[] Permissions)[] roles)
+    {
+        await using var context = ContextFor(Guid.Empty);
+
+        var tenant = Tenant.Create("Al-Saqqa Family", "al-saqqa", Now);
+        context.Tenants.Add(tenant);
+
+        var user = new ApplicationUser
+        {
+            Id = Guid.CreateVersion7(),
+            TenantId = tenant.Id,
+            Email = "admin@example.com",
+            UserName = "admin@example.com",
+            CreatedAt = Now
+        };
+        context.Users.Add(user);
+
+        var catalog = Permissions.All
+            .Select(code => Permission.Create(code, null, Now))
+            .ToDictionary(p => p.Code);
+        context.Permissions.AddRange(catalog.Values);
+
+        foreach (var (roleName, permissionCodes) in roles)
+        {
+            var role = Role.Create(tenant.Id, roleName, null, Now);
+            context.Roles.Add(role);
+            context.UserRoles.Add(UserRole.Create(user.Id, role.Id));
+            context.RolePermissions.AddRange(
+                permissionCodes.Select(code => RolePermission.Create(role.Id, catalog[code].Id)));
+        }
+
+        await context.SaveChangesAsync();
+        return (tenant.Id, user.Id);
+    }
+
+    [Fact]
+    public async Task Resolves_the_permissions_granted_by_a_users_single_role()
+    {
+        var (tenantId, userId) = await SeedUserWithRolesAsync(
+            ("Editor", [Permissions.Member.View, Permissions.Member.Create]));
+
+        await using var context = ContextFor(tenantId);
+        var resolver = new PermissionResolver(context);
+
+        var permissions = await resolver.GetPermissionsAsync(userId);
+
+        permissions.Should().BeEquivalentTo("Member.View", "Member.Create");
+    }
+
+    [Fact]
+    public async Task Resolves_the_union_of_multiple_roles_without_duplicates()
+    {
+        var (tenantId, userId) = await SeedUserWithRolesAsync(
+            ("Viewer", [Permissions.Member.View]),
+            ("Mover",  [Permissions.Member.View, Permissions.Member.Move]));
+
+        await using var context = ContextFor(tenantId);
+        var resolver = new PermissionResolver(context);
+
+        var permissions = await resolver.GetPermissionsAsync(userId);
+
+        permissions.Should().BeEquivalentTo("Member.View", "Member.Move");
+        permissions.Should().OnlyHaveUniqueItems();
+    }
+
+    [Fact]
+    public async Task Returns_empty_for_a_user_with_no_roles()
+    {
+        var (tenantId, userId) = await SeedUserWithRolesAsync();
+
+        await using var context = ContextFor(tenantId);
+        var resolver = new PermissionResolver(context);
+
+        (await resolver.GetPermissionsAsync(userId)).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Returns_empty_for_a_user_id_belonging_to_another_tenant()
+    {
+        var (_, userId) = await SeedUserWithRolesAsync(("Editor", [Permissions.Member.View]));
+
+        await using var context = ContextFor(Guid.CreateVersion7());
+        var resolver = new PermissionResolver(context);
+
+        // The role query filter excludes the other tenant's roles, so no permission leaks across.
+        (await resolver.GetPermissionsAsync(userId)).Should().BeEmpty();
+    }
+}
+```
+
+- [ ] **Step 2: Run the test to verify it fails**
+
+Run: `dotnet test tests/FamilyTree.Api.IntegrationTests --filter FullyQualifiedName~PermissionResolverTests`
+Expected: compilation failure — `PermissionResolver` does not exist.
+
+- [ ] **Step 3: Write the resolver**
+
+Create `src/FamilyTree.Application/Authorization/IPermissionResolver.cs`:
+
+```csharp
+namespace FamilyTree.Application.Authorization;
+
+public interface IPermissionResolver
+{
+    /// <summary>The union of every permission granted by every role the user holds.</summary>
+    Task<IReadOnlyCollection<string>> GetPermissionsAsync(Guid userId, CancellationToken ct = default);
+}
+```
+
+Create `src/FamilyTree.Infrastructure/Authorization/PermissionResolver.cs`:
+
+```csharp
+using FamilyTree.Application.Authorization;
+using FamilyTree.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
+
+namespace FamilyTree.Infrastructure.Authorization;
+
+public sealed class PermissionResolver(ApplicationDbContext context) : IPermissionResolver
+{
+    public async Task<IReadOnlyCollection<string>> GetPermissionsAsync(
+        Guid userId, CancellationToken ct = default)
+    {
+        // Roles carry a tenant query filter, so a user id from another tenant joins to nothing.
+        var codes = await (
+            from userRole in context.UserRoles
+            join role in context.Roles on userRole.RoleId equals role.Id
+            join rolePermission in context.RolePermissions on role.Id equals rolePermission.RoleId
+            join permission in context.Permissions on rolePermission.PermissionId equals permission.Id
+            where userRole.UserId == userId
+            select permission.Code)
+            .Distinct()
+            .ToListAsync(ct);
+
+        return codes;
+    }
+}
+```
+
+- [ ] **Step 4: Write the failing seeder test**
+
+Create `tests/FamilyTree.Api.IntegrationTests/Persistence/DatabaseSeederTests.cs`:
+
+```csharp
+using FluentAssertions;
+using FamilyTree.Api.IntegrationTests.Fixtures;
+using FamilyTree.Domain.Authorization;
+using FamilyTree.Infrastructure.Persistence.Seed;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+using Microsoft.AspNetCore.Identity;
+using FamilyTree.Infrastructure.Identity;
+
+namespace FamilyTree.Api.IntegrationTests.Persistence;
+
+public sealed class DatabaseSeederTests(PostgresFixture fixture) : DatabaseTestBase(fixture)
+{
+    private static readonly SeedOptions Options = new()
+    {
+        TenantName = "Al-Saqqa Family",
+        TenantSlug = "al-saqqa",
+        FamilyTreeName = "عائلة السقا",
+        AdminEmail = "admin@example.com",
+        AdminPassword = "Str0ng!Seed#Password"
+    };
+
+    private async Task RunSeederAsync()
+    {
+        await using var context = ContextFor(Guid.Empty);
+        var hasher = new PasswordHasher<ApplicationUser>();
+        var seeder = new DatabaseSeeder(context, hasher, Microsoft.Extensions.Options.Options.Create(Options), TimeProvider.System);
+        await seeder.SeedAsync();
+    }
+
+    [Fact]
+    public async Task Seeds_one_tenant_one_tree_the_full_catalog_and_four_system_roles()
+    {
+        await RunSeederAsync();
+
+        await using var context = ContextFor(Guid.Empty);
+
+        (await context.Tenants.CountAsync()).Should().Be(1);
+        (await context.FamilyTrees.IgnoreQueryFilters().CountAsync()).Should().Be(1);
+        (await context.Permissions.CountAsync()).Should().Be(Permissions.All.Count);
+        (await context.Roles.IgnoreQueryFilters().CountAsync()).Should().Be(4);
+        (await context.Roles.IgnoreQueryFilters().CountAsync(r => r.IsSystem)).Should().Be(4);
+    }
+
+    [Fact]
+    public async Task Grants_the_super_admin_role_every_permission_in_the_catalog()
+    {
+        await RunSeederAsync();
+
+        await using var context = ContextFor(Guid.Empty);
+        var superAdmin = await context.Roles.IgnoreQueryFilters()
+            .SingleAsync(r => r.Name == SystemRoles.SuperAdmin);
+
+        var granted = await context.RolePermissions.CountAsync(rp => rp.RoleId == superAdmin.Id);
+
+        granted.Should().Be(Permissions.All.Count);
+    }
+
+    [Fact]
+    public async Task Creates_the_admin_user_bound_to_the_tenant_with_the_super_admin_role()
+    {
+        await RunSeederAsync();
+
+        await using var context = ContextFor(Guid.Empty);
+        var tenantId = await context.Tenants.Select(t => t.Id).SingleAsync();
+        var user = await context.Users.IgnoreQueryFilters().SingleAsync();
+
+        user.Email.Should().Be("admin@example.com");
+        user.TenantId.Should().Be(tenantId);
+        user.IsActive.Should().BeTrue();
+        user.PasswordHash.Should().NotBeNullOrWhiteSpace();
+        user.PasswordHash.Should().NotContain("Str0ng!Seed#Password", "the password is hashed, never stored");
+
+        var superAdmin = await context.Roles.IgnoreQueryFilters()
+            .SingleAsync(r => r.Name == SystemRoles.SuperAdmin);
+        (await context.UserRoles.AnyAsync(ur => ur.UserId == user.Id && ur.RoleId == superAdmin.Id))
+            .Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Running_the_seeder_twice_changes_nothing()
+    {
+        await RunSeederAsync();
+        await RunSeederAsync();
+
+        await using var context = ContextFor(Guid.Empty);
+
+        (await context.Tenants.CountAsync()).Should().Be(1);
+        (await context.Users.IgnoreQueryFilters().CountAsync()).Should().Be(1);
+        (await context.Roles.IgnoreQueryFilters().CountAsync()).Should().Be(4);
+        (await context.Permissions.CountAsync()).Should().Be(Permissions.All.Count);
+    }
+
+    [Fact]
+    public async Task Viewer_role_receives_only_read_permissions()
+    {
+        await RunSeederAsync();
+
+        await using var context = ContextFor(Guid.Empty);
+        var viewer = await context.Roles.IgnoreQueryFilters().SingleAsync(r => r.Name == SystemRoles.Viewer);
+
+        var codes = await (from rp in context.RolePermissions
+                           join p in context.Permissions on rp.PermissionId equals p.Id
+                           where rp.RoleId == viewer.Id
+                           select p.Code).ToListAsync();
+
+        codes.Should().BeEquivalentTo("FamilyTree.View", "Member.View");
+    }
+}
+```
+
+- [ ] **Step 5: Write the seed configuration and role definitions**
+
+Create `src/FamilyTree.Infrastructure/Persistence/Seed/SeedOptions.cs`:
+
+```csharp
+namespace FamilyTree.Infrastructure.Persistence.Seed;
+
+public sealed class SeedOptions
+{
+    public const string SectionName = "Seed";
+
+    public string TenantName { get; init; } = null!;
+    public string TenantSlug { get; init; } = null!;
+    public string FamilyTreeName { get; init; } = null!;
+    public string AdminEmail { get; init; } = null!;
+
+    /// <summary>Supplied by environment variable or user-secrets. Never committed.</summary>
+    public string AdminPassword { get; init; } = null!;
+}
+```
+
+Create `src/FamilyTree.Infrastructure/Persistence/Seed/SystemRoles.cs`:
+
+```csharp
+using FamilyTree.Domain.Authorization;
+
+namespace FamilyTree.Infrastructure.Persistence.Seed;
+
+/// <summary>
+/// The four predefined roles from SRS §19, expressed as permission sets rather than as
+/// hard-coded role checks. Custom roles created later sit alongside these as equals.
+/// </summary>
+public static class SystemRoles
+{
+    public const string SuperAdmin = "Super Admin";
+    public const string Administrator = "Administrator";
+    public const string Editor = "Editor";
+    public const string Viewer = "Viewer";
+
+    public static IReadOnlyDictionary<string, IReadOnlyList<string>> Definitions { get; } =
+        new Dictionary<string, IReadOnlyList<string>>
+        {
+            [SuperAdmin] = Permissions.All,
+
+            [Administrator] =
+            [
+                Permissions.FamilyTree.View, Permissions.FamilyTree.Edit,
+                Permissions.Member.View, Permissions.Member.Create, Permissions.Member.Edit,
+                Permissions.Member.Move, Permissions.Member.Delete,
+                Permissions.User.View, Permissions.User.Create, Permissions.User.Edit,
+                Permissions.User.Deactivate,
+                Permissions.Role.View,
+                Permissions.Audit.View,
+                Permissions.PublicLink.Create, Permissions.PublicLink.Revoke
+            ],
+
+            [Editor] =
+            [
+                Permissions.FamilyTree.View,
+                Permissions.Member.View, Permissions.Member.Create,
+                Permissions.Member.Edit, Permissions.Member.Move
+            ],
+
+            [Viewer] =
+            [
+                Permissions.FamilyTree.View,
+                Permissions.Member.View
+            ]
+        };
+}
+```
+
+Only Super Admin can manage roles — that is the deliberate difference between it and Administrator.
+
+- [ ] **Step 6: Write the seeder**
+
+Create `src/FamilyTree.Infrastructure/Persistence/Seed/DatabaseSeeder.cs`:
+
+```csharp
+using FamilyTree.Domain.Authorization;
+using FamilyTree.Domain.FamilyTrees;
+using FamilyTree.Domain.Tenants;
+using FamilyTree.Infrastructure.Identity;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+
+namespace FamilyTree.Infrastructure.Persistence.Seed;
+
+/// <summary>
+/// Creates the single V1 tenant, its family tree, the permission catalog, the four system
+/// roles, and the first Super Admin. Idempotent: safe to run on every startup.
+/// </summary>
+public sealed class DatabaseSeeder(
+    ApplicationDbContext context,
+    IPasswordHasher<ApplicationUser> passwordHasher,
+    IOptions<SeedOptions> options,
+    TimeProvider timeProvider)
+{
+    private readonly SeedOptions _options = options.Value;
+
+    public async Task SeedAsync(CancellationToken ct = default)
+    {
+        var now = timeProvider.GetUtcNow();
+
+        await using var transaction = await context.Database.BeginTransactionAsync(ct);
+
+        await SeedPermissionCatalogAsync(now, ct);
+        var tenant = await SeedTenantAsync(now, ct);
+        await SeedFamilyTreeAsync(tenant.Id, now, ct);
+        var roleIds = await SeedSystemRolesAsync(tenant.Id, now, ct);
+        await SeedAdminUserAsync(tenant.Id, roleIds[SystemRoles.SuperAdmin], now, ct);
+
+        await transaction.CommitAsync(ct);
+    }
+
+    private async Task SeedPermissionCatalogAsync(DateTimeOffset now, CancellationToken ct)
+    {
+        var existing = await context.Permissions.Select(p => p.Code).ToListAsync(ct);
+        var missing = Permissions.All.Except(existing).ToList();
+        if (missing.Count == 0) return;
+
+        context.Permissions.AddRange(missing.Select(code => Permission.Create(code, null, now)));
+        await context.SaveChangesAsync(ct);
+    }
+
+    private async Task<Tenant> SeedTenantAsync(DateTimeOffset now, CancellationToken ct)
+    {
+        var existing = await context.Tenants.FirstOrDefaultAsync(t => t.Slug == _options.TenantSlug, ct);
+        if (existing is not null) return existing;
+
+        var tenant = Tenant.Create(_options.TenantName, _options.TenantSlug, now);
+        context.Tenants.Add(tenant);
+        await context.SaveChangesAsync(ct);
+        return tenant;
+    }
+
+    private async Task SeedFamilyTreeAsync(Guid tenantId, DateTimeOffset now, CancellationToken ct)
+    {
+        var exists = await context.FamilyTrees.IgnoreQueryFilters().AnyAsync(t => t.TenantId == tenantId, ct);
+        if (exists) return;
+
+        context.FamilyTrees.Add(FamilyTreeAggregate.Create(tenantId, _options.FamilyTreeName, now));
+        await context.SaveChangesAsync(ct);
+    }
+
+    private async Task<Dictionary<string, Guid>> SeedSystemRolesAsync(
+        Guid tenantId, DateTimeOffset now, CancellationToken ct)
+    {
+        var catalog = await context.Permissions.ToDictionaryAsync(p => p.Code, p => p.Id, ct);
+        var roleIds = new Dictionary<string, Guid>();
+
+        foreach (var (roleName, permissionCodes) in SystemRoles.Definitions)
+        {
+            var role = await context.Roles.IgnoreQueryFilters()
+                .FirstOrDefaultAsync(r => r.TenantId == tenantId && r.Name == roleName, ct);
+
+            if (role is null)
+            {
+                role = Role.CreateSystem(tenantId, roleName, null, now);
+                context.Roles.Add(role);
+                await context.SaveChangesAsync(ct);
+            }
+
+            roleIds[roleName] = role.Id;
+
+            var alreadyGranted = await context.RolePermissions
+                .Where(rp => rp.RoleId == role.Id)
+                .Select(rp => rp.PermissionId)
+                .ToListAsync(ct);
+
+            var toGrant = permissionCodes
+                .Select(code => catalog[code])
+                .Except(alreadyGranted)
+                .Select(permissionId => RolePermission.Create(role.Id, permissionId))
+                .ToList();
+
+            if (toGrant.Count > 0)
+            {
+                context.RolePermissions.AddRange(toGrant);
+                await context.SaveChangesAsync(ct);
+            }
+        }
+
+        return roleIds;
+    }
+
+    private async Task SeedAdminUserAsync(
+        Guid tenantId, Guid superAdminRoleId, DateTimeOffset now, CancellationToken ct)
+    {
+        var normalizedEmail = _options.AdminEmail.ToUpperInvariant();
+
+        var user = await context.Users.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(u => u.NormalizedEmail == normalizedEmail, ct);
+
+        if (user is null)
+        {
+            user = new ApplicationUser
+            {
+                Id = Guid.CreateVersion7(),
+                TenantId = tenantId,
+                Email = _options.AdminEmail,
+                NormalizedEmail = normalizedEmail,
+                UserName = _options.AdminEmail,
+                NormalizedUserName = normalizedEmail,
+                EmailConfirmed = true,
+                IsActive = true,
+                CreatedAt = now,
+                SecurityStamp = Guid.CreateVersion7().ToString()
+            };
+            user.PasswordHash = passwordHasher.HashPassword(user, _options.AdminPassword);
+
+            context.Users.Add(user);
+            await context.SaveChangesAsync(ct);
+        }
+
+        var hasRole = await context.UserRoles
+            .AnyAsync(ur => ur.UserId == user.Id && ur.RoleId == superAdminRoleId, ct);
+
+        if (!hasRole)
+        {
+            context.UserRoles.Add(UserRole.Create(user.Id, superAdminRoleId));
+            await context.SaveChangesAsync(ct);
+        }
+    }
+}
+```
+
+- [ ] **Step 7: Run the tests to verify they pass**
+
+Run: `dotnet test tests/FamilyTree.Api.IntegrationTests`
+Expected: PASS — 15 tests (6 isolation + 4 resolver + 5 seeder).
+
+- [ ] **Step 8: Commit**
+
+```bash
+git add src/FamilyTree.Application src/FamilyTree.Infrastructure tests/FamilyTree.Api.IntegrationTests
+git commit -m "feat: add permission resolution and idempotent database seeder"
+```
+
+---
+
+*Tasks 9–12 are appended in the sections that follow.*
