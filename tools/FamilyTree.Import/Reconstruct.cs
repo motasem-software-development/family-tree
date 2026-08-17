@@ -23,7 +23,8 @@ public sealed record Reconstruction(IReadOnlyList<ImportedMember> Members, strin
 /// passed through <see cref="string.Normalize(NormalizationForm)"/> with
 /// <see cref="NormalizationForm.FormKC"/> to fold Arabic presentation forms (U+FB50-U+FEFF,
 /// which the raw glyph-id -> Unicode mapping in <see cref="ToUnicodeCMap"/> can produce) down
-/// to their base letters, before whitespace is collapsed and trimmed.
+/// to their base letters. Two further codepoints are then folded explicitly (see
+/// <see cref="FoldFontArtifacts"/>) before whitespace is collapsed and trimmed.
 /// </para>
 ///
 /// <para>
@@ -92,9 +93,40 @@ public static class Reconstruct
             .Select(row => string.Concat(row.OrderBy(g => g.X).Reverse().Select(g => g.Text)));
 
         var raw = string.Join(" ", rows);
-        var normalized = raw.Normalize(NormalizationForm.FormKC);
+        var normalized = FoldFontArtifacts(raw.Normalize(NormalizationForm.FormKC));
         return Regex.Replace(normalized, @"\s+", " ").Trim();
     }
+
+    /// <summary>
+    /// Folds two codepoints that survive <see cref="NormalizationForm.FormKC"/> unchanged but
+    /// are font-subsetting artifacts of this specific source, not intentional Persian/Urdu
+    /// letters: U+06CC (ARABIC LETTER FARSI YEH) -> U+064A (ARABIC LETTER YEH), and U+06BE
+    /// (ARABIC LETTER HEH DOACHASHMEE) -> U+0647 (ARABIC LETTER HEH).
+    ///
+    /// <para>
+    /// This is deliberately <i>not</i> the presentation-form table the plan's Global Constraints
+    /// ban -- that ban targets hand-rolling the U+FB50-U+FEFF fold NFKC already performs
+    /// correctly. NFKC declines to touch U+06CC/U+06BE at all (verified directly:
+    /// <c>"ی".Normalize(FormKC)</c> and <c>"ھ".Normalize(FormKC)</c> are both
+    /// no-ops), because in Persian/Urdu orthography these are genuinely distinct letters from
+    /// Arabic Yeh/Heh. They are not distinct here: this document's own raw ToUnicode CMap maps
+    /// glyph <c>03EB</c> directly to U+06BE (confirmed against the decompressed CMap stream,
+    /// not a parsing artifact) and glyph <c>03F3</c> to U+FBFE (Farsi Yeh Isolated Form, which
+    /// NFKC folds to U+06CC) for what is, in every other respect, ordinary Arabic Heh/Yeh --
+    /// e.g. <c>03F1</c> maps directly to standard U+064A and <c>03F2</c>'s Yeh Final Form folds
+    /// to U+064A via NFKC, so only one specific glyph slot (used for isolated-position Yeh, and
+    /// reused for medial position since no medial-Yeh entry exists at all) carries the
+    /// Farsi-Yeh codepoint. Standard Arabic Heh (U+0647) does not appear anywhere in this
+    /// document's raw glyph set; every Heh-shaped letter routes through this non-standard
+    /// codepoint. Leaving this unfolded would mean every name containing a medial Yeh or any
+    /// Heh -- 114 and 21 occurrences respectively across 349 members -- compares unequal to the
+    /// same name typed with a standard Arabic keyboard, silently breaking search/sort/lookup
+    /// against user-entered Arabic text.
+    /// </para>
+    /// </summary>
+    private static string FoldFontArtifacts(string s) => s
+        .Replace('ی', 'ي')   // ARABIC LETTER FARSI YEH -> ARABIC LETTER YEH
+        .Replace('ھ', 'ه');  // ARABIC LETTER HEH DOACHASHMEE -> ARABIC LETTER HEH
 
     private static int? NearestBoxIndex(IReadOnlyList<Box> boxes, (double X, double Y) point)
     {
