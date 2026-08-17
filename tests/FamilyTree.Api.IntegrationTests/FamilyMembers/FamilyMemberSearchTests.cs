@@ -96,6 +96,12 @@ public sealed class FamilyMemberSearchTests(PostgresFixture fixture) : DatabaseT
 
         page.Total.Should().Be(5);
         page.Items.Should().HaveCount(3);
+
+        // Each محمد is a direct child of داوود. Without the per-hit ancestor reset in
+        // ReadPageAsync, the second and third hits would accumulate the earlier hits'
+        // chains — which every count-only assertion in this file would happily allow.
+        page.Items.Should().OnlyContain(i => i.Generation == 2);
+        page.Items.Should().OnlyContain(i => i.Ancestors.Count == 1 && i.Ancestors[0].Name == "داوود");
     }
 
     [Fact]
@@ -142,6 +148,21 @@ public sealed class FamilyMemberSearchTests(PostgresFixture fixture) : DatabaseT
 
         page.Total.Should().Be(0);
         page.Items.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task A_literal_percent_or_underscore_in_a_name_is_findable()
+    {
+        // The other half of escaping: over-escaping would make every query containing a
+        // metacharacter silently return nothing, and the fail-closed test above cannot see it.
+        var tenantId = await SeedTenantWithTreeAsync("search-literal");
+        await using var context = ContextFor(tenantId);
+        var service = ServiceFor(context, tenantId);
+        await SeedChainAsync(service, "50% محمد");
+
+        var page = await service.SearchAsync("50%", 20, 0, default);
+
+        page.Items.Should().ContainSingle().Which.Name.Should().Be("50% محمد");
     }
 
     [Fact]
