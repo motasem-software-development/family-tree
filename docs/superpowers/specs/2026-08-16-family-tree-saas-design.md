@@ -244,6 +244,45 @@ RFC 7807 Problem Details with a stable machine-readable `code` (`MEMBER_HAS_CHIL
 `MOVE_CREATES_CYCLE`, `CONCURRENCY_CONFLICT`, …). The frontend maps codes to translated
 messages. Message text is not part of the contract — it cannot be, given the bilingual UI.
 
+### 4.9 User and role management
+
+> Added 2026-08-18 for Phase 4. Phase 1 built the permission model — catalog, resolver,
+> `RequirePermission`, seeded roles, and the `UserRole` / `RolePermission` joins. Phase 4
+> adds only the management surface on top of it. Nothing in §4.3 changes.
+
+Eleven endpoints: users (list, create, update, activate, deactivate, administrator password
+reset), roles (list, create, update, delete), and a permission catalog the role editor reads.
+Users and roles are both tenant-owned, so §4.4's uniform 404 applies to every id parameter.
+
+**Passwords.** §4.2 makes provisioning administrator-driven, which requires a way for a user
+to replace the password an administrator chose. `ApplicationUser` carries
+`MustChangePassword`; administrator create and administrator reset set it, self-service
+change clears it. The flag travels as a JWT claim, and middleware rejects every request other
+than `GET /me` and `POST /me/password` with `PASSWORD_CHANGE_REQUIRED` while it is set. The
+rule lives on the server because §9 forbids business rules enforced only in the frontend — a
+temporary-password token can do exactly two things regardless of client.
+
+**Lockout guard.** A tenant must not be able to strip itself of administration. The guard
+rejects any operation leaving no active user who holds both `User.Edit` and `Role.Edit` —
+the pair required to recover — and fires on deactivation, on role reassignment, and on role
+edits or deletions that remove those permissions. Error code `LAST_ADMINISTRATOR`.
+
+The guard is computed over **effective permissions, not role names**, for the same reason
+§4.3 gives: a name check would be the one role-name-based authorization decision in the
+system, and it would be defeated by renaming Super Admin or by a custom role that is Super
+Admin in all but name. `Role.IsSystem` already prevents modifying a seeded role; this
+protects role membership, which `IsSystem` does not reach.
+
+**Permission changes are not instant.** Permissions are claims in a 15-minute access token
+(§4.3), so revoking a role takes effect on that user's next token, not on their next request.
+This is inherent to the claims design rather than an oversight — resolving permissions per
+request would make the claims architecture pointless. Deactivation is sharper: login and
+refresh both reject an inactive user immediately, so the exposure is one access-token
+lifetime rather than one refresh-token lifetime.
+
+**Audit writes are deferred to Phase 5**, which owns the audit schema and the viewer.
+Designing that schema here would mean designing it twice.
+
 ---
 
 ## 5. Tree visualization
