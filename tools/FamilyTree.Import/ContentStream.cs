@@ -92,7 +92,7 @@ public static class ContentStream
                 case "m":
                     {
                         var p = Operands(tokens, i, 2);
-                        activePoints = new List<(double, double)> { (p[0], p[1]) };
+                        activePoints = new List<(double, double)> { TransformPoint(p[0], p[1], ctm) };
                         activeOps.Clear();
                         pathActive = true;
                         break;
@@ -102,7 +102,7 @@ public static class ContentStream
                     if (pathActive)
                     {
                         var p = Operands(tokens, i, 2);
-                        activePoints.Add((p[0], p[1]));
+                        activePoints.Add(TransformPoint(p[0], p[1], ctm));
                         activeOps.Append('l');
                     }
                     break;
@@ -113,7 +113,7 @@ public static class ContentStream
                         // Take only the curve's endpoint (the last x,y pair of the six
                         // operands), which is what bounding boxes and endpoints need.
                         var p = Operands(tokens, i, 2);
-                        activePoints.Add((p[0], p[1]));
+                        activePoints.Add(TransformPoint(p[0], p[1], ctm));
                         activeOps.Append('c');
                     }
                     break;
@@ -134,6 +134,16 @@ public static class ContentStream
 
         return new PageContent(glyphs, paths);
     }
+
+    /// <summary>
+    /// Path construction operators (m/l/c) record points in the coordinate space active at
+    /// draw time, which is local to whatever CTM is in effect (many PDFs wrap each shape in
+    /// its own q / cm / ... / Q, reusing a shared local template scaled and translated per
+    /// instance). Unlike glyphs -- positioned via Tm x CTM at the point of use -- path points
+    /// must be pushed through the CTM alone (no text matrix) to land in page space.
+    /// </summary>
+    private static (double X, double Y) TransformPoint(double x, double y, double[] ctm) =>
+        (x * ctm[0] + y * ctm[2] + ctm[4], x * ctm[1] + y * ctm[3] + ctm[5]);
 
     private static double[] Operands(string[] tokens, int operatorIndex, int count)
     {
