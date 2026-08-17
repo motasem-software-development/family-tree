@@ -741,3 +741,44 @@ migration" is Task 7.
 **Open risk.** Two questions remain genuinely unresolved: whether every glyph lands in exactly
 one box (Task 4) and whether the edge graph closes into a single tree (Task 5). Both carry
 explicit stop-and-report instructions rather than assertions to loosen.
+
+---
+
+## Task 8 — verification findings (recorded 2026-08-17)
+
+Verified against the running stack (API on :5000, Vite on :5174), signed in as the seeded admin.
+
+**Import landed intact.**
+
+| Check | Result |
+|---|---|
+| Members via `GET /api/v1/family-members` | 349 |
+| `GET /api/v1/family-tree/view` | 349 nodes, single root داوود, 10 generations |
+| Header stat line | `349 فرداً · 10 أجيال` — correct Arabic plural categories (`many` for 349, `few` for 10) |
+| Most frequent names | محمد ×39, أحمد ×18, محمود ×10, خالد ×8 |
+| Deep chain renders | داوود → سلمان → أمد → علي → أحمد → عايش → أكرم → خالد |
+
+The two source typos (`ممد`, `أمد`) are present as imported, per the confirmed decision to reproduce
+the PDF faithfully.
+
+### Input to Phase 3
+
+**1. No virtualization — all 349 rows are in the DOM at once.** Expanding every branch puts
+`document.querySelectorAll('[role="treeitem"]').length === 349` simultaneously. Design spec §5.4
+requires "rendering is viewport-virtualized: only nodes whose projected bounds intersect the visible
+rectangle plus a margin are in the DOM." At 349 nodes the outline stays responsive, so this is not
+urgent — but the requirement is unimplemented and the measurement is now real rather than assumed.
+
+**2. Search results are capped at 8, and the count label reports the cap rather than the truth.**
+`flattenTree.ts` `searchNodes(..., limit = 8)` slices matches, and `AppShell` renders
+`t('tree.resultCount', { count: results.length })` — the *displayed* count. Searching محمد therefore
+reads "8 نتائج" when 39 members match. The label states a falsehood. Two ways out, both Phase 3's to
+choose: report the true total and label the list as a preview ("showing 8 of 39"), or let the
+server-side search endpoint return a total alongside a page of hits.
+
+**3. The ancestor-path requirement is now demonstrated, not argued.** Searching محمد returns rows
+distinguished only by "الجيل 8 / الجيل 9 / الجيل 8 / الجيل 8" — four entries, three of them
+identical in every visible respect. Design spec §5.4 calls the ancestor path "required rather than
+decorative"; with 39 identical names and generation as the only discriminator, a user cannot pick
+the right person. This is the concrete case Phase 3 must solve, and it only became visible with real
+data — which is exactly why §8 sequences this import before Phase 3.
