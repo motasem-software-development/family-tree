@@ -54,6 +54,13 @@ public static class ContentStream
                     ctm = Multiply(Operands(tokens, i, 6), ctm);
                     break;
 
+                case "BT":
+                case "ET":
+                    // Per spec, BT resets the text matrix (and the line matrix it doubles as
+                    // here) to identity; ET has no further effect but is reset too for symmetry.
+                    tm = (double[])Identity.Clone();
+                    break;
+
                 case "Tm":
                     tm = Operands(tokens, i, 6);
                     break;
