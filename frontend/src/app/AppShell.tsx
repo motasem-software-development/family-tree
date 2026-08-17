@@ -1,4 +1,4 @@
-import type { CSSProperties, ReactNode } from 'react'
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../features/auth/AuthContext'
@@ -79,7 +79,33 @@ export const AppShell = ({
   const { pathname } = useLocation()
 
   const initials = (user?.email ?? '?').slice(0, 2).toUpperCase()
-  const showResults = query.trim().length > 0
+
+  // The popover is dismissible on its own, separately from the query: Escape cancels the
+  // search outright, while clicking away only puts the list down — the matches stay
+  // highlighted on the canvas, which is the point of a search that dims instead of filters.
+  const searchRef = useRef<HTMLDivElement>(null)
+  const [dismissed, setDismissed] = useState(false)
+  const showResults = query.trim().length > 0 && !dismissed
+
+  useEffect(() => {
+    if (!showResults) return
+
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      onQueryChange?.('')
+      setDismissed(false)
+    }
+    const onPointerDown = (event: PointerEvent) => {
+      if (!searchRef.current?.contains(event.target as Node)) setDismissed(true)
+    }
+
+    document.addEventListener('keydown', onKey)
+    document.addEventListener('pointerdown', onPointerDown)
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      document.removeEventListener('pointerdown', onPointerDown)
+    }
+  }, [showResults, onQueryChange])
 
   const toggleLanguage = () => {
     void i18n.changeLanguage(i18n.language.startsWith('ar') ? 'en' : 'ar')
@@ -254,6 +280,7 @@ export const AppShell = ({
           </div>
 
           <div
+            ref={searchRef}
             style={{
               position: 'relative',
               marginInlineStart: 'auto',
@@ -279,7 +306,11 @@ export const AppShell = ({
               </svg>
               <input
                 value={query}
-                onChange={(event) => onQueryChange?.(event.target.value)}
+                onChange={(event) => {
+                  setDismissed(false)
+                  onQueryChange?.(event.target.value)
+                }}
+                onFocus={() => setDismissed(false)}
                 placeholder={t('tree.searchPlaceholder')}
                 aria-label={t('tree.searchPlaceholder')}
                 style={{

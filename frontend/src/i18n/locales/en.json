@@ -1,12 +1,20 @@
 {
-  "app": { "title": "Family Tree" },
-  "language": { "ar": "العربية", "en": "English" },
+  "app": {
+    "title": "Family Tree"
+  },
+  "language": {
+    "ar": "العربية",
+    "en": "English"
+  },
   "auth": {
-    "signIn": "Sign in",
     "email": "Email",
+    "emailPlaceholder": "you@example.com",
     "password": "Password",
+    "passwordPlaceholder": "Your password",
+    "signIn": "Sign in",
     "signOut": "Sign out",
-    "signingIn": "Signing in…"
+    "signingIn": "Signing in…",
+    "subtitle": "Sign in to your family workspace"
   },
   "nav": {
     "tenantTag": "Family workspace",
@@ -23,7 +31,6 @@
   "tree": {
     "searchPlaceholder": "Search family members…",
     "noResults": "No matching members.",
-    "resultCount": "{{count}} results",
     "shareBtn": "Public link",
     "loading": "Loading the tree…",
     "emptyTitle": "No family members yet",
@@ -42,11 +49,15 @@
     "move": "Move",
     "delete": "Delete",
     "gen": "Generation",
-    "membersCount": "{{count}} members",
-    "generationsCount": "{{count}} generations",
     "needPerm": "Requires",
     "movePhase": "Move isn't available yet.",
-    "treeLabel": "Family tree"
+    "treeLabel": "Family tree",
+    "resultCount_one": "{{count}} result",
+    "resultCount_other": "{{count}} results",
+    "membersCount_one": "{{count}} member",
+    "membersCount_other": "{{count}} members",
+    "generationsCount_one": "{{count}} generation",
+    "generationsCount_other": "{{count}} generations"
   },
   "panel": {
     "parent": "Parent",
@@ -64,7 +75,6 @@
     "deleteTitle": "Delete member",
     "deleteBody": "This action cannot be undone.",
     "blockedTitle": "Can't delete",
-    "blockedBody": "Can't delete {{name}} because he has {{count}} children. Move or delete his children first.",
     "nameLabel": "Name",
     "namePlaceholder": "Enter a name",
     "parentLabel": "Parent",
@@ -73,7 +83,9 @@
     "save": "Save",
     "add": "Add member",
     "confirmDelete": "Delete member",
-    "saving": "Saving…"
+    "saving": "Saving…",
+    "blockedBody_one": "Can't delete {{name}} because they have {{count}} child. Move or delete that child first.",
+    "blockedBody_other": "Can't delete {{name}} because they have {{count}} children. Move or delete those children first."
   },
   "toast": {
     "added": "{{name}} was added.",

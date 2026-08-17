@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { I18nextProvider } from 'react-i18next'
+import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import i18n from '../../i18n'
 import { MembersPage } from './MembersPage'
@@ -15,7 +16,12 @@ vi.mock('./membersApi')
 // permissive default so the other tests are unaffected.
 let permissive = true
 vi.mock('../auth/AuthContext', () => ({
-  useAuth: () => ({ hasPermission: () => permissive }),
+  useAuth: () => ({
+    // The page now renders inside AppShell, which reads the signed-in user and can sign out.
+    user: { email: 'admin@example.com', familyTreeName: 'عائلة السقا', permissions: [] },
+    hasPermission: () => permissive,
+    logout: vi.fn(),
+  }),
 }))
 
 const member = (over: Partial<FamilyMember> = {}): FamilyMember => ({
@@ -33,7 +39,9 @@ const renderPage = () => {
   return render(
     <I18nextProvider i18n={i18n}>
       <QueryClientProvider client={queryClient}>
-        <MembersPage />
+        <MemoryRouter>
+          <MembersPage />
+        </MemoryRouter>
       </QueryClientProvider>
     </I18nextProvider>,
   )
@@ -112,36 +120,39 @@ describe('MembersPage', () => {
     expect(screen.queryByLabelText(i18n.t('members.parent'))).not.toBeInTheDocument()
   })
 
-  it('deletes a member', async () => {
+  it('deletes a member once the in-app dialog is confirmed', async () => {
     const user = userEvent.setup()
-    vi.spyOn(window, 'confirm').mockReturnValue(true)
     renderPage()
     await screen.findByText('سليمان')
 
     await user.click(screen.getByRole('button', { name: i18n.t('members.delete') }))
+    // The row button only opens the dialog — nothing is destroyed until it is confirmed.
+    expect(membersApi.remove).not.toHaveBeenCalled()
+    await user.click(screen.getByRole('button', { name: i18n.t('modal.confirmDelete') }))
 
     await waitFor(() => expect(membersApi.remove).toHaveBeenCalledWith('a'))
   })
 
-  it('does not delete when the confirmation is declined', async () => {
+  it('does not delete when the dialog is cancelled', async () => {
     const user = userEvent.setup()
-    vi.spyOn(window, 'confirm').mockReturnValue(false)
     renderPage()
     await screen.findByText('سليمان')
 
     await user.click(screen.getByRole('button', { name: i18n.t('members.delete') }))
+    await user.click(screen.getByRole('button', { name: i18n.t('modal.cancel') }))
 
     expect(membersApi.remove).not.toHaveBeenCalled()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
   it('translates a server error code instead of showing it raw', async () => {
     const user = userEvent.setup()
-    vi.spyOn(window, 'confirm').mockReturnValue(true)
     vi.mocked(membersApi.remove).mockRejectedValue(new ApiError('MEMBER_HAS_CHILDREN', 409))
     renderPage()
     await screen.findByText('سليمان')
 
     await user.click(screen.getByRole('button', { name: i18n.t('members.delete') }))
+    await user.click(screen.getByRole('button', { name: i18n.t('modal.confirmDelete') }))
 
     expect(await screen.findByText(i18n.t('errors.MEMBER_HAS_CHILDREN'))).toBeInTheDocument()
   })
