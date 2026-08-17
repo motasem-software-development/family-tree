@@ -31,6 +31,12 @@ dotnet ef database update --project src/FamilyTree.Infrastructure --startup-proj
 docker compose up -d
 ```
 
+The `AddNameTrigramIndex` migration runs `CREATE EXTENSION IF NOT EXISTS pg_trgm`, which
+requires privileges a plain application role usually lacks. Local Docker and the Testcontainers
+test image both run as superuser, so this is invisible in development. On a managed or
+least-privilege database, have a superuser run `CREATE EXTENSION pg_trgm;` once before applying
+migrations — the `IF NOT EXISTS` guard then makes the migration a no-op.
+
 The SPA is on http://localhost:8080 and the API on http://localhost:5000.
 
 The `api` service must stay single-instance: startup seeding has no advisory lock, so two
