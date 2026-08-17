@@ -77,6 +77,13 @@ public sealed class FamilyMemberService(
         return members.Select(Map).ToList();
     }
 
+    public Task<FamilyMemberSearchResponse> SearchAsync(
+        string query, int limit, int offset, CancellationToken ct = default) =>
+        // The only read here that does NOT go through the tenant query filter, because it is
+        // raw SQL. FamilyMemberSearchQuery re-establishes the guarantee with an explicit
+        // predicate on every table reference — see the class comment there.
+        FamilyMemberSearchQuery.ExecuteAsync(context, tenant.TenantId, query, limit, offset, ct);
+
     public async Task<FamilyMemberResponse> UpdateAsync(
         Guid id, UpdateFamilyMemberRequest request, CancellationToken ct = default)
     {
