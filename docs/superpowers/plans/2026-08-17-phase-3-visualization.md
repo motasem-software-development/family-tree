@@ -2177,6 +2177,110 @@ git commit -am "docs: record Phase 3 verification findings"
 
 ---
 
+## Task 11 — verification findings (recorded 2026-08-17)
+
+Verified against the running stack: PostgreSQL in Docker, API on :5000 (`dotnet run`), Vite on :5180,
+signed in as the seeded admin, driving the real imported family. Browser checks were automated
+rather than hand-driven, so every number below is a measurement rather than an impression.
+
+**Note on the local dataset:** the dev database now holds **351** members, not the 349 Phase 2.5
+recorded — two were added at some point between the phases. Counts below are against 351.
+
+### Suites
+
+| Suite | Result |
+|---|---|
+| Backend (`dotnet test`) | 215 passing (44 domain, 29 import, 20 application, 122 integration) — was 197 |
+| Frontend (`vitest run`) | 104 passing — was 88 |
+| `tsc -b`, `oxlint` | clean (2 pre-existing fast-refresh warnings in unrelated files) |
+
+### Finding 2 of Phase 2.5 — the count that lied
+
+| Check | Before (Phase 2.5) | Now |
+|---|---|---|
+| Search محمد, label | `8 نتائج` while 39 matched | **`عرض 8 من 40 نتيجة`** |
+| True total from the API | not available | `total: 40` |
+
+The label now states the truth. `GET /api/v1/family-members/search?q=محمد` returns `total: 40` with a
+20-item default page; the UI requests 8 and says so.
+
+### Finding 3 of Phase 2.5 — results a user could not tell apart
+
+Phase 2.5 recorded four محمد hits distinguished only by `الجيل 8 / الجيل 9 / الجيل 8 / الجيل 8`.
+The same search now returns:
+
+```
+محمد  ||  داوود ‹ سلمان ‹ احمد ‹ علي ‹ مصطفى ‹ عمر ‹ خليل ‹ سمير
+محمد  ||  داوود ‹ سلمان ‹ احمد ‹ علي ‹ مصطفى ‹ عمر ‹ خليل ‹ وسام
+محمد  ||  داوود ‹ سلمان ‹ احمد ‹ علي ‹ مصطفى ‹ عمر ‹ خليل
+محمد  ||  داوود ‹ سلمان ‹ احمد ‹ علي ‹ مصطفى ‹ عمر
+```
+
+The first two are both محمد at generation 9 and are separable **only** by their last ancestor
+(سمير vs وسام). Generation alone could never have told them apart — which is precisely what design
+spec §5.4 meant by "required rather than decorative".
+
+### Finding 1 of Phase 2.5 — every row in the DOM
+
+| Check | Before | Now |
+|---|---|---|
+| Rows in the outline | 349, all in the DOM | 170 expanded, **26 in the DOM** |
+| `aria-setsize` on a row | n/a | **170** — the family's size, not the window's |
+
+Scrolled to `scrollTop 3000`, mid-list:
+
+| Measurement | Value | Check |
+|---|---|---|
+| Rendered rows | 26 of 170 | windowed |
+| `aria-posinset` range | 61 … 86 | contiguous, correctly offset |
+| `padStart` | 2640px | = 60 × 44 ✓ |
+| `padEnd` | 3696px | = (170 − 86) × 44 ✓ |
+| `padStart + 26×44 + padEnd` | 7480px | **exactly** 170 × 44 ✓ |
+
+The scrollbar invariant holds to the pixel, so the scrollbar does not jump as the window moves.
+
+A side effect worth recording: expanding "every branch" is no longer scriptable by clicking every
+visible caret, because collapsed branches outside the window have no caret in the DOM. That is
+virtualization working, not a defect.
+
+### The zoom/scroll fix
+
+| Measurement | At zoom 1.0 | After 5 × zoom-in |
+|---|---|---|
+| Computed `zoom` | `1` | `1.5` |
+| Computed `transform` | `none` | `none` |
+| Container `scrollHeight` | 8152px | **12151px** |
+
+Scrolling to the bottom at maximum zoom reaches `scrollTop 11536.8` of a `maxScroll` of 11537, and
+the last rendered row is `aria-posinset 177` of 177 — **the final row is reachable**. Before this
+phase the transform never grew `scrollHeight`, so that content sat outside the scrollable area with
+no way to get to it. As designed, zoom steps are now instant rather than animated.
+
+### Reveal a deep search hit
+
+Selected the hit at `داوود ‹ سلمان ‹ احمد ‹ علي ‹ مصطفى ‹ عمر ‹ محمد ‹ طارق` (generation 9) while
+scrolled to 3000:
+
+- the outline grew from **170 to 177 rows** as its ancestors expanded;
+- the viewport scrolled from 3000 to **3831**;
+- the target row was **rendered and `aria-selected="true"`** afterwards.
+
+This is exactly the case the Critical finding in Task 9 predicted would fail: the outline expands
+and the reveal scrolls **in the same commit**. With the `minHeight` fix in place it lands correctly.
+
+### Console
+
+Six console errors, all of them `ERR_NAME_NOT_RESOLVED` for `gc.kis.v2.scr.kaspersky-labs.com` —
+a local antivirus browser extension failing to inject. **Zero application errors.**
+
+### Not verified here
+
+The `CREATE EXTENSION pg_trgm` privilege risk remains open by nature: this database runs as
+superuser, as do Docker and Testcontainers. A least-privilege deployed database is still the place
+that risk lands, and the README documents the mitigation.
+
+---
+
 ## Self-review
 
 **Spec coverage.** §5.4's four requirements: server-side trigram search → Tasks 1–3; ancestor path as required discriminator → Tasks 2, 6; viewport virtualization → Tasks 7–9; memoized layout and root-`<g>` zoom/pan → not applicable after the supersession, recorded in Task 10. §3.4's `pg_trgm` index → Task 1. §4.4's uniform non-disclosure → Task 2 (blank and no-match both return an empty page) and Task 3 (200, not 404). §6's standing cross-tenant requirement → Task 2, `Another_tenants_members_are_never_matched` and `An_unauthenticated_tenant_context_matches_nothing`, load-bearing here because raw SQL bypasses the query filter. Phase 2 deviation 1 → Task 1 verbatim. Phase 2.5 findings 1, 2, 3 → Tasks 7–9, 5, and 6 respectively.
