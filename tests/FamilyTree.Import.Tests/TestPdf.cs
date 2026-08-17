@@ -9,4 +9,9 @@ public static class TestPdf
     });
 
     public static PageContent Page() => _page.Value;
+
+    private static readonly Lazy<Reconstruction> _reconstruction = new(() =>
+        Reconstruct.Build(Page(), Geometry.Classify(Page())));
+
+    public static Reconstruction Reconstruction() => _reconstruction.Value;
 }
