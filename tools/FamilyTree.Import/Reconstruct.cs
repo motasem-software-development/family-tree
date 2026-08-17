@@ -3,7 +3,14 @@ using System.Text.RegularExpressions;
 
 namespace FamilyTree.Import;
 
-public sealed record ImportedMember(int Id, string Name, int? ParentId);
+/// <summary>
+/// <paramref name="Y"/> is the source box's <see cref="Box.Y1"/> (its top edge, in PDF page
+/// space where Y increases upward) -- added purely so <c>Emit</c> (Task 6) can order siblings
+/// top-to-bottom as the spec requires; nothing in Tasks 1-5 reads it. Trailing optional
+/// parameter so existing 3-arg positional construction (see <see cref="ReconstructTests"/>)
+/// keeps compiling unchanged.
+/// </summary>
+public sealed record ImportedMember(int Id, string Name, int? ParentId, double Y = 0);
 
 public sealed record Reconstruction(IReadOnlyList<ImportedMember> Members, string Orientation);
 
@@ -77,7 +84,7 @@ public static class Reconstruct
         for (var i = 0; i < boxes.Count; i++)
         {
             int? parentId = chosenMap.TryGetValue(i, out var parentIndex) ? parentIndex + 1 : null;
-            members.Add(new ImportedMember(i + 1, names[i], parentId));
+            members.Add(new ImportedMember(i + 1, names[i], parentId, boxes[i].Y1));
         }
 
         return new Reconstruction(members, orientation);
