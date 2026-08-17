@@ -252,9 +252,10 @@ describe('TreePage', () => {
     renderPage()
 
     await user.type(await screen.findByLabelText(/بحث|Search/i), 'فارس')
-    // Click the result's caption — the ancestor path is unique to the dropdown, while the
-    // hit's own name also appears in the outline behind it.
-    await user.click(await screen.findByText('سليمان'))
+    // The dropdown result button contains BOTH the name and the ancestor caption, so its
+    // accessible name is the two joined — unique, whereas the caption alone ("سليمان") also
+    // matches the root row rendered in the outline behind the dropdown.
+    await user.click(await screen.findByRole('button', { name: /^فارس\s+سليمان$/ }))
 
     // Virtualized, the row may not be in the DOM at all — expanding its ancestors is no longer
     // enough to put it in front of the user.
