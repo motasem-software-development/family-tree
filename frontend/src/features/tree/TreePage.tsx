@@ -82,7 +82,7 @@ export const TreePage = () => {
     return map
   }, [members])
 
-  const { page: searchPage, isSearching } = useSearch(query)
+  const { page: searchPage, isSearching, belowThreshold } = useSearch(query)
 
   const results = useMemo<SearchResult[]>(
     () =>
@@ -229,6 +229,7 @@ export const TreePage = () => {
       results={results}
       resultTotal={searchPage.total}
       isSearching={isSearching}
+      belowThreshold={belowThreshold}
       onQueryChange={setQuery}
       onSelectResult={revealResult}
     >

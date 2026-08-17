@@ -68,6 +68,8 @@ interface AppShellProps {
   /** Every server-side match, which may exceed `results.length`. */
   resultTotal?: number
   isSearching?: boolean
+  /** The user has typed something, but not enough characters to search yet. */
+  belowThreshold?: boolean
   onQueryChange?: (value: string) => void
   onSelectResult?: (id: string) => void
   children: ReactNode
@@ -80,6 +82,7 @@ export const AppShell = ({
   results = [],
   resultTotal = 0,
   isSearching = false,
+  belowThreshold = false,
   onQueryChange,
   onSelectResult,
   children,
@@ -355,18 +358,22 @@ export const AppShell = ({
                   overflowY: 'auto',
                 }}
               >
-                <div
-                  style={{
-                    padding: '8px 12px',
-                    fontSize: 11,
-                    color: 'var(--text-3)',
-                    borderBottom: '1px solid var(--divider)',
-                  }}
-                >
-                  {results.length < resultTotal
-                    ? t('tree.resultCountPartial', { shown: results.length, total: resultTotal })
-                    : t('tree.resultCount', { count: resultTotal })}
-                </div>
+                {/* A count is a claim about a completed search: withhold it while one is
+                    pending (isSearching) or impossible (belowThreshold). */}
+                {!isSearching && !belowThreshold && (
+                  <div
+                    style={{
+                      padding: '8px 12px',
+                      fontSize: 11,
+                      color: 'var(--text-3)',
+                      borderBottom: '1px solid var(--divider)',
+                    }}
+                  >
+                    {results.length < resultTotal
+                      ? t('tree.resultCountPartial', { shown: results.length, total: resultTotal })
+                      : t('tree.resultCount', { count: resultTotal })}
+                  </div>
+                )}
                 {results.map((result) => (
                   <button
                     key={result.id}
@@ -399,10 +406,14 @@ export const AppShell = ({
                       color: 'var(--text-2)',
                     }}
                   >
-                    {/* "No matches" is a claim about the data; while a request is in flight it
-                        is not yet true. Saying so would be wrong for the ~250ms debounce plus
-                        round trip on every single query. */}
-                    {isSearching ? t('tree.searching') : t('tree.noResults')}
+                    {/* "No matches" is a claim about the data; while a request is in flight, or
+                        below the minimum query length, it is not yet true — belowThreshold
+                        takes precedence since no request can be in flight for it. */}
+                    {belowThreshold
+                      ? t('tree.keepTyping')
+                      : isSearching
+                        ? t('tree.searching')
+                        : t('tree.noResults')}
                   </div>
                 )}
               </div>

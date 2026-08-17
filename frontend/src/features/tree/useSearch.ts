@@ -18,6 +18,8 @@ export interface SearchState {
   page: MemberSearchPage
   /** A request is in flight for the current query — distinct from "no matches". */
   isSearching: boolean
+  /** The user has typed something, but not enough characters to search yet. */
+  belowThreshold: boolean
 }
 
 /**
@@ -38,10 +40,15 @@ export const useSearch = (query: string): SearchState => {
     placeholderData: keepPreviousData,
   })
 
+  // Gated on the trimmed (not debounced) value: dropping below the threshold clears results
+  // immediately instead of holding the previous query's hits for the rest of the debounce.
+  const meetsThreshold = trimmed.length >= MIN_QUERY_LENGTH
+
   return {
-    page: enabled ? (data ?? EMPTY) : EMPTY,
+    page: meetsThreshold && enabled ? (data ?? EMPTY) : EMPTY,
     // The user has typed past the threshold but the settled query has not caught up yet: still
     // searching, even though no request has been issued.
-    isSearching: trimmed.length >= MIN_QUERY_LENGTH && (isFetching || debounced !== trimmed),
+    isSearching: meetsThreshold && (isFetching || debounced !== trimmed),
+    belowThreshold: trimmed.length > 0 && trimmed.length < MIN_QUERY_LENGTH,
   }
 }

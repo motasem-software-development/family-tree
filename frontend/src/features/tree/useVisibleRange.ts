@@ -62,5 +62,8 @@ export const useVisibleRange = (
     }
   }, [measure, scrollRef])
 
-  return range
+  // `range` is state and lags one render behind a sharp drop in `count` (collapse-all while
+  // scrolled deep). Rendering everything for that single frame is the same fail-safe the
+  // unmeasured-viewport case uses: a slow frame beats a blank one under a huge spacer.
+  return range.endIndex > count || range.startIndex > count ? allRows(count) : range
 }

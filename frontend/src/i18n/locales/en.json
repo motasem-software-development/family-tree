@@ -31,6 +31,7 @@
   "tree": {
     "searchPlaceholder": "Search family members…",
     "noResults": "No matching members.",
+    "keepTyping": "Keep typing to search…",
     "shareBtn": "Public link",
     "loading": "Loading the tree…",
     "emptyTitle": "No family members yet",

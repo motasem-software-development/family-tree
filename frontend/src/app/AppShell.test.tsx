@@ -106,6 +106,39 @@ describe('AppShell', () => {
     expect(screen.queryByText('لا توجد نتائج مطابقة.')).not.toBeInTheDocument()
   })
 
+  it('does not claim "no results" while below the minimum query length', async () => {
+    renderShell({ query: 'م', results: [], resultTotal: 0, belowThreshold: true })
+
+    expect(await screen.findByText('أكمل الكتابة للبحث…')).toBeInTheDocument()
+    expect(screen.queryByText('لا توجد نتائج مطابقة.')).not.toBeInTheDocument()
+  })
+
+  it('does not show a zero count while below the minimum query length', async () => {
+    renderShell({ query: 'م', results: [], resultTotal: 0, belowThreshold: true })
+
+    await screen.findByText('أكمل الكتابة للبحث…')
+    expect(screen.queryByText('لا نتائج')).not.toBeInTheDocument()
+  })
+
+  it('does not show a zero count while a request is in flight', async () => {
+    renderShell({ query: 'محمد', results: [], resultTotal: 0, isSearching: true })
+
+    await screen.findByText('جارٍ البحث…')
+    expect(screen.queryByText('لا نتائج')).not.toBeInTheDocument()
+  })
+
+  it('reports a plain count when the page holds exactly every match at the page size', async () => {
+    const results = Array.from({ length: 8 }, (_, index) => ({
+      id: `m${index}`,
+      name: 'محمد',
+      meta: 'داوود ‹ سلمان',
+    }))
+    renderShell({ query: 'محمد', results, resultTotal: 8 })
+
+    expect(await screen.findByText('8 نتائج')).toBeInTheDocument()
+    expect(screen.queryByText(/عرض/)).not.toBeInTheDocument()
+  })
+
   describe('search results popover', () => {
     const renderSearching = (onQueryChange = vi.fn()) => {
       renderShell({
