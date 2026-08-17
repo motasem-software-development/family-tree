@@ -114,10 +114,56 @@ public static class Geometry
 
         var connectors = connectorPaths
             .Where(p => p.Points.Count > 0)
-            .Select(p => new Connector(p.Points[0], p.Points[^1]))
+            .Select(ToConnector)
             .ToList();
 
         return new Classified(boxes, connectors);
+    }
+
+    /// <summary>
+    /// Picks the pair of points with the largest pairwise distance as the connector's two
+    /// ends, rather than naively using <c>Points[0]</c>/<c>Points[^1]</c>.
+    ///
+    /// <para>
+    /// <b>Why:</b> most connector shapes (the 338 "llcl end=S" elbows, 6 "lc end=S" stubs) are
+    /// open paths where the first and last recorded points already are the two extremes, so
+    /// this is a no-op for them. But the 4 "lclcl end=h" brackets are <i>closed</i> paths (the
+    /// 'h' terminator closes back to the start), so <c>Points[0] == Points[^1]</c> exactly --
+    /// both sit at the bracket's near corner (against the box being bracketed), while the
+    /// bracket's actual far end (against the other rounded box it links to) sits at the
+    /// path's middle points (measured: indices 2 and 3 of 6, each within 0pt of a different
+    /// rounded ancestor box). Using the naive first/last pair collapsed all 4 of these
+    /// connectors to a zero-length segment sitting entirely inside one box, which <see cref="Reconstruct"/>
+    /// then had to discard as carrying no direction -- losing 4 of the tree's 348 edges and
+    /// capping the reconstructed hierarchy at 5 roots instead of 1. Farthest-pair selection
+    /// recovers the real long diagonal for the closed brackets while leaving the open shapes
+    /// unchanged.
+    /// </para>
+    /// </summary>
+    private static Connector ToConnector(PdfPath p)
+    {
+        var points = p.Points;
+        var bestI = 0;
+        var bestJ = 0;
+        var bestDistanceSquared = -1.0;
+
+        for (var i = 0; i < points.Count; i++)
+        {
+            for (var j = i + 1; j < points.Count; j++)
+            {
+                var dx = points[i].X - points[j].X;
+                var dy = points[i].Y - points[j].Y;
+                var distanceSquared = dx * dx + dy * dy;
+                if (distanceSquared > bestDistanceSquared)
+                {
+                    bestDistanceSquared = distanceSquared;
+                    bestI = i;
+                    bestJ = j;
+                }
+            }
+        }
+
+        return new Connector(points[bestI], points[bestJ]);
     }
 
     public static bool Contains(Box b, double x, double y) =>
