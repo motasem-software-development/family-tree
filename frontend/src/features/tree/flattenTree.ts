@@ -108,16 +108,3 @@ export const treeStats = (rootMembers: readonly FamilyTreeNode[]): TreeStats => 
     generations: nodes.reduce((deepest, node) => Math.max(deepest, node.generation), 0),
   }
 }
-
-/** Search hits across the whole tree, not just the expanded part. Capped for the dropdown. */
-export const searchNodes = (
-  rootMembers: readonly FamilyTreeNode[],
-  query: string,
-  limit = 8,
-): FamilyTreeNode[] => {
-  const term = normalize(query)
-  if (term.length === 0) return []
-  return allNodes(rootMembers)
-    .filter((node) => normalize(node.name).includes(term))
-    .slice(0, limit)
-}

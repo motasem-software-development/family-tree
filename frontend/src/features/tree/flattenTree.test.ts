@@ -1,12 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  ancestorIds,
-  descendantCount,
-  findNode,
-  flattenTree,
-  searchNodes,
-  treeStats,
-} from './flattenTree'
+import { ancestorIds, descendantCount, findNode, flattenTree, treeStats } from './flattenTree'
 import type { FamilyTreeNode } from '../members/types'
 
 const node = (
@@ -134,22 +127,6 @@ describe('treeStats', () => {
 
   it('is zero for an empty tree', () => {
     expect(treeStats([])).toEqual({ members: 0, generations: 0 })
-  })
-})
-
-describe('searchNodes', () => {
-  it('finds matches anywhere in the tree, including collapsed branches', () => {
-    expect(searchNodes(tree(), 'محمود').map((n) => n.id)).toEqual(['m1'])
-  })
-
-  it('returns nothing for a blank query', () => {
-    expect(searchNodes(tree(), '  ')).toEqual([])
-  })
-
-  it('caps the number of results', () => {
-    const many = Array.from({ length: 20 }, (_, i) => node(`n${i}`, `اسم ${i}`, 1))
-
-    expect(searchNodes(many, 'اسم', 8)).toHaveLength(8)
   })
 })
 

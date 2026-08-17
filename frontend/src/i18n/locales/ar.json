@@ -58,6 +58,8 @@
     "resultCount_few": "{{count}} نتائج",
     "resultCount_many": "{{count}} نتيجة",
     "resultCount_other": "{{count}} نتيجة",
+    "resultCountPartial": "عرض {{shown}} من {{total}} نتيجة",
+    "searching": "جارٍ البحث…",
     "membersCount_zero": "لا أفراد",
     "membersCount_one": "فرد واحد",
     "membersCount_two": "فردان",

@@ -2,7 +2,6 @@ import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 
 import { useTranslation } from 'react-i18next'
 import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../features/auth/AuthContext'
-import type { FamilyTreeNode } from '../features/members/types'
 
 const FamilyIcon = ({ size = 17 }: { size?: number }) => (
   <svg
@@ -49,8 +48,14 @@ const PendingNavItem = ({ label, icon }: { label: string; icon: ReactNode }) => 
   )
 }
 
+/**
+ * A search hit as the shell sees it: an id to select, a name to show, and a caption that
+ * disambiguates. The shell no longer takes a FamilyTreeNode — results come from the server and
+ * may name members that are not in the loaded tree at all.
+ */
 export interface SearchResult {
-  node: FamilyTreeNode
+  id: string
+  name: string
   meta: string
 }
 
@@ -60,6 +65,9 @@ interface AppShellProps {
   /** Omit the search props on screens that have nothing to search — the box is then hidden. */
   query?: string
   results?: readonly SearchResult[]
+  /** Every server-side match, which may exceed `results.length`. */
+  resultTotal?: number
+  isSearching?: boolean
   onQueryChange?: (value: string) => void
   onSelectResult?: (id: string) => void
   children: ReactNode
@@ -70,6 +78,8 @@ export const AppShell = ({
   statLine,
   query = '',
   results = [],
+  resultTotal = 0,
+  isSearching = false,
   onQueryChange,
   onSelectResult,
   children,
@@ -353,13 +363,15 @@ export const AppShell = ({
                     borderBottom: '1px solid var(--divider)',
                   }}
                 >
-                  {t('tree.resultCount', { count: results.length })}
+                  {results.length < resultTotal
+                    ? t('tree.resultCountPartial', { shown: results.length, total: resultTotal })
+                    : t('tree.resultCount', { count: resultTotal })}
                 </div>
                 {results.map((result) => (
                   <button
-                    key={result.node.id}
+                    key={result.id}
                     type="button"
-                    onClick={() => onSelectResult?.(result.node.id)}
+                    onClick={() => onSelectResult?.(result.id)}
                     style={{
                       display: 'block',
                       width: '100%',
@@ -372,7 +384,7 @@ export const AppShell = ({
                       cursor: 'pointer',
                     }}
                   >
-                    <div style={{ fontSize: 13, fontWeight: 500 }}>{result.node.name}</div>
+                    <div style={{ fontSize: 13, fontWeight: 500 }}>{result.name}</div>
                     <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 2 }}>
                       {result.meta}
                     </div>
@@ -387,7 +399,10 @@ export const AppShell = ({
                       color: 'var(--text-2)',
                     }}
                   >
-                    {t('tree.noResults')}
+                    {/* "No matches" is a claim about the data; while a request is in flight it
+                        is not yet true. Saying so would be wrong for the ~250ms debounce plus
+                        round trip on every single query. */}
+                    {isSearching ? t('tree.searching') : t('tree.noResults')}
                   </div>
                 )}
               </div>

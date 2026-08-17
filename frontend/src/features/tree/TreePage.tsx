@@ -12,17 +12,11 @@ import {
   useTreeQuery,
   useUpdateMember,
 } from '../members/useMembers'
-import {
-  ancestorIds,
-  findNode,
-  flattenTree,
-  searchNodes,
-  treeStats,
-  type ExpandedMap,
-} from './flattenTree'
+import { ancestorIds, findNode, flattenTree, treeStats, type ExpandedMap } from './flattenTree'
 import { ContextMenu, MemberModal, Toast, type MenuAnchor, type ModalKind } from './MemberActions'
 import { MemberPanel } from './MemberPanel'
 import { TreeCanvas } from './TreeCanvas'
+import { useSearch } from './useSearch'
 
 const ZOOM_STEP = 0.1
 const ZOOM_MIN = 0.5
@@ -87,13 +81,22 @@ export const TreePage = () => {
     return map
   }, [members])
 
+  const { page: searchPage, isSearching } = useSearch(query)
+
   const results = useMemo<SearchResult[]>(
     () =>
-      searchNodes(roots, query).map((node) => ({
-        node,
-        meta: `${t('tree.gen')} ${node.generation}`,
+      searchPage.items.map((hit) => ({
+        id: hit.id,
+        name: hit.name,
+        // The path is the whole point: 39 members are named محمد, and their ancestry is the
+        // only thing that tells them apart (design spec §5.4). A root member has no path, so
+        // fall back to the generation rather than showing an empty caption.
+        meta:
+          hit.ancestors.length > 0
+            ? hit.ancestors.map((ancestor) => ancestor.name).join(' ‹ ')
+            : `${t('tree.gen')} ${hit.generation}`,
       })),
-    [roots, query, t],
+    [searchPage, t],
   )
 
   const permissions = {
@@ -218,6 +221,8 @@ export const TreePage = () => {
       statLine={statLine}
       query={query}
       results={results}
+      resultTotal={searchPage.total}
+      isSearching={isSearching}
       onQueryChange={setQuery}
       onSelectResult={revealResult}
     >

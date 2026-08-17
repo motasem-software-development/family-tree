@@ -1,11 +1,11 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import type { ComponentProps } from 'react'
 import { I18nextProvider } from 'react-i18next'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import i18n from '../i18n'
 import { AppShell } from './AppShell'
-import type { FamilyTreeNode } from '../features/members/types'
 
 let permissions: string[] = []
 
@@ -17,11 +17,11 @@ vi.mock('../features/auth/AuthContext', () => ({
   }),
 }))
 
-const renderShell = () =>
+const renderShell = (props: Partial<Omit<ComponentProps<typeof AppShell>, 'children'>> = {}) =>
   render(
     <I18nextProvider i18n={i18n}>
       <MemoryRouter>
-        <AppShell familyName="عائلة السقا" statLine="4 · 3">
+        <AppShell familyName="عائلة السقا" statLine="4 · 3" {...props}>
           <p>canvas</p>
         </AppShell>
       </MemoryRouter>
@@ -72,33 +72,49 @@ describe('AppShell', () => {
     expect(screen.getByText('canvas')).toBeInTheDocument()
   })
 
-  describe('search results popover', () => {
-    const node: FamilyTreeNode = {
-      id: 's1',
-      name: 'سليمان',
-      parentId: null,
-      generation: 1,
-      hasMoreChildren: false,
-      children: [],
-    }
+  it('says how many results are shown out of the true total', async () => {
+    renderShell({
+      query: 'محمد',
+      results: [
+        { id: 'a', name: 'محمد', meta: 'داوود ‹ سلمان' },
+        { id: 'b', name: 'محمد', meta: 'داوود ‹ علي' },
+      ],
+      resultTotal: 39,
+    })
 
+    // The old label reported results.length and would have said "2".
+    expect(await screen.findByText(/39/)).toBeInTheDocument()
+  })
+
+  it('reports a plain count when the page holds every match', async () => {
+    renderShell({
+      query: 'خالد',
+      results: [{ id: 'a', name: 'خالد', meta: 'داوود ‹ سلمان' }],
+      resultTotal: 1,
+    })
+
+    // ar.json tree.resultCount_one — Arabic's singular category carries no digit at all.
+    expect(await screen.findByText('نتيجة واحدة')).toBeInTheDocument()
+  })
+
+  it('shows a searching state rather than "no results" while a request is in flight', async () => {
+    renderShell({ query: 'محمد', results: [], resultTotal: 0, isSearching: true })
+
+    expect(await screen.findByText('جارٍ البحث…')).toBeInTheDocument()
+    // ar.json tree.noResults, copied exactly: a negative assertion against a string that does
+    // not exist in the bundle passes whether or not the code is correct.
+    expect(screen.queryByText('لا توجد نتائج مطابقة.')).not.toBeInTheDocument()
+  })
+
+  describe('search results popover', () => {
     const renderSearching = (onQueryChange = vi.fn()) => {
-      render(
-        <I18nextProvider i18n={i18n}>
-          <MemoryRouter>
-            <AppShell
-              familyName="عائلة السقا"
-              statLine="14"
-              query="سليمان"
-              results={[{ node, meta: 'الجيل 1' }]}
-              onQueryChange={onQueryChange}
-              onSelectResult={vi.fn()}
-            >
-              <p>canvas</p>
-            </AppShell>
-          </MemoryRouter>
-        </I18nextProvider>,
-      )
+      renderShell({
+        statLine: '14',
+        query: 'سليمان',
+        results: [{ id: 's1', name: 'سليمان', meta: 'الجيل 1' }],
+        onQueryChange,
+        onSelectResult: vi.fn(),
+      })
       return onQueryChange
     }
 

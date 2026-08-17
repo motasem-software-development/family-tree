@@ -65,6 +65,7 @@ describe('TreePage', () => {
     vi.mocked(membersApi.create).mockResolvedValue({ ...FLAT[0], id: 'new', name: 'خالد' })
     vi.mocked(membersApi.update).mockResolvedValue({ ...FLAT[1], name: 'فارس أحمد', version: 4 })
     vi.mocked(membersApi.remove).mockResolvedValue(undefined)
+    vi.mocked(membersApi.search).mockResolvedValue({ total: 0, items: [] })
   })
 
   it('renders the root family and its first generation', async () => {
@@ -180,6 +181,41 @@ describe('TreePage', () => {
     // Both rows remain on the canvas — search is a highlight, not a filter.
     expect(screen.getByRole('treeitem', { name: /سليمان/ })).toBeInTheDocument()
     expect(screen.getByRole('treeitem', { name: /عمر/ })).toBeInTheDocument()
+  })
+
+  it('shows the ancestor path for each search hit', async () => {
+    const user = userEvent.setup()
+    vi.mocked(membersApi.search).mockResolvedValue({
+      total: 39,
+      items: [
+        {
+          id: 'f1',
+          name: 'محمد',
+          generation: 3,
+          ancestors: [
+            { id: 's1', name: 'داوود' },
+            { id: 's2', name: 'سلمان' },
+          ],
+        },
+      ],
+    })
+    renderPage()
+
+    await user.type(await screen.findByLabelText(/بحث|Search/i), 'محمد')
+
+    // Generation alone was the old caption and could not tell 39 محمدs apart.
+    expect(await screen.findByText('داوود ‹ سلمان')).toBeInTheDocument()
+    expect(await screen.findByText(/39/)).toBeInTheDocument()
+  })
+
+  it('asks the server rather than filtering the loaded tree', async () => {
+    const user = userEvent.setup()
+    vi.mocked(membersApi.search).mockResolvedValue({ total: 0, items: [] })
+    renderPage()
+
+    await user.type(await screen.findByLabelText(/بحث|Search/i), 'فارس')
+
+    await waitFor(() => expect(membersApi.search).toHaveBeenCalledWith('فارس', 8))
   })
 
   it('disables write actions for a caller who only has view permission', async () => {

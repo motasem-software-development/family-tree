@@ -54,6 +54,8 @@
     "treeLabel": "Family tree",
     "resultCount_one": "{{count}} result",
     "resultCount_other": "{{count}} results",
+    "resultCountPartial": "Showing {{shown}} of {{total}} results",
+    "searching": "Searching…",
     "membersCount_one": "{{count}} member",
     "membersCount_other": "{{count}} members",
     "generationsCount_one": "{{count}} generation",
