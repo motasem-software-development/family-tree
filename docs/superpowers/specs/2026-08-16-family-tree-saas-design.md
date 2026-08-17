@@ -265,6 +265,14 @@ messages. Message text is not part of the contract — it cannot be, given the b
 > §5.5's node component contract still holds in spirit — the node is a button carrying its own
 > permission-aware actions. The implementation lives in `frontend/src/features/tree/`.
 >
+> **§5.4 after the supersession (recorded 2026-08-17, Phase 3).** Three of its four requirements
+> survive and were built in Phase 3: server-side search against the trigram index, the ancestor
+> path as a *required* discriminator, and viewport virtualization — the last one demoted to "a
+> later concern" by the outline's cost model, then built anyway once the imported tree made 349
+> simultaneous rows real. What does not survive is zoom and pan as a transform on a root `<g>`:
+> the outline scrolls and CSS-zooms instead. Memoized layout does not apply — there is no layout
+> step left to memoize.
+>
 > The sections below are retained as the record of what was originally decided, and why.
 
 ### 5.1 Rendering approach
@@ -374,7 +382,7 @@ Following technical specification §57, with three changes.
 | 1 — Foundation | Solution setup, .NET 10 API, React app, PostgreSQL, EF Core, migrations, authentication, tenant model, tenant context middleware, **i18n infrastructure** |
 | 2 — Family tree | Tree and root family, member create / edit / delete, parent-child hierarchy |
 | **2.5 — Data import** | PDF reconstruction, verification artifact, seed migration |
-| 3 — Visualization | **Layout engine first**, then SVG renderer, zoom, pan, expand/collapse, search, node actions, orientation toggle |
+| 3 — Visualization | **Scope corrected 2026-08-17 — see §5's supersession note.** Delivered: server-side search (`pg_trgm` index, recursive-CTE ancestor paths, true result totals), outline virtualization, and the zoom scroll fix. Not delivered, because the 2026-08-17 design decision removed them: layout engine, SVG renderer, orientation toggle. Expand/collapse, zoom, and node actions shipped early with the design handoff during Phase 2. |
 | 4 — Authorization | Permissions, roles, custom roles, user management |
 | 5 — Advanced operations | Move member, cycle detection, relationship history, audit logs |
 | 6 — Public access | Link creation with search toggle, public viewer, revocation |

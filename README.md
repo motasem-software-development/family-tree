@@ -3,7 +3,7 @@
 Multi-tenant family tree platform. Arabic/English, RTL-first.
 
 - **Design spec:** `docs/superpowers/specs/2026-08-16-family-tree-saas-design.md`
-- **Current phase:** Phase 2 — Family Tree
+- **Current phase:** Phase 3 — Visualization
 
 ## Requirements
 
@@ -42,7 +42,8 @@ The SPA is on http://localhost:8080 and the API on http://localhost:5000.
 The `api` service must stay single-instance: startup seeding has no advisory lock, so two
 replicas booting at once could race on the same seeded tenant/admin.
 
-The members screen is at `/members` once signed in. Tree visualization is Phase 3.
+The members screen is at `/members` once signed in, and the tree outline is at `/`. Search runs
+server-side and returns each hit's ancestor path; the outline renders only the rows in view.
 
 ## Tests
 
