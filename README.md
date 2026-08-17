@@ -78,3 +78,17 @@ message text is not part of the contract.
 | `INVALID_REFRESH_TOKEN` | 401 | Refresh token unknown, rotated, or revoked |
 | `ACCOUNT_INACTIVE` | 401 | The authenticated account has been deactivated |
 | `TENANT_INACTIVE` | 401 | The authenticated account's tenant subscription is inactive |
+
+## Search
+
+`GET /api/v1/family-members/search?q=<text>&limit=<1-50>&offset=<n>` requires `Member.View` and
+returns `{ total, items: [{ id, name, generation, ancestors: [{ id, name }] }] }`.
+
+`total` is every match, independent of the page size — a client must not report `items.length`
+as the result count. `ancestors` is root-first and excludes the hit itself; it is what
+distinguishes the 39 members named محمد from each other.
+
+Matching is a case-insensitive substring (`ILIKE '%q%'`), accelerated by a trigram GIN index.
+`%` and `_` in the query are matched literally. A blank query returns an empty page. `limit` is
+clamped to 1..50 and a negative `offset` is treated as 0 — bad paging values are corrected
+rather than rejected, so no new error code applies to this endpoint.

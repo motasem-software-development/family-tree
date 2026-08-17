@@ -12,8 +12,30 @@ public static class FamilyMemberEndpoints
     {
         var group = app.MapGroup("/api/v1/family-members").WithTags("FamilyMembers");
 
+        // Mirrors FamilyMemberSearchQuery.DefaultLimit, which is internal to Infrastructure and
+        // must not be referenced from Api. The service clamps to 1..50 regardless of what
+        // arrives here.
+        const int defaultSearchLimit = 20;
+
         group.MapGet("/", async (IFamilyMemberService members, CancellationToken ct) =>
             Results.Ok(await members.ListAsync(ct)))
+            .RequirePermission(Permissions.Member.View);
+
+        // Declared before "/{id:guid}" for readability only — the guid route constraint makes
+        // the two unambiguous regardless of order.
+        group.MapGet("/search", async (
+            string? q,
+            int? limit,
+            int? offset,
+            IFamilyMemberService members,
+            CancellationToken ct) =>
+        {
+            // Paging bounds are clamped in the service rather than rejected: a search box
+            // sending a stray limit should return sensible results, not a 400 the user cannot
+            // act on. The clamp is documented in the README so it is contract, not accident.
+            var page = await members.SearchAsync(q ?? string.Empty, limit ?? defaultSearchLimit, offset ?? 0, ct);
+            return Results.Ok(page);
+        })
             .RequirePermission(Permissions.Member.View);
 
         group.MapGet("/{id:guid}", async (Guid id, IFamilyMemberService members, CancellationToken ct) =>

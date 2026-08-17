@@ -260,4 +260,72 @@ public sealed class FamilyMemberEndpointsTests(PostgresFixture fixture) : IAsync
         first.StatusCode.Should().Be(second.StatusCode);
         (await first.Content.ReadAsStringAsync()).Should().Be(await second.Content.ReadAsStringAsync());
     }
+
+    [Fact]
+    public async Task Search_requires_authentication()
+    {
+        var response = await _client.GetAsync("/api/v1/family-members/search?q=محمد");
+
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task Search_returns_matches_with_their_ancestor_path()
+    {
+        await AuthenticateAsync();
+        var root = await CreateAsync("داوود");
+        var middle = await CreateAsync("سلمان", root.Id);
+        var leaf = await CreateAsync("خالد-اختبار", middle.Id);
+
+        var page = await _client.GetFromJsonAsync<FamilyMemberSearchResponse>(
+            "/api/v1/family-members/search?q=خالد-اختبار");
+
+        page!.Total.Should().Be(1);
+        var hit = page.Items.Should().ContainSingle().Subject;
+        hit.Id.Should().Be(leaf.Id);
+        hit.Ancestors.Select(a => a.Name).Should().Equal("داوود", "سلمان");
+        hit.Generation.Should().Be(3);
+    }
+
+    [Fact]
+    public async Task Search_reports_the_true_total_alongside_a_smaller_page()
+    {
+        await AuthenticateAsync();
+        var root = await CreateAsync("داوود");
+        for (var i = 0; i < 4; i++) await CreateAsync("محمد-اختبار", root.Id);
+
+        var page = await _client.GetFromJsonAsync<FamilyMemberSearchResponse>(
+            "/api/v1/family-members/search?q=محمد-اختبار&limit=2");
+
+        page!.Total.Should().Be(4);
+        page.Items.Should().HaveCount(2);
+    }
+
+    [Fact]
+    public async Task Search_without_a_query_returns_an_empty_page_rather_than_an_error()
+    {
+        await AuthenticateAsync();
+        await CreateAsync("داوود");
+
+        var response = await _client.GetAsync("/api/v1/family-members/search");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var page = (await response.Content.ReadFromJsonAsync<FamilyMemberSearchResponse>())!;
+        page.Total.Should().Be(0);
+        page.Items.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Search_returns_an_empty_page_for_a_name_that_does_not_exist()
+    {
+        await AuthenticateAsync();
+        await CreateAsync("داوود");
+
+        var response = await _client.GetAsync("/api/v1/family-members/search?q=لايوجد");
+
+        // 200 with nothing in it, not 404: a "not found" here would let a caller probe for
+        // which names exist (design spec §4.4).
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await response.Content.ReadFromJsonAsync<FamilyMemberSearchResponse>())!.Total.Should().Be(0);
+    }
 }
