@@ -14,3 +14,12 @@ afterEach(() => {
   window.history.pushState({}, '', '/')
   queryClient.clear()
 })
+
+// jsdom has no ResizeObserver. The outline observes its scroll container to re-window on
+// resize; in tests every element measures 0 and the window degrades to "render all rows", so a
+// no-op stub is faithful rather than merely convenient.
+globalThis.ResizeObserver ??= class {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+} as unknown as typeof ResizeObserver
