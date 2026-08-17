@@ -41,6 +41,7 @@ export const TreePage = () => {
   const [panelOpen, setPanelOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [zoom, setZoom] = useState(1)
+  const [revealId, setRevealId] = useState<string | null>(null)
   const [menu, setMenu] = useState<MenuAnchor | null>(null)
   const [modal, setModal] = useState<ModalKind | null>(null)
   const [nameValue, setNameValue] = useState('')
@@ -116,7 +117,9 @@ export const TreePage = () => {
     setPanelOpen(true)
   }
 
-  /** Reveal a search hit: open every branch above it, then select it and clear the query. */
+  const clearReveal = useCallback(() => setRevealId(null), [])
+
+  /** Reveal a search hit: open every branch above it, scroll to it, then select it. */
   const revealResult = (id: string) => {
     const opened: Record<string, boolean> = { ...expanded }
     ancestorIds(roots, id).forEach((ancestor) => {
@@ -126,6 +129,9 @@ export const TreePage = () => {
     setExpanded(opened)
     setSelectedId(id)
     setPanelOpen(true)
+    // Expanding ancestors used to be enough — the row was always in the DOM. Windowed, it may
+    // not be, so the canvas is asked to scroll to it once this render settles.
+    setRevealId(id)
     setQuery('')
   }
 
@@ -235,6 +241,8 @@ export const TreePage = () => {
         direction={direction}
         zoom={zoom}
         isLoading={isLoading}
+        revealId={revealId}
+        onRevealed={clearReveal}
         onToggleRoot={() => setRootOpen((open) => !open)}
         onToggle={toggle}
         onSelect={select}

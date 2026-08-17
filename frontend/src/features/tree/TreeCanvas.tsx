@@ -1,7 +1,9 @@
-import type { ReactNode } from 'react'
+import { useEffect, useRef, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { Direction } from '../../i18n/useDirection'
 import type { TreeRow } from './flattenTree'
+import { useVisibleRange } from './useVisibleRange'
+import { ROW_HEIGHT } from './windowRange'
 
 /** One indent level. The rail gradient repeats at exactly this pitch. */
 const INDENT = 28
@@ -31,6 +33,9 @@ interface TreeCanvasProps {
   direction: Direction
   zoom: number
   isLoading: boolean
+  /** A search hit to scroll to once its branch is open. Cleared via onRevealed. */
+  revealId: string | null
+  onRevealed: () => void
   onToggleRoot: () => void
   onToggle: (id: string) => void
   onSelect: (id: string) => void
@@ -84,6 +89,8 @@ export const TreeCanvas = ({
   direction,
   zoom,
   isLoading,
+  revealId,
+  onRevealed,
   onToggleRoot,
   onToggle,
   onSelect,
@@ -97,8 +104,38 @@ export const TreeCanvas = ({
   const { t } = useTranslation()
   const rtl = direction === 'rtl'
 
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const listRef = useRef<HTMLDivElement>(null)
+  const range = useVisibleRange(scrollRef, listRef, rows.length, zoom)
+
+  useEffect(() => {
+    if (revealId === null) return
+
+    const index = rows.findIndex((row) => row.id === revealId)
+    const scroller = scrollRef.current
+    const list = listRef.current
+
+    // The row is not in the outline — a still-collapsed ancestor, or a hit from a result set
+    // that has since changed. Clear the request rather than leaving it pending forever.
+    if (index === -1 || scroller === null || list === null) {
+      onRevealed()
+      return
+    }
+
+    // The row's offset from the list's top in layout pixels, converted to the scroll
+    // container's visual pixels — the same coordinate mapping useVisibleRange performs, in
+    // reverse. Centred rather than top-aligned: a family member is only meaningful next to
+    // their siblings and parent.
+    const listTop = list.getBoundingClientRect().top - scroller.getBoundingClientRect().top
+    const rowTop = scroller.scrollTop + listTop + index * ROW_HEIGHT * zoom
+    scroller.scrollTo({ top: Math.max(0, rowTop - scroller.clientHeight / 2), behavior: 'smooth' })
+
+    onRevealed()
+  }, [revealId, rows, zoom, onRevealed])
+
   return (
     <div
+      ref={scrollRef}
       style={{
         flex: 1,
         minWidth: 0,
@@ -140,9 +177,15 @@ export const TreeCanvas = ({
         style={{
           padding: '36px 40px 120px',
           minHeight: '100%',
-          transformOrigin: 'top var(--origin-x, right)',
-          transform: `scale(${zoom})`,
-          transition: 'transform var(--motion-base) var(--ease-standard)',
+          // CSS `zoom`, not `transform: scale()`. A transform is purely visual: it never grows
+          // the scroll container's scrollHeight, so zooming past 1.0 pushed content outside the
+          // scrollable area with no way to reach it. `zoom` participates in layout, so the
+          // scrollbar tracks the scaled content.
+          //
+          // The cost is the transition the design handoff had on `transform` — `zoom` is not
+          // reliably animatable across browsers, so zoom steps are now instant. An unreachable
+          // bottom of the tree is the worse defect.
+          zoom,
         }}
       >
         <button
@@ -177,18 +220,26 @@ export const TreeCanvas = ({
 
         <div style={{ height: 10 }} />
 
-        <div role="tree" aria-label={t('tree.treeLabel')}>
-          {rows.map((row) => (
+        <div role="tree" aria-label={t('tree.treeLabel')} ref={listRef}>
+          {/* Spacers stand in for the rows outside the window, so the scrollbar reflects the
+              whole outline rather than only what is rendered. */}
+          <div aria-hidden="true" style={{ height: range.padStart }} />
+          {rows.slice(range.startIndex, range.endIndex).map((row, offset) => (
             <TreeRowView
               key={row.id}
               row={row}
               rtl={rtl}
               selected={selectedId === row.id}
+              // Windowing removes rows from the DOM; without these a screen reader would
+              // announce the size of the window instead of the size of the family.
+              setSize={rows.length}
+              posInSet={range.startIndex + offset + 1}
               onToggle={onToggle}
               onSelect={onSelect}
               onMenu={onMenu}
             />
           ))}
+          <div aria-hidden="true" style={{ height: range.padEnd }} />
         </div>
 
         {!isLoading && rows.length === 0 && rootOpen && (
@@ -280,12 +331,23 @@ interface TreeRowViewProps {
   row: TreeRow
   rtl: boolean
   selected: boolean
+  setSize: number
+  posInSet: number
   onToggle: (id: string) => void
   onSelect: (id: string) => void
   onMenu: (id: string, anchor: DOMRect) => void
 }
 
-const TreeRowView = ({ row, rtl, selected, onToggle, onSelect, onMenu }: TreeRowViewProps) => {
+const TreeRowView = ({
+  row,
+  rtl,
+  selected,
+  setSize,
+  posInSet,
+  onToggle,
+  onSelect,
+  onMenu,
+}: TreeRowViewProps) => {
   const { t } = useTranslation()
   const hasChildren = row.childCount > 0 || row.hasMoreChildren
 
@@ -317,6 +379,8 @@ const TreeRowView = ({ row, rtl, selected, onToggle, onSelect, onMenu }: TreeRow
       aria-level={row.generation}
       aria-expanded={hasChildren ? row.isOpen : undefined}
       aria-selected={selected}
+      aria-setsize={setSize}
+      aria-posinset={posInSet}
       style={{ display: 'flex', alignItems: 'center', height: 44 }}
     >
       {/* Depth rail: one hairline per ancestor level, repeated at the indent pitch. */}

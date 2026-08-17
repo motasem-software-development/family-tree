@@ -229,4 +229,35 @@ describe('TreePage', () => {
     expect(within(panel).getByRole('button', { name: i18n.t('tree.edit') })).toBeDisabled()
     expect(within(panel).getByRole('button', { name: i18n.t('tree.delete') })).toBeDisabled()
   })
+
+  it('labels each row with its position in the whole outline', async () => {
+    // Windowing removes rows from the DOM, so a screen reader can no longer count them. Without
+    // setsize/posinset it would announce "1 of 2" on a 349-member tree.
+    renderPage()
+
+    const rows = await screen.findAllByRole('treeitem')
+    expect(rows[0]).toHaveAttribute('aria-setsize', String(rows.length))
+    expect(rows[0]).toHaveAttribute('aria-posinset', '1')
+  })
+
+  it('scrolls a revealed search hit into view', async () => {
+    const user = userEvent.setup()
+    const scrollTo = vi.fn()
+    Element.prototype.scrollTo = scrollTo as unknown as typeof Element.prototype.scrollTo
+
+    vi.mocked(membersApi.search).mockResolvedValue({
+      total: 1,
+      items: [{ id: 'f1', name: 'فارس', generation: 2, ancestors: [{ id: 's1', name: 'سليمان' }] }],
+    })
+    renderPage()
+
+    await user.type(await screen.findByLabelText(/بحث|Search/i), 'فارس')
+    // Click the result's caption — the ancestor path is unique to the dropdown, while the
+    // hit's own name also appears in the outline behind it.
+    await user.click(await screen.findByText('سليمان'))
+
+    // Virtualized, the row may not be in the DOM at all — expanding its ancestors is no longer
+    // enough to put it in front of the user.
+    await waitFor(() => expect(scrollTo).toHaveBeenCalled())
+  })
 })
