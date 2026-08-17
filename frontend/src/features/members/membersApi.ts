@@ -1,5 +1,11 @@
 import { apiFetch } from '../../services/apiClient'
-import type { FamilyMember, FamilyTreeSummary, FamilyTreeView, TreeQueryParams } from './types'
+import type {
+  FamilyMember,
+  FamilyTreeSummary,
+  FamilyTreeView,
+  MemberSearchPage,
+  TreeQueryParams,
+} from './types'
 
 const MEMBERS = '/api/v1/family-members'
 const TREE = '/api/v1/family-tree'
@@ -32,6 +38,15 @@ export const membersApi = {
     }),
 
   remove: (id: string): Promise<void> => apiFetch<void>(`${MEMBERS}/${id}`, { method: 'DELETE' }),
+
+  /**
+   * `URLSearchParams` rather than string concatenation: Arabic queries need percent-encoding,
+   * and a name containing `&` would otherwise split into two parameters.
+   */
+  search: (query: string, limit: number): Promise<MemberSearchPage> => {
+    const params = new URLSearchParams({ q: query, limit: String(limit) })
+    return apiFetch<MemberSearchPage>(`${MEMBERS}/search?${params}`)
+  },
 
   summary: (): Promise<FamilyTreeSummary> => apiFetch<FamilyTreeSummary>(TREE),
 

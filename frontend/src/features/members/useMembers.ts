@@ -5,6 +5,8 @@ import type { FamilyMember, FamilyTreeView, TreeQueryParams } from './types'
 export const memberKeys = {
   all: ['members'] as const,
   tree: (params?: TreeQueryParams) => ['members', 'tree', params ?? {}] as const,
+  // Nested under 'members' so a create/edit/delete invalidation refreshes search results too.
+  search: (query: string, limit: number) => ['members', 'search', query, limit] as const,
 }
 
 export const useMembersQuery = () =>

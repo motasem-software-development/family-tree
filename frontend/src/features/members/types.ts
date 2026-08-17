@@ -34,3 +34,22 @@ export interface TreeQueryParams {
   rootId?: string
   maxDepth?: number
 }
+
+export interface MemberAncestor {
+  id: string
+  name: string
+}
+
+export interface MemberSearchHit {
+  id: string
+  name: string
+  generation: number
+  /** Root first, excluding the hit itself. Empty for a first-generation member. */
+  ancestors: MemberAncestor[]
+}
+
+export interface MemberSearchPage {
+  /** Every match on the server, not the length of `items`. */
+  total: number
+  items: MemberSearchHit[]
+}

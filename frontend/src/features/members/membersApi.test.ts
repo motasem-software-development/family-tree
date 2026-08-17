@@ -112,4 +112,18 @@ describe('membersApi', () => {
 
     expect(fetchMock.mock.calls[0][0]).toBe('/api/v1/family-tree/view?rootId=abc&maxDepth=2')
   })
+
+  it('sends the query and limit as search parameters', async () => {
+    const page = { total: 39, items: [] }
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(page))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = await membersApi.search('محمد', 8)
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/v1/family-members/search?q=%D9%85%D8%AD%D9%85%D8%AF&limit=8',
+      expect.anything(),
+    )
+    expect(result).toEqual(page)
+  })
 })
