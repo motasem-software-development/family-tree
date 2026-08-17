@@ -92,6 +92,9 @@ export const AppShell = ({
 
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return
+      // Only while focus is inside the search box. Escape belongs to the topmost layer, and
+      // a document-wide handler here would swallow the press that should close an open modal.
+      if (!searchRef.current?.contains(document.activeElement)) return
       onQueryChange?.('')
       setDismissed(false)
     }

@@ -1,9 +1,11 @@
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { I18nextProvider } from 'react-i18next'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import i18n from '../i18n'
 import { AppShell } from './AppShell'
+import type { FamilyTreeNode } from '../features/members/types'
 
 let permissions: string[] = []
 
@@ -68,5 +70,70 @@ describe('AppShell', () => {
     renderShell()
 
     expect(screen.getByText('canvas')).toBeInTheDocument()
+  })
+
+  describe('search results popover', () => {
+    const node: FamilyTreeNode = {
+      id: 's1',
+      name: 'سليمان',
+      parentId: null,
+      generation: 1,
+      hasMoreChildren: false,
+      children: [],
+    }
+
+    const renderSearching = (onQueryChange = vi.fn()) => {
+      render(
+        <I18nextProvider i18n={i18n}>
+          <MemoryRouter>
+            <AppShell
+              familyName="عائلة السقا"
+              statLine="14"
+              query="سليمان"
+              results={[{ node, meta: 'الجيل 1' }]}
+              onQueryChange={onQueryChange}
+              onSelectResult={vi.fn()}
+            >
+              <p>canvas</p>
+            </AppShell>
+          </MemoryRouter>
+        </I18nextProvider>,
+      )
+      return onQueryChange
+    }
+
+    it('clears the search when Escape is pressed inside the search box', async () => {
+      const user = userEvent.setup()
+      const onQueryChange = renderSearching()
+
+      await user.click(screen.getByLabelText(i18n.t('tree.searchPlaceholder')))
+      await user.keyboard('{Escape}')
+
+      expect(onQueryChange).toHaveBeenCalledWith('')
+    })
+
+    it('leaves Escape alone when focus is elsewhere, so the top layer keeps it', async () => {
+      const user = userEvent.setup()
+      const onQueryChange = renderSearching()
+
+      // A modal above the shell owns Escape while it is open. A document-wide handler here
+      // would swallow that press and the modal would need a second one to close.
+      await user.click(screen.getByText('canvas'))
+      await user.keyboard('{Escape}')
+
+      expect(onQueryChange).not.toHaveBeenCalled()
+    })
+
+    it('puts the results list down on an outside click but keeps the query', async () => {
+      const user = userEvent.setup()
+      const onQueryChange = renderSearching()
+
+      expect(screen.getByText('سليمان')).toBeInTheDocument()
+      await user.click(screen.getByText('canvas'))
+
+      // The matches stay highlighted on the canvas — search dims, it does not filter.
+      expect(screen.queryByText('سليمان')).not.toBeInTheDocument()
+      expect(onQueryChange).not.toHaveBeenCalled()
+    })
   })
 })
