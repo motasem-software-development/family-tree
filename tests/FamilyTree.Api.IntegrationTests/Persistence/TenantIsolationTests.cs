@@ -15,8 +15,10 @@ public sealed class TenantIsolationTests(PostgresFixture fixture) : DatabaseTest
         // but the isolation guarantee is untestable with fewer than two (spec §6).
         await using var context = ContextFor(Guid.Empty);
 
-        var a = Tenant.Create("Al-Saqqa Family", "al-saqqa", Now);
-        var b = Tenant.Create("Al-Hassan Family", "al-hassan", Now);
+        // Slugs deliberately do not collide with the "al-saqqa" slug the SeedImportedFamily
+        // migration inserts before every test runs (ix_tenants_slug is unique).
+        var a = Tenant.Create("Al-Saqqa Family", "iso-al-saqqa", Now);
+        var b = Tenant.Create("Al-Hassan Family", "iso-al-hassan", Now);
         context.Tenants.AddRange(a, b);
 
         context.FamilyTrees.AddRange(

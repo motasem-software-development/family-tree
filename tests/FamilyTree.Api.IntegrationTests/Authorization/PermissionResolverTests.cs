@@ -14,7 +14,9 @@ public sealed class PermissionResolverTests(PostgresFixture fixture) : DatabaseT
     {
         await using var context = ContextFor(Guid.Empty);
 
-        var tenant = Tenant.Create("Al-Saqqa Family", "al-saqqa", Now);
+        // Slug deliberately does not collide with the "al-saqqa" slug the SeedImportedFamily
+        // migration inserts before every test runs (ix_tenants_slug is unique).
+        var tenant = Tenant.Create("Al-Saqqa Family", "perm-al-saqqa", Now);
         context.Tenants.Add(tenant);
 
         var user = new ApplicationUser

@@ -147,12 +147,13 @@ public sealed class FamilyMemberEndpointsTests(PostgresFixture fixture) : IAsync
     public async Task Get_list_returns_every_member_of_the_tenant()
     {
         await AuthenticateAsync();
+        var before = (await _client.GetFromJsonAsync<List<FamilyMemberResponse>>("/api/v1/family-members"))!.Count;
         await CreateAsync("سليمان");
         await CreateAsync("عمر");
 
         var members = await _client.GetFromJsonAsync<List<FamilyMemberResponse>>("/api/v1/family-members");
 
-        members.Should().HaveCount(2);
+        members.Should().HaveCount(before + 2);
     }
 
     [Fact]

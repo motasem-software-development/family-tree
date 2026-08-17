@@ -77,19 +77,21 @@ public sealed class FamilyTreeEndpointsTests(PostgresFixture fixture) : IAsyncLi
         var tree = await _client.GetFromJsonAsync<FamilyTreeResponse>("/api/v1/family-tree");
 
         tree!.Name.Should().Be("عائلة السقا");
-        tree.MemberCount.Should().Be(0);
+        // The migration seeds the reviewed import (docs/import/family-tree.json): 349 members.
+        tree.MemberCount.Should().Be(349);
     }
 
     [Fact]
     public async Task Get_counts_the_members()
     {
         await AuthenticateAsync();
+        var before = (await _client.GetFromJsonAsync<FamilyTreeResponse>("/api/v1/family-tree"))!.MemberCount;
         await CreateAsync("سليمان");
         await CreateAsync("عمر");
 
         var tree = await _client.GetFromJsonAsync<FamilyTreeResponse>("/api/v1/family-tree");
 
-        tree!.MemberCount.Should().Be(2);
+        tree!.MemberCount.Should().Be(before + 2);
     }
 
     [Fact]
@@ -117,14 +119,17 @@ public sealed class FamilyTreeEndpointsTests(PostgresFixture fixture) : IAsyncLi
     }
 
     [Fact]
-    public async Task View_returns_the_root_family_with_no_members_when_the_tree_is_empty()
+    public async Task View_returns_the_imported_root_before_any_members_are_added()
     {
         await AuthenticateAsync();
 
         var view = await _client.GetFromJsonAsync<FamilyTreeViewResponse>("/api/v1/family-tree/view");
 
         view!.Name.Should().Be("عائلة السقا");
-        view.RootMembers.Should().BeEmpty();
+        // The migration seeds exactly one root (داوود) — no members created by this test yet.
+        var root = view.RootMembers.Should().ContainSingle().Subject;
+        root.Name.Should().Be("داوود");
+        root.Generation.Should().Be(1);
     }
 
     [Fact]
@@ -135,7 +140,10 @@ public sealed class FamilyTreeEndpointsTests(PostgresFixture fixture) : IAsyncLi
         var faris = await CreateAsync("فارس", suleiman.Id);
         await CreateAsync("محمود", faris.Id);
 
-        var view = await _client.GetFromJsonAsync<FamilyTreeViewResponse>("/api/v1/family-tree/view");
+        // Scoped by rootId: without it the view would also include the imported root (داوود),
+        // since the created سليمان is itself a second, unrelated root member.
+        var view = await _client.GetFromJsonAsync<FamilyTreeViewResponse>(
+            $"/api/v1/family-tree/view?rootId={suleiman.Id}");
 
         var root = view!.RootMembers.Should().ContainSingle().Subject;
         root.Name.Should().Be("سليمان");
@@ -155,7 +163,7 @@ public sealed class FamilyTreeEndpointsTests(PostgresFixture fixture) : IAsyncLi
         await CreateAsync("محمود", faris.Id);
 
         var view = await _client.GetFromJsonAsync<FamilyTreeViewResponse>(
-            "/api/v1/family-tree/view?maxDepth=2");
+            $"/api/v1/family-tree/view?rootId={suleiman.Id}&maxDepth=2");
 
         var farisNode = view!.RootMembers[0].Children.Should().ContainSingle().Subject;
         farisNode.Children.Should().BeEmpty();
