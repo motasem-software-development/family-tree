@@ -3,7 +3,7 @@ import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { I18nextProvider } from 'react-i18next'
 import { MemoryRouter } from 'react-router-dom'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import i18n from '../../i18n'
 import { ApiError } from '../../services/apiClient'
 import { membersApi } from '../members/membersApi'
@@ -67,6 +67,8 @@ describe('TreePage', () => {
     vi.mocked(membersApi.remove).mockResolvedValue(undefined)
     vi.mocked(membersApi.search).mockResolvedValue({ total: 0, items: [] })
   })
+
+  afterEach(() => vi.restoreAllMocks())
 
   it('renders the root family and its first generation', async () => {
     renderPage()
@@ -242,8 +244,10 @@ describe('TreePage', () => {
 
   it('scrolls a revealed search hit into view', async () => {
     const user = userEvent.setup()
-    const scrollTo = vi.fn()
-    Element.prototype.scrollTo = scrollTo as unknown as typeof Element.prototype.scrollTo
+    // jsdom does not implement Element.scrollTo at all, so vi.spyOn has nothing to wrap until a
+    // no-op stub exists on the prototype for it to replace.
+    Element.prototype.scrollTo ??= () => {}
+    const scrollTo = vi.spyOn(Element.prototype, 'scrollTo').mockImplementation(() => {})
 
     vi.mocked(membersApi.search).mockResolvedValue({
       total: 1,

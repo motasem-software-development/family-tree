@@ -220,7 +220,16 @@ export const TreeCanvas = ({
 
         <div style={{ height: 10 }} />
 
-        <div role="tree" aria-label={t('tree.treeLabel')} ref={listRef}>
+        <div
+          role="tree"
+          aria-label={t('tree.treeLabel')}
+          ref={listRef}
+          // The spacers are sized from `range`, which lags one render behind `rows` when a
+          // reveal expands the outline in the same commit. Pinning the list's height to the
+          // real row count makes the scrollable extent correct immediately, so scrollTo is
+          // not clamped against a stale, too-short scrollHeight.
+          style={{ minHeight: rows.length * ROW_HEIGHT }}
+        >
           {/* Spacers stand in for the rows outside the window, so the scrollbar reflects the
               whole outline rather than only what is rendered. */}
           <div aria-hidden="true" style={{ height: range.padStart }} />
