@@ -106,4 +106,48 @@ public sealed class DatabaseSeederTests(PostgresFixture fixture) : DatabaseTestB
 
         codes.Should().BeEquivalentTo("FamilyTree.View", "Member.View");
     }
+
+    [Fact]
+    public async Task SeedAsync_throws_when_the_configured_slug_does_not_match_the_imported_family_tenant()
+    {
+        // DatabaseTestBase.InitializeAsync already ran every migration, including
+        // SeedImportedFamily, which creates the "al-saqqa" tenant that owns the imported
+        // 349-member family tree. A seeder configured for a different slug must refuse to
+        // start rather than silently create a second, empty tenant and orphan that data.
+        var mismatched = new SeedOptions
+        {
+            TenantName = "Some Other Family",
+            TenantSlug = "some-other-slug",
+            FamilyTreeName = "Some Other Tree",
+            AdminEmail = "admin@example.com",
+            AdminPassword = "Str0ng!Seed#Password"
+        };
+
+        await using var context = ContextFor(Guid.Empty);
+        var hasher = new PasswordHasher<ApplicationUser>();
+        var seeder = new DatabaseSeeder(
+            context, hasher, Microsoft.Extensions.Options.Options.Create(mismatched), TimeProvider.System);
+
+        var act = async () => await seeder.SeedAsync();
+
+        (await act.Should().ThrowAsync<InvalidOperationException>())
+            .Which.Message.Should().Contain("al-saqqa").And.Contain("some-other-slug");
+
+        // And no second tenant was created — the guard runs before any tenant does.
+        (await context.Tenants.CountAsync(t => t.Slug == "some-other-slug")).Should().Be(0);
+    }
+
+    [Fact]
+    public async Task SeedAsync_does_not_throw_when_the_configured_slug_matches_the_imported_family_tenant()
+    {
+        // The default configuration (Options above, slug "al-saqqa") must behave exactly as it
+        // did before this guard existed: the migration's tenant and the seeder's configured
+        // slug agree, so the seeder reuses it without complaint.
+        var act = async () => await RunSeederAsync();
+
+        await act.Should().NotThrowAsync();
+
+        await using var context = ContextFor(Guid.Empty);
+        (await context.Tenants.CountAsync()).Should().Be(1);
+    }
 }

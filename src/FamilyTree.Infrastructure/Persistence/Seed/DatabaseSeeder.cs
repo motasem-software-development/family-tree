@@ -20,11 +20,22 @@ public sealed class DatabaseSeeder(
 {
     private readonly SeedOptions _options = options.Value;
 
+    /// <summary>
+    /// The tenant slug the SeedImportedFamily migration (20260817131959) hardcodes when it
+    /// creates — or reuses — the tenant that owns the 349-member imported family tree. Must
+    /// stay in sync with that migration's TENANT_SLUG literal.
+    /// </summary>
+    private const string ImportedFamilyTenantSlug = "al-saqqa";
+
     public async Task SeedAsync(CancellationToken ct = default)
     {
         var now = timeProvider.GetUtcNow();
 
         await using var transaction = await context.Database.BeginTransactionAsync(ct);
+
+        // Must run before SeedTenantAsync — that is what "before any tenant is created" means
+        // here: if this throws, no second tenant ever comes into existence.
+        await GuardAgainstTenantSlugMismatchAsync(ct);
 
         await SeedPermissionCatalogAsync(now, ct);
         var tenant = await SeedTenantAsync(now, ct);
@@ -33,6 +44,37 @@ public sealed class DatabaseSeeder(
         await SeedAdminUserAsync(tenant.Id, roleIds[SystemRoles.SuperAdmin], now, ct);
 
         await transaction.CommitAsync(ct);
+    }
+
+    /// <summary>
+    /// Refuses to start rather than silently orphaning the imported family tree. If
+    /// SeedImportedFamily already created (or reused) a tenant under its hardcoded default slug
+    /// and the configured SEED_TENANT_SLUG points somewhere else, continuing would create a
+    /// second, empty tenant under the configured slug, seed the admin user there, and leave the
+    /// 349 real members sitting under a tenant nobody can log into — with the app showing an
+    /// empty tree and no error anywhere. This is a misconfiguration, not something to guess a
+    /// fix for automatically, so it fails loudly instead.
+    /// </summary>
+    private async Task GuardAgainstTenantSlugMismatchAsync(CancellationToken ct)
+    {
+        if (_options.TenantSlug == ImportedFamilyTenantSlug) return;
+
+        var importedFamilyTenantExists = await context.Tenants
+            .AnyAsync(t => t.Slug == ImportedFamilyTenantSlug, ct);
+
+        if (!importedFamilyTenantExists) return;
+
+        throw new InvalidOperationException(
+            $"Seed configuration mismatch: SEED_TENANT_SLUG is configured as " +
+            $"'{_options.TenantSlug}', but a tenant with slug '{ImportedFamilyTenantSlug}' " +
+            $"already exists — the slug the SeedImportedFamily migration uses for the imported " +
+            $"349-member family tree. Starting up would create a second, empty tenant under " +
+            $"'{_options.TenantSlug}' and seed the admin user there, leaving the real family " +
+            $"data orphaned under '{ImportedFamilyTenantSlug}' with no visible error. Fix: set " +
+            $"SEED_TENANT_SLUG='{ImportedFamilyTenantSlug}' to match the seeded data, or, if " +
+            $"'{_options.TenantSlug}' is intentional, manually re-point the existing " +
+            $"family_trees/family_members rows at the correct tenant before starting the app. " +
+            $"Refusing to start.");
     }
 
     private async Task SeedPermissionCatalogAsync(DateTimeOffset now, CancellationToken ct)
