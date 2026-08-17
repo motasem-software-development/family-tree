@@ -1237,18 +1237,21 @@ Append inside its top-level `describe`:
       resultTotal: 1,
     })
 
-    expect(await screen.findByText('1 نتيجة')).toBeInTheDocument()
+    // ar.json tree.resultCount_one — Arabic's singular category carries no digit at all.
+    expect(await screen.findByText('نتيجة واحدة')).toBeInTheDocument()
   })
 
   it('shows a searching state rather than "no results" while a request is in flight', async () => {
     renderShell({ query: 'محمد', results: [], resultTotal: 0, isSearching: true })
 
     expect(await screen.findByText('جارٍ البحث…')).toBeInTheDocument()
-    expect(screen.queryByText('لا يوجد أفراد مطابقون.')).not.toBeInTheDocument()
+    // ar.json tree.noResults, copied exactly: a negative assertion against a string that does
+    // not exist in the bundle passes whether or not the code is correct.
+    expect(screen.queryByText('لا توجد نتائج مطابقة.')).not.toBeInTheDocument()
   })
 ```
 
-The two Arabic assertions must match `ar.json` exactly — `tree.resultCount_one` and `tree.noResults`. Read those values from the file rather than trusting the strings above if the test fails on an exact-match assertion.
+Both Arabic strings above are copied from `frontend/src/i18n/locales/ar.json` as it stands: `tree.resultCount_one` is `"نتيجة واحدة"` and `tree.noResults` is `"لا توجد نتائج مطابقة."`. `resultCount` carries the full Arabic plural set (`zero`/`one`/`two`/`few`/`many`/`other`), which is why the one-result case interpolates no number.
 
 - [ ] **Step 2: Run them to verify they fail**
 
@@ -1369,14 +1372,7 @@ Replace the empty state (lines 381-392):
 cd frontend && npx vitest run src/app/AppShell.test.tsx
 ```
 
-Expected: PASS. `TreePage.test.tsx` and `tsc -b` will now fail because `TreePage` still passes the old shape — Task 6 fixes that. Do not fix it here.
-
-- [ ] **Step 6: Commit**
-
-```bash
-git add frontend/src/app/AppShell.tsx frontend/src/app/AppShell.test.tsx frontend/src/i18n/locales
-git commit -m "feat: report the true search result total in the shell"
-```
+Expected: PASS for this file. `TreePage.test.tsx` and `tsc -b` will now fail, because `TreePage` still constructs the old `{ node, meta }` shape — Task 6 fixes that. Do not fix it here, and **do not commit yet**: reshaping the prop and updating its only caller are one atomic change, and a commit between them would leave the repository not compiling. Task 6's commit covers both tasks' files.
 
 ---
 
@@ -1516,11 +1512,14 @@ Expected: PASS across the whole frontend suite.
 
 `revealResult` still calls `ancestorIds` against the loaded tree, which returns `[]` for an id that is not there — so a hit outside the loaded tree would select nothing. The tree endpoint currently returns every member, so this cannot happen; leave it rather than adding a guard for a state the API cannot produce.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 6: Commit — Tasks 5 and 6 together**
+
+Task 5 deliberately left its work uncommitted, because `SearchResult`'s new shape and its only
+caller must land in the same commit for the repository to compile at every point in history.
 
 ```bash
-git add frontend/src/features/tree
-git commit -m "feat: show ancestor paths in search results from the server"
+git add frontend/src/app/AppShell.tsx frontend/src/app/AppShell.test.tsx frontend/src/i18n/locales frontend/src/features/tree
+git commit -m "feat: show ancestor paths and true totals in search results"
 ```
 
 ---
