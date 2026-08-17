@@ -49,13 +49,16 @@ public sealed record Classified(IReadOnlyList<Box> Boxes, IReadOnlyList<Connecto
 /// <para>
 /// <b>Why glyph containment against raw tick geometry scored 0/1887 at first.</b> A tick is a
 /// literal line (zero height), so no point can land "inside" it. Measuring every glyph's Y
-/// against its x-overlapping tick's Y showed the offset is <i>exactly</i> 8.15pt for all 1,862
-/// non-ancestor glyphs (baseline sits a fixed distance above its name-line, independent of font
-/// size), and the X range of the tick already fully contains the glyph run (0pt excursion
-/// measured across the fixture) -- so a tick is inflated into a box by holding its X range and
-/// extending Y by that measured offset plus a small safety margin. The 5 rounded-rect boxes
-/// already have real height and need no inflation; their own glyphs (the two largest-font
-/// ancestor labels) land inside them directly.
+/// against its x-overlapping tick's Y showed the offset is <b>8.1514-8.1522pt</b> for all 1,862
+/// non-ancestor glyphs -- real but tiny variation (under 0.001pt), not floating-point noise; see
+/// <c>GeometryTests.Tick_baseline_offset_is_tight_across_the_fixture</c>, which measures this
+/// distribution directly and fails loudly if a future fixture change widens it (baseline sits a
+/// near-fixed distance above its name-line, independent of font size), and the X range of the
+/// tick already fully contains the glyph run (0pt excursion measured across the fixture) -- so a
+/// tick is inflated into a box by holding its X range and extending Y by
+/// <see cref="TickBaselineOffset"/> (chosen at the low end of the measured spread) plus a small
+/// safety margin. The 5 rounded-rect boxes already have real height and need no inflation; their
+/// own glyphs (the two largest-font ancestor labels) land inside them directly.
 /// </para>
 ///
 /// <para>
@@ -72,11 +75,12 @@ public sealed record Classified(IReadOnlyList<Box> Boxes, IReadOnlyList<Connecto
 /// </summary>
 public static class Geometry
 {
-    // Measured across the fixture: every non-ancestor glyph's Y sits exactly 8.15pt above its
-    // tick's Y (baseline offset, independent of font size), and 0pt outside the tick's X range.
-    // A small safety margin is added on both axes for floating-point slack; it does not need to
-    // clear the 31.1pt+ vertical spacing between generations at the same X because the exact
-    // measured offset already lands well inside that gap.
+    // Measured across the fixture (GeometryTests.Tick_baseline_offset_is_tight_across_the_fixture):
+    // every non-ancestor glyph's Y sits 8.1514-8.1522pt above its tick's Y (baseline offset,
+    // near-independent of font size), and 0pt outside the tick's X range. TickBaselineOffset is
+    // set at the low end of that measured spread; Margin covers the rest plus floating-point
+    // slack. Neither needs to clear the 31.1pt+ vertical spacing between generations at the same
+    // X because the measured offset already lands well inside that gap.
     private const double TickBaselineOffset = 8.15;
     private const double Margin = 0.5;
 
