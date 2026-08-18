@@ -8,7 +8,8 @@ public sealed record RefreshTokenPair(string RawToken, string TokenHash);
 public interface ITokenService
 {
     AccessToken CreateAccessToken(
-        Guid userId, Guid tenantId, string email, IReadOnlyCollection<string> permissions);
+        Guid userId, Guid tenantId, string email,
+        IReadOnlyCollection<string> permissions, bool mustChangePassword);
 
     RefreshTokenPair CreateRefreshToken();
 

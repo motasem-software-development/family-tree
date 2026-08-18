@@ -32,7 +32,8 @@ public class JwtTokenServiceTests
     public void CreateAccessToken_embeds_the_user_tenant_and_permissions()
     {
         var token = CreateService().CreateAccessToken(
-            UserId, TenantId, "admin@example.com", ["Member.View", "Member.Create"]);
+            UserId, TenantId, "admin@example.com", ["Member.View", "Member.Create"],
+            mustChangePassword: false);
 
         var jwt = Parse(token.Value);
 
@@ -45,7 +46,8 @@ public class JwtTokenServiceTests
     [Fact]
     public void CreateAccessToken_expires_in_fifteen_minutes()
     {
-        var token = CreateService().CreateAccessToken(UserId, TenantId, "admin@example.com", []);
+        var token = CreateService().CreateAccessToken(
+            UserId, TenantId, "admin@example.com", [], mustChangePassword: false);
 
         token.ExpiresAt.Should().BeCloseTo(DateTimeOffset.UtcNow.AddMinutes(15), TimeSpan.FromSeconds(5));
     }
@@ -53,7 +55,8 @@ public class JwtTokenServiceTests
     [Fact]
     public async Task CreateAccessToken_produces_a_token_that_validates_against_the_signing_key()
     {
-        var token = CreateService().CreateAccessToken(UserId, TenantId, "admin@example.com", []);
+        var token = CreateService().CreateAccessToken(
+            UserId, TenantId, "admin@example.com", [], mustChangePassword: false);
 
         var result = await new JsonWebTokenHandler().ValidateTokenAsync(token.Value, new TokenValidationParameters
         {

@@ -12,6 +12,7 @@ public sealed class JwtTokenService : ITokenService
 {
     public const string TenantIdClaim = AuthClaims.TenantId;
     public const string PermissionClaim = AuthClaims.Permission;
+    public const string MustChangePasswordClaim = AuthClaims.MustChangePassword;
 
     private const int MinimumSigningKeyBytes = 32;
 
@@ -47,7 +48,8 @@ public sealed class JwtTokenService : ITokenService
     }
 
     public AccessToken CreateAccessToken(
-        Guid userId, Guid tenantId, string email, IReadOnlyCollection<string> permissions)
+        Guid userId, Guid tenantId, string email,
+        IReadOnlyCollection<string> permissions, bool mustChangePassword)
     {
         var now = _timeProvider.GetUtcNow();
         var expires = now.AddMinutes(_options.AccessTokenLifetimeMinutes);
@@ -59,6 +61,11 @@ public sealed class JwtTokenService : ITokenService
             new(TenantIdClaim, tenantId.ToString())
         };
         claims.AddRange(permissions.Select(p => new Claim(PermissionClaim, p)));
+
+        // Emitted only when true. An absent claim and a "false" claim would both have to be
+        // handled by the gate middleware; emitting one shape means the gate has one branch.
+        if (mustChangePassword)
+            claims.Add(new Claim(MustChangePasswordClaim, "true"));
 
         var credentials = new SigningCredentials(
             new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_options.SigningKey)),

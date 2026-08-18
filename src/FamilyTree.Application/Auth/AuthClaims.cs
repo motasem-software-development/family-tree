@@ -11,4 +11,5 @@ public static class AuthClaims
 {
     public const string TenantId = "tenant_id";
     public const string Permission = "permission";
+    public const string MustChangePassword = "must_change_password";
 }

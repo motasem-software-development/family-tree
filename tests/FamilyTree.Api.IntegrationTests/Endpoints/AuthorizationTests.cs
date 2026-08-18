@@ -34,7 +34,8 @@ public sealed class AuthorizationTests(PostgresFixture fixture) : IAsyncLifetime
         var tokens = scope.ServiceProvider.GetRequiredService<ITokenService>();
 
         return tokens.CreateAccessToken(
-            Guid.CreateVersion7(), Guid.CreateVersion7(), "someone@example.com", permissions).Value;
+            Guid.CreateVersion7(), Guid.CreateVersion7(), "someone@example.com", permissions,
+            mustChangePassword: false).Value;
     }
 
     [Fact]

@@ -125,7 +125,7 @@ public sealed class AuthService(
         var permissions = await permissionResolver.GetPermissionsAsync(user.Id, user.TenantId, ct);
 
         var access = tokenService.CreateAccessToken(
-            user.Id, user.TenantId, user.Email!, permissions);
+            user.Id, user.TenantId, user.Email!, permissions, user.MustChangePassword);
 
         var refresh = tokenService.CreateRefreshToken();
 
