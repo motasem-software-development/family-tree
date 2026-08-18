@@ -59,7 +59,24 @@ public sealed class XmindLayoutStrategyTests
         var scene = Build(Node("r", Node("a", Node("a1"))));
 
         scene.Connectors.Count(c => c.Kind == ConnectorKind.Ribbon).Should().Be(1);
-        scene.Connectors.Should().Contain(c => c.Kind == ConnectorKind.Elbow);
+        // A genuine parent-to-child elbow has 4 points; Tick also emits ConnectorKind.Elbow but
+        // with only 2, so this must require the 4-point shape to be discriminating.
+        scene.Connectors.Should().Contain(c => c.Kind == ConnectorKind.Elbow && c.Points.Count == 4);
+    }
+
+    [Fact]
+    public void The_centre_sits_where_its_own_ribbons_anchor()
+    {
+        var scene = Build(Node("r", Node("a", Node("a1"), Node("a2")), Node("b")));
+        var centre = scene.Nodes.Single(n => n.Label == "r");
+
+        var ribbons = scene.Connectors.Where(c => c.Kind == ConnectorKind.Ribbon).ToList();
+        ribbons.Should().NotBeEmpty();
+        // A ribbon's first and last points are the two edges of the centre-side opening,
+        // straddling the centre's Y; their midpoint is where it anchors.
+        foreach (var ribbon in ribbons)
+            ((ribbon.Points[0].Y + ribbon.Points[^1].Y) / 2)
+                .Should().BeApproximately(centre.Y, 1e-6);
     }
 
     [Fact]
@@ -102,6 +119,9 @@ public sealed class XmindLayoutStrategyTests
         scene.Nodes.Should().NotContain(n => n.Label == string.Empty);
         scene.Nodes.Single(n => n.Label == "one").Color
             .Should().NotBe(scene.Nodes.Single(n => n.Label == "two").Color);
+        // A synthetic centre is invisible; ribbons radiating from it would imply a common
+        // ancestor that does not exist, so a forest must have none at all.
+        scene.Connectors.Should().NotContain(c => c.Kind == ConnectorKind.Ribbon);
     }
 
     [Fact]

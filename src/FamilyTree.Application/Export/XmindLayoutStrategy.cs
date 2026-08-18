@@ -31,14 +31,17 @@ public sealed class XmindLayoutStrategy : ILayoutStrategy
         var nodes = new List<SceneNode>();
         var connectors = new List<SceneConnector>();
 
-        if (!isSynthetic) nodes.Add(ToScene(centre, options.Palette.CentreColor, metrics));
-
         var topLevel = centre.Children;
         if (topLevel.Count == 0)
+        {
+            if (!isSynthetic) nodes.Add(ToScene(centre, options.Palette.CentreColor, metrics));
             return SceneNormaliser.Normalise(nodes, connectors, metrics);
+        }
 
         var sides = SideAssignment.Assign(topLevel);
         PlaceSides(centre, topLevel, sides, metrics);
+
+        if (!isSynthetic) nodes.Add(ToScene(centre, options.Palette.CentreColor, metrics));
 
         foreach (var branch in topLevel)
         {
