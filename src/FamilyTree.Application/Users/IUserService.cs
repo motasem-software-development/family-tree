@@ -8,4 +8,6 @@ public interface IUserService
 
     /// <summary>Returns null when no such user is visible to the caller's tenant.</summary>
     Task<UserResponse?> GetAsync(Guid id, CancellationToken ct = default);
+
+    Task<UserResponse> CreateAsync(CreateUserRequest request, CancellationToken ct = default);
 }

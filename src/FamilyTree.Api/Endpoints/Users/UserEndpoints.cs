@@ -1,5 +1,6 @@
 using FamilyTree.Api.Authorization;
 using FamilyTree.Application.Users;
+using FamilyTree.Contracts.Users;
 using FamilyTree.Domain.Authorization;
 
 namespace FamilyTree.Api.Endpoints.Users;
@@ -17,6 +18,14 @@ public static class UserEndpoints
         group.MapGet("/{id:guid}", async (Guid id, IUserService users, CancellationToken ct) =>
             await users.GetAsync(id, ct) is { } user ? Results.Ok(user) : Results.NotFound())
             .RequirePermission(Permissions.User.View);
+
+        group.MapPost("/", async (
+            CreateUserRequest request, IUserService users, CancellationToken ct) =>
+        {
+            var created = await users.CreateAsync(request, ct);
+            return Results.Created($"/api/v1/users/{created.Id}", created);
+        })
+            .RequirePermission(Permissions.User.Create);
 
         return app;
     }

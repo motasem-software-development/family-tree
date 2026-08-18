@@ -85,4 +85,84 @@ public sealed class UserEndpointsTests(PostgresFixture fixture) : IAsyncLifetime
 
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
+
+    [Fact]
+    public async Task Creating_a_user_assigns_roles_and_forces_a_password_change()
+    {
+        await AuthenticateAsync();
+        var viewerRoleId = await RoleIdAsync("Viewer");
+
+        var response = await _client.PostAsJsonAsync("/api/v1/users",
+            new CreateUserRequest("cousin@example.com", "Temp0rary!Password", [viewerRoleId]));
+
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
+        var created = (await response.Content.ReadFromJsonAsync<UserResponse>())!;
+        created.Email.Should().Be("cousin@example.com");
+        created.IsActive.Should().BeTrue();
+        // The administrator chose this password, so the new user must replace it (spec §4.9).
+        created.MustChangePassword.Should().BeTrue();
+        created.Roles.Should().ContainSingle().Which.Name.Should().Be("Viewer");
+    }
+
+    [Fact]
+    public async Task A_created_user_can_log_in_and_is_immediately_gated()
+    {
+        await AuthenticateAsync();
+        var viewerRoleId = await RoleIdAsync("Viewer");
+
+        await _client.PostAsJsonAsync("/api/v1/users",
+            new CreateUserRequest("cousin@example.com", "Temp0rary!Password", [viewerRoleId]));
+
+        using var fresh = _factory.CreateClient();
+        var login = await fresh.PostAsJsonAsync("/api/v1/auth/login",
+            new LoginRequest("cousin@example.com", "Temp0rary!Password"));
+        login.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var tokens = (await login.Content.ReadFromJsonAsync<LoginResponse>())!;
+        fresh.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", tokens.AccessToken);
+
+        var blocked = await fresh.GetAsync("/api/v1/family-members");
+        blocked.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await CodeOf(blocked)).Should().Be("PASSWORD_CHANGE_REQUIRED");
+    }
+
+    [Fact]
+    public async Task A_duplicate_email_is_rejected()
+    {
+        await AuthenticateAsync();
+        var viewerRoleId = await RoleIdAsync("Viewer");
+
+        var response = await _client.PostAsJsonAsync("/api/v1/users",
+            new CreateUserRequest(ApiFactory.AdminEmail, "Temp0rary!Password", [viewerRoleId]));
+
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await CodeOf(response)).Should().Be("USER_EMAIL_TAKEN");
+    }
+
+    [Fact]
+    public async Task An_unknown_role_id_is_rejected()
+    {
+        await AuthenticateAsync();
+
+        var response = await _client.PostAsJsonAsync("/api/v1/users",
+            new CreateUserRequest("cousin@example.com", "Temp0rary!Password",
+                [Guid.Parse("0199a0b1-0000-7000-8000-000000000001")]));
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await CodeOf(response)).Should().Be("ROLE_NOT_FOUND");
+    }
+
+    [Fact]
+    public async Task A_short_password_is_rejected()
+    {
+        await AuthenticateAsync();
+        var viewerRoleId = await RoleIdAsync("Viewer");
+
+        var response = await _client.PostAsJsonAsync("/api/v1/users",
+            new CreateUserRequest("cousin@example.com", "short", [viewerRoleId]));
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await CodeOf(response)).Should().Be("PASSWORD_TOO_SHORT");
+    }
 }
