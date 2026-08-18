@@ -1,12 +1,25 @@
 import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { Route, Routes } from 'react-router-dom'
+import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { Providers } from '../app/providers'
+import { AuthProvider, useAuth } from '../features/auth/AuthContext'
 import { tokenStorage } from '../services/tokenStorage'
 import { ProtectedRoute } from './ProtectedRoute'
 
 const jsonResponse = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
+
+const meResponse = (mustChangePassword: boolean) =>
+  jsonResponse({
+    id: '0193...',
+    email: 'admin@example.com',
+    tenantId: '0193...',
+    familyTreeName: 'عائلة السقا',
+    permissions: ['FamilyTree.View'],
+    mustChangePassword,
+  })
 
 const renderRoutes = () =>
   render(
@@ -17,6 +30,48 @@ const renderRoutes = () =>
       </Routes>
     </Providers>,
   )
+
+// A stand-in for the shared sign-out control that both the change-password gate and every
+// app-shell screen expose — calling the same context logout() that they call.
+const SignOutButton = () => {
+  const { logout } = useAuth()
+  return (
+    <button type="button" onClick={() => void logout()}>
+      sign out
+    </button>
+  )
+}
+
+const renderAt = (path: string) => {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter initialEntries={[path]}>
+        <AuthProvider>
+          <Routes>
+            <Route path="/login" element={<p>login screen</p>} />
+            <Route
+              path="/change-password"
+              element={
+                <ProtectedRoute>
+                  <SignOutButton />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/members"
+              element={
+                <ProtectedRoute>
+                  <SignOutButton />
+                </ProtectedRoute>
+              }
+            />
+          </Routes>
+        </AuthProvider>
+      </MemoryRouter>
+    </QueryClientProvider>,
+  )
+}
 
 describe('ProtectedRoute', () => {
   beforeEach(() => tokenStorage.clear())
@@ -47,6 +102,44 @@ describe('ProtectedRoute', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ code: 'UNAUTHORIZED' }, 401)))
 
     renderRoutes()
+
+    expect(await screen.findByText('login screen')).toBeInTheDocument()
+  })
+
+  it('lands on the login screen after signing out from the change-password gate', async () => {
+    tokenStorage.write({ accessToken: 'abc', refreshToken: 'def' })
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation((path: string) => {
+        if (path === '/api/v1/me') return Promise.resolve(meResponse(true))
+        if (path === '/api/v1/auth/logout') return Promise.resolve(new Response(null, { status: 204 }))
+        throw new Error(`unexpected fetch: ${path}`)
+      }),
+    )
+
+    renderAt('/change-password')
+
+    await userEvent.click(await screen.findByRole('button', { name: 'sign out' }))
+
+    // The defect: tokens clear but the gate screen keeps rendering because nothing tells the
+    // 'me' query observer, and its stale user keeps ProtectedRoute from redirecting.
+    expect(await screen.findByText('login screen')).toBeInTheDocument()
+  })
+
+  it('lands on the login screen after signing out from an app-shell screen', async () => {
+    tokenStorage.write({ accessToken: 'abc', refreshToken: 'def' })
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation((path: string) => {
+        if (path === '/api/v1/me') return Promise.resolve(meResponse(false))
+        if (path === '/api/v1/auth/logout') return Promise.resolve(new Response(null, { status: 204 }))
+        throw new Error(`unexpected fetch: ${path}`)
+      }),
+    )
+
+    renderAt('/members')
+
+    await userEvent.click(await screen.findByRole('button', { name: 'sign out' }))
 
     expect(await screen.findByText('login screen')).toBeInTheDocument()
   })

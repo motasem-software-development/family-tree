@@ -1,4 +1,11 @@
-import { createContext, useCallback, useContext, useMemo, type PropsWithChildren } from 'react'
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useMemo,
+  useState,
+  type PropsWithChildren,
+} from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiFetch } from '../../services/apiClient'
 import { tokenStorage } from '../../services/tokenStorage'
@@ -26,10 +33,17 @@ const AuthContext = createContext<AuthContextValue | null>(null)
 export const AuthProvider = ({ children }: PropsWithChildren) => {
   const queryClient = useQueryClient()
 
+  // Sign-out must take effect the instant it happens, not whenever the ['me'] query observer
+  // next happens to notice tokenStorage.clear() / queryClient.clear() — neither of those is
+  // guaranteed to re-render this provider on its own. This flag is the one thing that reliably
+  // does: setting it forces the state update React re-renders on, so `user` below flips to
+  // null in the same render pass that handles the click, on every screen that reads it.
+  const [isSignedOut, setIsSignedOut] = useState(false)
+
   const { data, isLoading } = useQuery({
     queryKey: ['me'],
     queryFn: () => apiFetch<CurrentUser>('/api/v1/me'),
-    enabled: tokenStorage.read() !== null,
+    enabled: !isSignedOut && tokenStorage.read() !== null,
     retry: false,
   })
 
@@ -47,6 +61,9 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
   const login = useCallback(
     async (email: string, password: string) => {
       await loginMutation.mutateAsync({ email, password })
+      // Re-arm the query: a fresh sign-in (including the re-login ChangePasswordPage performs
+      // once the flag clears) must be able to fetch ['me'] again.
+      setIsSignedOut(false)
     },
     [loginMutation],
   )
@@ -62,20 +79,24 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
     }
     tokenStorage.clear()
     queryClient.clear()
+    setIsSignedOut(true)
   }, [queryClient])
 
   const value = useMemo<AuthContextValue>(
     () => ({
-      user: data ?? null,
-      isLoading: tokenStorage.read() !== null && isLoading,
+      // isSignedOut wins outright: once it is set, stale query data must never leak back into
+      // `user` for even one render, no matter what the query observer still holds.
+      user: isSignedOut ? null : (data ?? null),
+      isLoading: !isSignedOut && tokenStorage.read() !== null && isLoading,
       // Default false, never true: while the query is pending there is no signal yet, and
       // defaulting true would flash the change-password screen on every page load.
-      mustChangePassword: data?.mustChangePassword ?? false,
-      hasPermission: (permission) => data?.permissions.includes(permission) ?? false,
+      mustChangePassword: isSignedOut ? false : (data?.mustChangePassword ?? false),
+      hasPermission: (permission) =>
+        !isSignedOut && (data?.permissions.includes(permission) ?? false),
       login,
       logout,
     }),
-    [data, isLoading, login, logout],
+    [data, isLoading, isSignedOut, login, logout],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
