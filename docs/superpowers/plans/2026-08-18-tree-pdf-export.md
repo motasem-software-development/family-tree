@@ -387,9 +387,12 @@ public sealed class VerticalPackingTests
     [Fact]
     public void A_parent_of_a_lopsided_subtree_straddles_rather_than_averages()
     {
+        // Three children, not two: for exactly two the mean and the straddle are equal by
+        // definition, so a two-child fixture cannot discriminate the rule at all.
         var packed = Pack(Node("p",
             Node("a", Node("a1"), Node("a2"), Node("a3")),
-            Node("b")));
+            Node("b"),
+            Node("c")));
 
         var straddle = (packed.Children[0].Y + packed.Children[^1].Y) / 2;
         var mean = packed.Children.Average(c => c.Y);
@@ -808,21 +811,24 @@ public sealed class SideAssignmentTests
     }
 
     [Fact]
-    public void Sibling_order_is_preserved_within_a_side()
+    public void Every_branch_is_assigned_exactly_one_side()
     {
         var top = TopLevel(Leaves("a", 20), Leaves("b", 3), Leaves("c", 18), Leaves("d", 2));
         var sides = SideAssignment.Assign(top);
 
-        foreach (var side in new[] { Side.Right, Side.Left })
-        {
-            var indices = top
-                .Select((node, index) => (node, index))
-                .Where(entry => sides[entry.node] == side)
-                .Select(entry => entry.index)
-                .ToList();
+        sides.Should().HaveCount(top.Count);
+        top.Should().OnlyContain(node => sides.ContainsKey(node));
+    }
 
-            indices.Should().BeInAscendingOrder();
-        }
+    // Ties must not depend on an unstable sort, or two runs of the same tree produce
+    // different pictures.
+    [Fact]
+    public void Equal_weight_branches_assign_deterministically()
+    {
+        var first = SideAssignment.Assign(TopLevel(Leaves("a", 5), Leaves("b", 5)));
+        var second = SideAssignment.Assign(TopLevel(Leaves("a", 5), Leaves("b", 5)));
+
+        first.Values.Should().Equal(second.Values);
     }
 
     [Fact]
@@ -882,7 +888,7 @@ public static class SideAssignment
 - [ ] **Step 4: Run tests to verify they pass**
 
 Run: `dotnet test tests/FamilyTree.Application.Tests --filter SideAssignmentTests`
-Expected: PASS — 4 tests.
+Expected: PASS — 5 tests.
 
 - [ ] **Step 5: Commit**
 
@@ -1233,11 +1239,15 @@ public sealed class XmindLayoutStrategy : ILayoutStrategy
                 }
             }
 
-            connectors.Add(ConnectorBuilder.Ribbon(
-                new ScenePoint(centre.X + (direction > 0 ? centre.Width : 0), centre.Y),
-                InnerEdge(branch, direction),
-                metrics.RibbonHalfWidth,
-                color));
+            // A synthetic forest centre is invisible, so ribbons radiating from it would imply
+            // a common ancestor that does not exist. Real roots get their ribbon; a forest
+            // gets none.
+            if (!isSynthetic)
+                connectors.Add(ConnectorBuilder.Ribbon(
+                    new ScenePoint(centre.X + (direction > 0 ? centre.Width : 0), centre.Y),
+                    InnerEdge(branch, direction),
+                    metrics.RibbonHalfWidth,
+                    color));
         }
 
         return SceneNormaliser.Normalise(nodes, connectors, metrics);
