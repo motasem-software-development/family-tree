@@ -143,6 +143,34 @@ describe('ChangePasswordPage', () => {
     expect(loginBody).toEqual({ email: 'pending@example.com', password: 'NewPassw0rd!' })
   })
 
+  it('reports the change as done when the change succeeded but the re-login failed', async () => {
+    // The password HAS changed and every refresh token is revoked by this point. Reporting the
+    // login error here would say the operation failed when it did not, and a retry would then
+    // fail with PASSWORD_INCORRECT, because the "current password" field holds a password that
+    // no longer exists.
+    const fetchMock = vi.fn().mockImplementation((path: string) => {
+      if (path === '/api/v1/me') return Promise.resolve(meResponse())
+      if (path === '/api/v1/me/password') return Promise.resolve(new Response(null, { status: 204 }))
+      if (path === '/api/v1/auth/login') return Promise.resolve(jsonResponse({ code: 'UNAVAILABLE' }, 503))
+      throw new Error(`unexpected fetch: ${path}`)
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderPage()
+
+    await userEvent.type(screen.getByLabelText('Current password'), 'OldPassw0rd!')
+    await userEvent.type(screen.getByLabelText('New password'), 'NewPassw0rd!')
+    await userEvent.type(screen.getByLabelText('Confirm password'), 'NewPassw0rd!')
+    await userEvent.click(screen.getByRole('button', { name: 'Change password' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Your password was changed, but signing you in again did not work. Sign out, then sign in with your new password.',
+    )
+    expect(screen.queryByText('Something went wrong. Please try again.')).not.toBeInTheDocument()
+    // Retrying would submit a "current password" the server no longer recognises.
+    expect(screen.getByRole('button', { name: 'Change password' })).toBeDisabled()
+  })
+
   it('shows the Arabic message for the same failure when Arabic is active', async () => {
     await i18n.changeLanguage('ar')
     const fetchMock = vi.fn().mockImplementation((path: string) => {

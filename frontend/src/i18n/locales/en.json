@@ -22,7 +22,8 @@
     "confirmPassword": "Confirm password",
     "passwordMismatch": "The passwords do not match.",
     "changePassword": "Change password",
-    "changingPassword": "Changing…"
+    "changingPassword": "Changing…",
+    "passwordChangedSignInAgain": "Your password was changed, but signing you in again did not work. Sign out, then sign in with your new password."
   },
   "nav": {
     "tenantTag": "Family workspace",

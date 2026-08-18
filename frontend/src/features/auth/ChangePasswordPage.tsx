@@ -33,6 +33,11 @@ export const ChangePasswordPage = () => {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [mismatch, setMismatch] = useState(false)
   const [errorCode, setErrorCode] = useState<string | null>(null)
+  // The change itself succeeded but the re-login did not, so the user must sign in by hand.
+  // Tracked separately from errorCode because the two say opposite things about whether the
+  // password changed, and reporting the login failure as though the change had failed is the
+  // defect this exists to prevent.
+  const [changedNeedsSignIn, setChangedNeedsSignIn] = useState(false)
   const [submitting, setSubmitting] = useState(false)
 
   // A user only ever lands here with the flag set (ProtectedRoute sends them here precisely
@@ -53,23 +58,38 @@ export const ChangePasswordPage = () => {
     }
 
     setSubmitting(true)
+
+    // Two steps, two catches. Everything after this point has already changed the password,
+    // so a failure there can never be reported as "the change failed".
     try {
       await apiFetch('/api/v1/me/password', {
         method: 'POST',
         body: JSON.stringify({ currentPassword, newPassword }),
       })
-
-      // The server clears the DB flag and revokes every refresh token this session held, so
-      // the access token still in hand carries the stale must_change_password claim and there
-      // is no unrevoked refresh token to trade for a fresh one. Signing in again through the
-      // normal login path mints a token pair with no stale claim and invalidates the `['me']`
-      // query, which is what actually releases the redirect below — the redirect itself is UX
-      // only; the server gate (PasswordChangeGateMiddleware) is the real enforcement point (§9).
-      if (user) {
-        await login(user.email, newPassword)
-      }
     } catch (error) {
       setErrorCode(error instanceof ApiError ? error.code : 'NETWORK')
+      setSubmitting(false)
+      return
+    }
+
+    // The server has cleared the DB flag and revoked every refresh token this session held, so
+    // the access token still in hand carries the stale must_change_password claim and there is
+    // no unrevoked refresh token to trade for a fresh one. Signing in again through the normal
+    // login path mints a token pair with no stale claim and invalidates the `['me']` query,
+    // which is what actually releases the redirect above — the redirect itself is UX only; the
+    // server gate (PasswordChangeGateMiddleware) is the real enforcement point (§9).
+    //
+    // If that fails — transiently, or because `user` is null and there is no email to sign in
+    // with — the only honest thing to say is that the password DID change and the user must
+    // sign in again. Saying so beats calling logout(): a silent bounce to /login with no
+    // explanation looks exactly like the failure this screen is trying to report. The submit
+    // button is disabled from here on, because retrying would send a "current password" the
+    // server no longer recognises and answer PASSWORD_INCORRECT.
+    try {
+      if (!user) throw new ApiError('NO_SESSION', 0)
+      await login(user.email, newPassword)
+    } catch {
+      setChangedNeedsSignIn(true)
     } finally {
       setSubmitting(false)
     }
@@ -168,6 +188,22 @@ export const ChangePasswordPage = () => {
           </p>
         )}
 
+        {changedNeedsSignIn && (
+          <p
+            role="alert"
+            style={{
+              margin: '0 0 var(--space-5)',
+              padding: '10px 12px',
+              borderRadius: 'var(--r-md)',
+              background: 'var(--error-subtle)',
+              color: 'var(--error)',
+              fontSize: 13,
+            }}
+          >
+            {t('auth.passwordChangedSignInAgain')}
+          </p>
+        )}
+
         {errorCode !== null && (
           <p
             role="alert"
@@ -186,7 +222,7 @@ export const ChangePasswordPage = () => {
 
         <button
           type="submit"
-          disabled={submitting}
+          disabled={submitting || changedNeedsSignIn}
           style={{
             width: '100%',
             height: 'var(--control-h-lg)',

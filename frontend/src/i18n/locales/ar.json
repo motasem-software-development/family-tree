@@ -22,7 +22,8 @@
     "confirmPassword": "تأكيد كلمة المرور",
     "passwordMismatch": "كلمتا المرور غير متطابقتين.",
     "changePassword": "تغيير كلمة المرور",
-    "changingPassword": "جارٍ التغيير…"
+    "changingPassword": "جارٍ التغيير…",
+    "passwordChangedSignInAgain": "تم تغيير كلمة المرور، لكن تعذّر تسجيل دخولك من جديد. سجّل الخروج ثم ادخل بكلمة المرور الجديدة."
   },
   "nav": {
     "tenantTag": "مساحة العائلة",
