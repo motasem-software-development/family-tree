@@ -57,6 +57,7 @@ app.UseExceptionHandler();
 app.UseSerilogRequestLogging();
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseMiddleware<PasswordChangeGateMiddleware>();
 
 if (app.Environment.IsDevelopment())
     app.MapOpenApi();
