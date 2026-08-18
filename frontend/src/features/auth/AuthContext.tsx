@@ -2,12 +2,13 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
   type PropsWithChildren,
 } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { apiFetch } from '../../services/apiClient'
+import { apiFetch, onSessionEnded } from '../../services/apiClient'
 import { tokenStorage } from '../../services/tokenStorage'
 
 export interface CurrentUser {
@@ -68,6 +69,18 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
     [loginMutation],
   )
 
+  // The single "this session is over" path. Both triggers run it: the sign-out button below,
+  // and apiClient discovering that a token refresh failed. Keeping one implementation is the
+  // point — a refresh failure that only cleared tokenStorage left `user` non-null forever, so
+  // ProtectedRoute never redirected and the app stayed rendered over a dead session.
+  const endSession = useCallback(() => {
+    tokenStorage.clear()
+    queryClient.clear()
+    setIsSignedOut(true)
+  }, [queryClient])
+
+  useEffect(() => onSessionEnded(endSession), [endSession])
+
   const logout = useCallback(async () => {
     const tokens = tokenStorage.read()
     if (tokens) {
@@ -77,10 +90,8 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
         body: JSON.stringify({ refreshToken: tokens.refreshToken }),
       }).catch(() => undefined)
     }
-    tokenStorage.clear()
-    queryClient.clear()
-    setIsSignedOut(true)
-  }, [queryClient])
+    endSession()
+  }, [endSession])
 
   const value = useMemo<AuthContextValue>(
     () => ({

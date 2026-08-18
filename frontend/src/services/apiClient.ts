@@ -30,6 +30,35 @@ const errorFrom = async (response: Response): Promise<ApiError> => {
   }
 }
 
+type SessionEndedListener = () => void
+
+const sessionEndedListeners = new Set<SessionEndedListener>()
+
+/**
+ * Subscribe to "this session is over, and not because the user asked".
+ *
+ * A failed refresh is the client discovering that its credentials are gone — the server
+ * revokes every refresh token a user holds on deactivation, on an administrator password
+ * reset, and on the user's own password change. Clearing tokenStorage is not enough on its
+ * own: nothing re-renders on it, so the cached session data stays on screen and the user is
+ * left inside a fully rendered app whose every request fails. AuthProvider subscribes here and
+ * runs exactly the same teardown it runs for the sign-out button — one mechanism, two triggers.
+ *
+ * Returns an unsubscribe function.
+ */
+export const onSessionEnded = (listener: SessionEndedListener): (() => void) => {
+  sessionEndedListeners.add(listener)
+  return () => {
+    sessionEndedListeners.delete(listener)
+  }
+}
+
+/** Copied before iterating so a listener that unsubscribes itself cannot disturb the walk. */
+const endSession = (): void => {
+  tokenStorage.clear()
+  for (const listener of [...sessionEndedListeners]) listener()
+}
+
 /**
  * Guards concurrent refresh attempts. The backend rotates refresh tokens, so a second
  * caller presenting the same (now-revoked) token while a refresh is already in flight
@@ -40,6 +69,8 @@ let refreshInFlight: Promise<boolean> | null = null
 
 const performRefresh = async (): Promise<boolean> => {
   const tokens = tokenStorage.read()
+  // No refresh token means there was no session to end — a 401 on the login page, say. Ending
+  // one here would fire the teardown at exactly the moment the user is trying to sign in.
   if (!tokens?.refreshToken) return false
 
   let response: Response
@@ -52,12 +83,12 @@ const performRefresh = async (): Promise<boolean> => {
   } catch {
     // Network failure: treat the same as a failed refresh rather than leaking a raw
     // exception past the caller, which expects the original 401 to surface as an ApiError.
-    tokenStorage.clear()
+    endSession()
     return false
   }
 
   if (!response.ok) {
-    tokenStorage.clear()
+    endSession()
     return false
   }
 

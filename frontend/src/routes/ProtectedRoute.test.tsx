@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { Providers } from '../app/providers'
 import { AuthProvider, useAuth } from '../features/auth/AuthContext'
+import { apiFetch } from '../services/apiClient'
 import { tokenStorage } from '../services/tokenStorage'
 import { ProtectedRoute } from './ProtectedRoute'
 
@@ -42,6 +43,19 @@ const SignOutButton = () => {
   )
 }
 
+// Any ordinary in-app request. Its failure must be able to end the session the same way the
+// sign-out button does — see the refresh test below.
+const LoadButton = () => (
+  <button
+    type="button"
+    onClick={() => {
+      void apiFetch('/api/v1/family-members').catch(() => undefined)
+    }}
+  >
+    load members
+  </button>
+)
+
 const renderAt = (path: string) => {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
@@ -63,6 +77,7 @@ const renderAt = (path: string) => {
               element={
                 <ProtectedRoute>
                   <SignOutButton />
+                  <LoadButton />
                 </ProtectedRoute>
               }
             />
@@ -124,6 +139,38 @@ describe('ProtectedRoute', () => {
     // The defect: tokens clear but the gate screen keeps rendering because nothing tells the
     // 'me' query observer, and its stale user keeps ProtectedRoute from redirecting.
     expect(await screen.findByText('login screen')).toBeInTheDocument()
+  })
+
+  it('lands on the login screen when a token refresh fails mid-session', async () => {
+    // An administrator deactivates a colleague who has the app open; every path that revokes
+    // refresh tokens (deactivation, an administrator password reset, the user's own password
+    // change) produces this. Without a session-ended path the tokens clear and nothing else
+    // happens: `user` stays non-null from the cached ['me'] data, ProtectedRoute never
+    // redirects, and the colleague keeps looking at a fully rendered app whose every request
+    // fails — no message, no redirect, no sign-out.
+    tokenStorage.write({ accessToken: 'abc', refreshToken: 'def' })
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation((path: string) => {
+        if (path === '/api/v1/me') return Promise.resolve(meResponse(false))
+        if (path === '/api/v1/family-members') {
+          return Promise.resolve(jsonResponse({ code: 'UNAUTHORIZED' }, 401))
+        }
+        if (path === '/api/v1/auth/refresh') {
+          return Promise.resolve(jsonResponse({ code: 'INVALID_REFRESH_TOKEN' }, 401))
+        }
+        throw new Error(`unexpected fetch: ${path}`)
+      }),
+    )
+
+    renderAt('/members')
+
+    // The session must be fully rendered first: a cold-start 401 already redirects today, so
+    // starting from an unresolved session would prove nothing.
+    await userEvent.click(await screen.findByRole('button', { name: 'load members' }))
+
+    expect(await screen.findByText('login screen')).toBeInTheDocument()
+    expect(tokenStorage.read()).toBeNull()
   })
 
   it('lands on the login screen after signing out from an app-shell screen', async () => {
