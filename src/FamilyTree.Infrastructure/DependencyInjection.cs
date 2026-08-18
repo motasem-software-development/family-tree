@@ -39,6 +39,7 @@ public static class DependencyInjection
         services.AddScoped<IFamilyMemberService, FamilyMemberService>();
         services.AddScoped<IFamilyTreeService, FamilyTreeService>();
         services.AddScoped<IUserService, UserService>();
+        services.AddScoped<IAdministratorGuard, AdministratorGuard>();
         services.AddScoped<DatabaseSeeder>();
 
         return services;
