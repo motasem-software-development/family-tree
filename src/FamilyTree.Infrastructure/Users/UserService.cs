@@ -136,6 +136,65 @@ public sealed class UserService(
         return (await GetAsync(user.Id, ct))!;
     }
 
+    public async Task<UserResponse> SetActiveAsync(
+        Guid id, bool isActive, CancellationToken ct = default)
+    {
+        // IAdministratorGuard needs an ambient transaction on this same DbContext: it takes a
+        // per-tenant advisory lock held for the transaction's lifetime to close the TOCTOU
+        // window where two concurrent requests each remove a different administrator.
+        await using var transaction = await context.Database.BeginTransactionAsync(ct);
+
+        var user = await context.Users.FirstOrDefaultAsync(u => u.Id == id, ct)
+            ?? throw new NotFoundException("USER_NOT_FOUND", "No such user.");
+
+        user.IsActive = isActive;
+
+        if (!isActive)
+        {
+            // Staged, not saved: the guard evaluates the state this request is asking for.
+            await RevokeRefreshTokensAsync(user.Id, ct);
+            await guard.EnsureAdministratorRemainsAsync(ct);
+        }
+
+        await context.SaveChangesAsync(ct);
+        await transaction.CommitAsync(ct);
+
+        return (await GetAsync(user.Id, ct))!;
+    }
+
+    public async Task<UserResponse> ResetPasswordAsync(
+        Guid id, ResetPasswordRequest request, CancellationToken ct = default)
+    {
+        var user = await context.Users.FirstOrDefaultAsync(u => u.Id == id, ct)
+            ?? throw new NotFoundException("USER_NOT_FOUND", "No such user.");
+
+        if ((request.Password ?? string.Empty).Length < PasswordPolicy.MinimumLength)
+            throw new DomainException("PASSWORD_TOO_SHORT",
+                $"A password must be at least {PasswordPolicy.MinimumLength} characters.");
+
+        user.PasswordHash = passwordHasher.HashPassword(user, request.Password!);
+        // An administrator chose it, so it is temporary — the same rule as creation (§4.9).
+        user.MustChangePassword = true;
+
+        await RevokeRefreshTokensAsync(user.Id, ct);
+        await context.SaveChangesAsync(ct);
+
+        return (await GetAsync(user.Id, ct))!;
+    }
+
+    /// <summary>
+    /// Deactivation and password reset both invalidate the credential a refresh token was
+    /// issued against. AuthService already refuses to refresh an inactive user, so this is
+    /// defence in depth for deactivation — and the primary mechanism for a reset.
+    /// </summary>
+    private async Task RevokeRefreshTokensAsync(Guid userId, CancellationToken ct)
+    {
+        var now = timeProvider.GetUtcNow();
+        var tokens = await context.RefreshTokens.Where(t => t.UserId == userId).ToListAsync(ct);
+        foreach (var token in tokens)
+            token.Revoke(now, replacedByTokenHash: null);
+    }
+
     /// <summary>
     /// Deliberately minimal: one '@' with text on both sides and no whitespace. There is no
     /// email delivery in V1 (spec §4.2), so this is a typo guard, not an address validator.

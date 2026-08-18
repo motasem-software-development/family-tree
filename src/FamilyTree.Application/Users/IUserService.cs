@@ -12,4 +12,9 @@ public interface IUserService
     Task<UserResponse> CreateAsync(CreateUserRequest request, CancellationToken ct = default);
 
     Task<UserResponse> UpdateAsync(Guid id, UpdateUserRequest request, CancellationToken ct = default);
+
+    Task<UserResponse> SetActiveAsync(Guid id, bool isActive, CancellationToken ct = default);
+
+    Task<UserResponse> ResetPasswordAsync(
+        Guid id, ResetPasswordRequest request, CancellationToken ct = default);
 }

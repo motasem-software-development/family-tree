@@ -32,6 +32,21 @@ public static class UserEndpoints
             Results.Ok(await users.UpdateAsync(id, request, ct)))
             .RequirePermission(Permissions.User.Edit);
 
+        group.MapPost("/{id:guid}/activate", async (
+            Guid id, IUserService users, CancellationToken ct) =>
+            Results.Ok(await users.SetActiveAsync(id, isActive: true, ct)))
+            .RequirePermission(Permissions.User.Deactivate);
+
+        group.MapPost("/{id:guid}/deactivate", async (
+            Guid id, IUserService users, CancellationToken ct) =>
+            Results.Ok(await users.SetActiveAsync(id, isActive: false, ct)))
+            .RequirePermission(Permissions.User.Deactivate);
+
+        group.MapPost("/{id:guid}/password", async (
+            Guid id, ResetPasswordRequest request, IUserService users, CancellationToken ct) =>
+            Results.Ok(await users.ResetPasswordAsync(id, request, ct)))
+            .RequirePermission(Permissions.User.Edit);
+
         return app;
     }
 }

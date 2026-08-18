@@ -237,4 +237,104 @@ public sealed class UserEndpointsTests(PostgresFixture fixture) : IAsyncLifetime
         // otherwise it is indistinguishable from "administrators can never be demoted".
         response.StatusCode.Should().Be(HttpStatusCode.OK);
     }
+
+    [Fact]
+    public async Task Deactivating_a_user_blocks_their_login_and_kills_their_refresh_token()
+    {
+        await AuthenticateAsync();
+        var viewerRoleId = await RoleIdAsync("Viewer");
+
+        var create = await _client.PostAsJsonAsync("/api/v1/users",
+            new CreateUserRequest("cousin@example.com", "Temp0rary!Password", [viewerRoleId]));
+        var user = (await create.Content.ReadFromJsonAsync<UserResponse>())!;
+
+        using var theirs = _factory.CreateClient();
+        var login = await theirs.PostAsJsonAsync("/api/v1/auth/login",
+            new LoginRequest("cousin@example.com", "Temp0rary!Password"));
+        var tokens = (await login.Content.ReadFromJsonAsync<LoginResponse>())!;
+
+        var deactivate = await _client.PostAsync($"/api/v1/users/{user.Id}/deactivate", null);
+        deactivate.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await deactivate.Content.ReadFromJsonAsync<UserResponse>())!.IsActive.Should().BeFalse();
+
+        // AuthEndpoints maps ACCOUNT_INACTIVE to 403, distinct from the 401 used for bad
+        // credentials — see AuthEndpoints.StatusForCode.
+        var again = await theirs.PostAsJsonAsync("/api/v1/auth/login",
+            new LoginRequest("cousin@example.com", "Temp0rary!Password"));
+        again.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await CodeOf(again)).Should().Be("ACCOUNT_INACTIVE");
+
+        var refresh = await theirs.PostAsJsonAsync("/api/v1/auth/refresh",
+            new RefreshRequest(tokens.RefreshToken));
+        refresh.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task Reactivating_restores_login()
+    {
+        await AuthenticateAsync();
+        var viewerRoleId = await RoleIdAsync("Viewer");
+
+        var create = await _client.PostAsJsonAsync("/api/v1/users",
+            new CreateUserRequest("cousin@example.com", "Temp0rary!Password", [viewerRoleId]));
+        var user = (await create.Content.ReadFromJsonAsync<UserResponse>())!;
+
+        await _client.PostAsync($"/api/v1/users/{user.Id}/deactivate", null);
+        var activate = await _client.PostAsync($"/api/v1/users/{user.Id}/activate", null);
+
+        activate.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        using var theirs = _factory.CreateClient();
+        var login = await theirs.PostAsJsonAsync("/api/v1/auth/login",
+            new LoginRequest("cousin@example.com", "Temp0rary!Password"));
+        login.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task Deactivating_the_last_administrator_is_rejected()
+    {
+        await AuthenticateAsync();
+
+        var users = await _client.GetFromJsonAsync<List<UserResponse>>("/api/v1/users");
+        var admin = users!.Single(u => u.Email == ApiFactory.AdminEmail);
+
+        var response = await _client.PostAsync($"/api/v1/users/{admin.Id}/deactivate", null);
+
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await CodeOf(response)).Should().Be("LAST_ADMINISTRATOR");
+    }
+
+    [Fact]
+    public async Task An_administrator_reset_forces_the_user_to_change_it_again()
+    {
+        await AuthenticateAsync();
+        var viewerRoleId = await RoleIdAsync("Viewer");
+
+        var create = await _client.PostAsJsonAsync("/api/v1/users",
+            new CreateUserRequest("cousin@example.com", "Temp0rary!Password", [viewerRoleId]));
+        var user = (await create.Content.ReadFromJsonAsync<UserResponse>())!;
+
+        // Clear the flag first, so the assertion below proves the reset SET it rather than
+        // merely observing the value creation left behind.
+        using var theirs = _factory.CreateClient();
+        var firstLogin = await theirs.PostAsJsonAsync("/api/v1/auth/login",
+            new LoginRequest("cousin@example.com", "Temp0rary!Password"));
+        var tokens = (await firstLogin.Content.ReadFromJsonAsync<LoginResponse>())!;
+        theirs.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", tokens.AccessToken);
+        var selfChange = await theirs.PostAsJsonAsync("/api/v1/me/password",
+            new ChangePasswordRequest("Temp0rary!Password", "Ch0sen!ByThe#User"));
+        selfChange.StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        var reset = await _client.PostAsJsonAsync($"/api/v1/users/{user.Id}/password",
+            new ResetPasswordRequest("R3set!ByAdmin#Pass"));
+
+        reset.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await reset.Content.ReadFromJsonAsync<UserResponse>())!.MustChangePassword.Should().BeTrue();
+
+        using var after = _factory.CreateClient();
+        var login = await after.PostAsJsonAsync("/api/v1/auth/login",
+            new LoginRequest("cousin@example.com", "R3set!ByAdmin#Pass"));
+        login.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
 }
