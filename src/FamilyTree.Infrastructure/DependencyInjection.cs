@@ -2,6 +2,7 @@ using FamilyTree.Application.Auth;
 using FamilyTree.Application.Authorization;
 using FamilyTree.Application.FamilyMembers;
 using FamilyTree.Application.FamilyTrees;
+using FamilyTree.Application.Roles;
 using FamilyTree.Application.Users;
 using FamilyTree.Infrastructure.Auth;
 using FamilyTree.Infrastructure.Authorization;
@@ -10,6 +11,7 @@ using FamilyTree.Infrastructure.FamilyTrees;
 using FamilyTree.Infrastructure.Identity;
 using FamilyTree.Infrastructure.Persistence;
 using FamilyTree.Infrastructure.Persistence.Seed;
+using FamilyTree.Infrastructure.Roles;
 using FamilyTree.Infrastructure.Users;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -39,6 +41,7 @@ public static class DependencyInjection
         services.AddScoped<IFamilyMemberService, FamilyMemberService>();
         services.AddScoped<IFamilyTreeService, FamilyTreeService>();
         services.AddScoped<IUserService, UserService>();
+        services.AddScoped<IRoleService, RoleService>();
         services.AddScoped<IAdministratorGuard, AdministratorGuard>();
         services.AddScoped<DatabaseSeeder>();
 
