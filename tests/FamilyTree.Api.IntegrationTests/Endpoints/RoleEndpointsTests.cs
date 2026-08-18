@@ -187,6 +187,16 @@ public sealed class RoleEndpointsTests(PostgresFixture fixture) : IAsyncLifetime
         updated.Description.Should().Be("وصف محدث");
         updated.Permissions.Should().BeEquivalentTo("Member.View", "Member.Create");
 
+        // The PUT response body is computed inside the still-open transaction, so it would read
+        // back correctly even if the edit were never actually committed. A separate request,
+        // after the PUT has fully returned, is the only way to prove the edit persisted.
+        var reread = await _client.GetAsync($"/api/v1/roles/{role.Id}");
+        reread.StatusCode.Should().Be(HttpStatusCode.OK);
+        var rereadRole = (await reread.Content.ReadFromJsonAsync<RoleResponse>())!;
+        rereadRole.Name.Should().Be("أمناء الشجرة");
+        rereadRole.Description.Should().Be("وصف محدث");
+        rereadRole.Permissions.Should().BeEquivalentTo("Member.View", "Member.Create");
+
         var delete = await _client.DeleteAsync($"/api/v1/roles/{role.Id}");
         delete.StatusCode.Should().Be(HttpStatusCode.NoContent);
 
