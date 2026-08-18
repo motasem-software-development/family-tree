@@ -38,7 +38,7 @@ public sealed class RoleService(ApplicationDbContext context) : IRoleService
         CancellationToken ct = default) =>
         await context.Permissions.AsNoTracking()
             .OrderBy(p => p.Code)
-            .Select(p => new PermissionResponse(p.Code, p.Description!))
+            .Select(p => new PermissionResponse(p.Code, p.Description))
             .ToListAsync(ct);
 
     private async Task<ILookup<Guid, string>> PermissionsByRoleAsync(

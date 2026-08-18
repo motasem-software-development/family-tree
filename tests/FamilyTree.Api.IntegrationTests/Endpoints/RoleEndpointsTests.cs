@@ -85,6 +85,12 @@ public sealed class RoleEndpointsTests(PostgresFixture fixture) : IAsyncLifetime
 
         permissions.Should().HaveCount(18);
         permissions!.Select(p => p.Code).Should().Contain("Member.Move");
+        // DatabaseSeeder seeds every permission with a null description today; the frontend
+        // localizes permission labels from i18n keyed by code instead (bilingual UI, no single
+        // server-side string could serve it). This pins current reality so that whoever adds
+        // real description text has to consciously touch this test, not silently reshape the
+        // contract's nullability.
+        permissions.Should().OnlyContain(p => p.Description == null);
     }
 
     [Fact]
