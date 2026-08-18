@@ -9,11 +9,13 @@ export interface CurrentUser {
   tenantId: string
   familyTreeName: string
   permissions: string[]
+  mustChangePassword: boolean
 }
 
 interface AuthContextValue {
   user: CurrentUser | null
   isLoading: boolean
+  mustChangePassword: boolean
   hasPermission: (permission: string) => boolean
   login: (email: string, password: string) => Promise<void>
   logout: () => Promise<void>
@@ -66,6 +68,9 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
     () => ({
       user: data ?? null,
       isLoading: tokenStorage.read() !== null && isLoading,
+      // Default false, never true: while the query is pending there is no signal yet, and
+      // defaulting true would flash the change-password screen on every page load.
+      mustChangePassword: data?.mustChangePassword ?? false,
       hasPermission: (permission) => data?.permissions.includes(permission) ?? false,
       login,
       logout,

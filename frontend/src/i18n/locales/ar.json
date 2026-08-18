@@ -14,7 +14,15 @@
     "signIn": "تسجيل الدخول",
     "signOut": "تسجيل الخروج",
     "signingIn": "جارٍ تسجيل الدخول…",
-    "subtitle": "سجّل الدخول إلى مساحة عائلتك"
+    "subtitle": "سجّل الدخول إلى مساحة عائلتك",
+    "changePasswordTitle": "اختر كلمة مرور جديدة",
+    "changePasswordSubtitle": "تم تعيين كلمة المرور الحالية من قبل المسؤول. اختر كلمة مرور خاصة بك للمتابعة.",
+    "currentPassword": "كلمة المرور الحالية",
+    "newPassword": "كلمة المرور الجديدة",
+    "confirmPassword": "تأكيد كلمة المرور",
+    "passwordMismatch": "كلمتا المرور غير متطابقتين.",
+    "changePassword": "تغيير كلمة المرور",
+    "changingPassword": "جارٍ التغيير…"
   },
   "nav": {
     "tenantTag": "مساحة العائلة",

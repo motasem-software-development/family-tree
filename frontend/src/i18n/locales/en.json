@@ -14,7 +14,15 @@
     "signIn": "Sign in",
     "signOut": "Sign out",
     "signingIn": "Signing in…",
-    "subtitle": "Sign in to your family workspace"
+    "subtitle": "Sign in to your family workspace",
+    "changePasswordTitle": "Choose a new password",
+    "changePasswordSubtitle": "Your current password was set by an administrator. Choose your own to continue.",
+    "currentPassword": "Current password",
+    "newPassword": "New password",
+    "confirmPassword": "Confirm password",
+    "passwordMismatch": "The passwords do not match.",
+    "changePassword": "Change password",
+    "changingPassword": "Changing…"
   },
   "nav": {
     "tenantTag": "Family workspace",

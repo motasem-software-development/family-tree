@@ -3,7 +3,7 @@
 Multi-tenant family tree platform. Arabic/English, RTL-first.
 
 - **Design spec:** `docs/superpowers/specs/2026-08-16-family-tree-saas-design.md`
-- **Current phase:** Phase 3 — Visualization
+- **Current phase:** Phase 4 — Authorization
 
 ## Requirements
 
@@ -79,6 +79,25 @@ message text is not part of the contract.
 | `INVALID_REFRESH_TOKEN` | 401 | Refresh token unknown, rotated, or revoked |
 | `ACCOUNT_INACTIVE` | 401 | The authenticated account has been deactivated |
 | `TENANT_INACTIVE` | 401 | The authenticated account's tenant subscription is inactive |
+
+## User and role management
+
+The first administrator is created by startup seeding, not through the UI — it is the only
+account that exists before anyone can sign in, and is tied to the seeded tenant via
+`SEED_TENANT_SLUG`/`SEED_ADMIN_PASSWORD` in `.env`.
+
+From there, an administrator creates every other user through the Users screen. Each new user
+gets a temporary password chosen by the administrator; the server marks the account
+`mustChangePassword`, and the account cannot reach any screen but the forced change-password
+page until it replaces that password at first sign-in. This is enforced server-side
+(`PasswordChangeGateMiddleware`, keyed off a JWT claim) — the frontend redirect to
+`/change-password` is UX only, not the enforcement point.
+
+The built-in system roles cannot be edited or deleted; only custom roles can be. Every user
+deactivation, role edit, and role deletion is checked against a last-administrator lockout
+guard: the system refuses any change that would leave no active user holding both `User.Edit`
+and `Role.Edit` (accumulated across that user's roles, not necessarily from a single one), so a
+tenant can never lock itself out of user and role management.
 
 ## Search
 

@@ -1,4 +1,5 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
+import { ChangePasswordPage } from '../features/auth/ChangePasswordPage'
 import { LoginPage } from '../features/auth/LoginPage'
 import { MembersPage } from '../features/members/MembersPage'
 import { RolesPage } from '../features/roles/RolesPage'
@@ -18,6 +19,14 @@ export const AppRoutes = () => (
       element={
         <ProtectedRoute>
           <TreePage />
+        </ProtectedRoute>
+      }
+    />
+    <Route
+      path="/change-password"
+      element={
+        <ProtectedRoute>
+          <ChangePasswordPage />
         </ProtectedRoute>
       }
     />

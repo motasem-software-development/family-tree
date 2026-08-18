@@ -422,7 +422,7 @@ Following technical specification §57, with three changes.
 | 2 — Family tree | Tree and root family, member create / edit / delete, parent-child hierarchy |
 | **2.5 — Data import** | PDF reconstruction, verification artifact, seed migration |
 | 3 — Visualization | **Scope corrected 2026-08-17 — see §5's supersession note.** Delivered: server-side search (`pg_trgm` index, recursive-CTE ancestor paths, true result totals), outline virtualization, and the zoom scroll fix. Not delivered, because the 2026-08-17 design decision removed them: layout engine, SVG renderer, orientation toggle. Expand/collapse, zoom, and node actions shipped early with the design handoff during Phase 2. |
-| 4 — Authorization | Permissions, roles, custom roles, user management |
+| 4 — Authorization | User management (list, create, update, activate/deactivate, administrator password reset), role management including custom roles, the permission catalog endpoint, server-enforced first-login password change, and the last-administrator lockout guard (§4.9). Permissions, the resolver, `RequirePermission`, and the four system roles were built in Phase 1 and are unchanged. Audit writes deferred to Phase 5. |
 | 5 — Advanced operations | Move member, cycle detection, relationship history, audit logs |
 | 6 — Public access | Link creation with search toggle, public viewer, revocation |
 | 7 — Hardening | Observability, security, performance, integration testing, CI/CD, backup |
