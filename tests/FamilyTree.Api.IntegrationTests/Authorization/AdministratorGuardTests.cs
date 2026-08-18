@@ -32,11 +32,56 @@ public sealed class AdministratorGuardTests(PostgresFixture fixture) : IAsyncLif
     public async Task The_guard_passes_while_an_active_administrator_remains()
     {
         await using var scope = _factory.CreateTenantScope(_tenantId);
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         var guard = scope.ServiceProvider.GetRequiredService<IAdministratorGuard>();
+        await using var tx = await context.Database.BeginTransactionAsync();
 
         var act = () => guard.EnsureAdministratorRemainsAsync();
 
         await act.Should().NotThrowAsync();
+    }
+
+    [Fact]
+    public async Task The_guard_refuses_to_run_outside_a_transaction()
+    {
+        // Its per-tenant lock is transaction-scoped, so running without a transaction would
+        // leave the check-then-save race open. That is a caller error, not a conflict: it must
+        // fail loudly rather than report a safety it did not enforce.
+        await using var scope = _factory.CreateTenantScope(_tenantId);
+        var guard = scope.ServiceProvider.GetRequiredService<IAdministratorGuard>();
+
+        var act = () => guard.EnsureAdministratorRemainsAsync();
+
+        // ConflictException derives from DomainException, not from InvalidOperationException,
+        // so ThrowExactly here also proves the failure is not dressed up as LAST_ADMINISTRATOR.
+        (await act.Should().ThrowExactlyAsync<InvalidOperationException>())
+            .Which.Message.Should().Contain("transaction");
+    }
+
+    [Fact]
+    public async Task The_guard_serializes_concurrent_callers_for_the_same_tenant()
+    {
+        // Without this, two requests each deactivating a different one of the last two
+        // administrators would both read the other as still active, both pass, and both save.
+        await using var first = _factory.CreateTenantScope(_tenantId);
+        var firstContext = first.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        await using var firstTx = await firstContext.Database.BeginTransactionAsync();
+        await first.ServiceProvider.GetRequiredService<IAdministratorGuard>()
+            .EnsureAdministratorRemainsAsync();
+
+        await using var second = _factory.CreateTenantScope(_tenantId);
+        var secondContext = second.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        await using var secondTx = await secondContext.Database.BeginTransactionAsync();
+        var blocked = second.ServiceProvider.GetRequiredService<IAdministratorGuard>()
+            .EnsureAdministratorRemainsAsync();
+
+        var firstToFinish = await Task.WhenAny(blocked, Task.Delay(TimeSpan.FromSeconds(1)));
+        firstToFinish.Should().NotBeSameAs(blocked,
+            "the second caller must wait while the first holds the tenant lock");
+
+        // Ending the first transaction releases the lock, and the second proceeds.
+        await firstTx.RollbackAsync();
+        await blocked.WaitAsync(TimeSpan.FromSeconds(30));
     }
 
     [Fact]
@@ -45,6 +90,7 @@ public sealed class AdministratorGuardTests(PostgresFixture fixture) : IAsyncLif
         await using var scope = _factory.CreateTenantScope(_tenantId);
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         var guard = scope.ServiceProvider.GetRequiredService<IAdministratorGuard>();
+        await using var tx = await context.Database.BeginTransactionAsync();
 
         var admin = await context.Users.IgnoreQueryFilters()
             .SingleAsync(u => u.NormalizedEmail == ApiFactory.AdminEmail.ToUpperInvariant());
@@ -69,6 +115,7 @@ public sealed class AdministratorGuardTests(PostgresFixture fixture) : IAsyncLif
         await using var scope = _factory.CreateTenantScope(_tenantId);
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         var guard = scope.ServiceProvider.GetRequiredService<IAdministratorGuard>();
+        await using var tx = await context.Database.BeginTransactionAsync();
 
         // UserRole carries no tenant column and therefore no query filter, so this clears every
         // assignment in the database. Safe only because the seeded fixture holds one tenant —
@@ -88,6 +135,7 @@ public sealed class AdministratorGuardTests(PostgresFixture fixture) : IAsyncLif
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         var guard = scope.ServiceProvider.GetRequiredService<IAdministratorGuard>();
         var now = TimeProvider.System.GetUtcNow();
+        await using var tx = await context.Database.BeginTransactionAsync();
 
         var admin = await context.Users.IgnoreQueryFilters()
             .SingleAsync(u => u.NormalizedEmail == ApiFactory.AdminEmail.ToUpperInvariant());

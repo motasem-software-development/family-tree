@@ -24,10 +24,24 @@ namespace FamilyTree.Infrastructure.Users;
 ///    decision is taken in memory over ChangeTracker entries: Deleted rows drop out, Added rows
 ///    join in, and Modified entities are read at their current values.
 ///
+///    The blindness is symmetric, and the other direction fails OPEN: ExecuteUpdateAsync,
+///    ExecuteDeleteAsync and raw SQL apply straight at the database and never touch the tracker,
+///    so an already-loaded entity keeps its stale values and the guard would happily count an
+///    administrator that a bulk `UPDATE ... SET is_active = false` has already removed. Any
+///    mutation this guard protects must therefore go through tracked entities — never a bulk
+///    update or raw-SQL path. (The solution currently contains no such call.)
+///
 /// 3. Tenant scope comes from Role.TenantId and ApplicationUser.TenantId — UserRole has no
 ///    tenant column. Tenant is re-checked in memory rather than relying on the query filter
 ///    alone, because Added entities and rows a caller loaded with IgnoreQueryFilters are in the
 ///    tracker too, and the filter never saw them.
+///
+/// 4. Reading is not enough: check-then-save is a race. Two requests each deactivating a
+///    different one of the last two administrators would each see the other still active, both
+///    pass, and both save — zero administrators, recoverable only by hand. The guard therefore
+///    serializes per tenant on a PostgreSQL advisory lock held for the rest of the caller's
+///    transaction, so the second request blocks until the first has committed and then re-reads
+///    the state the first produced.
 /// </summary>
 public sealed class AdministratorGuard(
     ApplicationDbContext context, ITenantContext tenant) : IAdministratorGuard
@@ -39,6 +53,8 @@ public sealed class AdministratorGuard(
     public async Task EnsureAdministratorRemainsAsync(CancellationToken ct = default)
     {
         var tenantId = tenant.TenantId;
+
+        await SerializeOnTenantAsync(tenantId, ct);
 
         // The catalog is system-level and immutable, so a plain query is safe here.
         var recoveryPermissionIds = await context.Permissions
@@ -67,14 +83,15 @@ public sealed class AdministratorGuard(
 
         if (tenantRoleIds.Count == 0) throw Rejected();
 
-        // Roles staged as Added have no rows yet; their grants and assignments are already in
-        // the tracker, so only the persisted ones need loading.
-        var persistedRoleIds = tenantRoleIds.ToList();
+        // Every in-tenant role id, including Added ones that have no rows yet — those simply
+        // match nothing here, and their grants and assignments are already in the tracker.
+        // (A List, not the HashSet, because EF translates List.Contains to an IN clause.)
+        var roleIdFilter = tenantRoleIds.ToList();
         await context.RolePermissions
-            .Where(rp => persistedRoleIds.Contains(rp.RoleId))
+            .Where(rp => roleIdFilter.Contains(rp.RoleId))
             .LoadAsync(ct);
         await context.UserRoles
-            .Where(ur => persistedRoleIds.Contains(ur.RoleId))
+            .Where(ur => roleIdFilter.Contains(ur.RoleId))
             .LoadAsync(ct);
 
         var recoveryGrantsByRole = Pending<RolePermission>()
@@ -99,6 +116,38 @@ public sealed class AdministratorGuard(
             });
 
         if (!survives) throw Rejected();
+    }
+
+    /// <summary>
+    /// Blocks until this tenant's check-then-save sequence can run alone.
+    ///
+    /// pg_advisory_xact_lock is released when the surrounding transaction ends, which is exactly
+    /// the window that needs protecting — read, decide, save, commit — and means a crashed or
+    /// abandoned request cannot leave the lock held. It also means the lock is worthless without
+    /// a transaction: outside one, PostgreSQL commits the SELECT immediately and the lock is
+    /// dropped before the guard has read anything. A caller with no ambient transaction has
+    /// therefore not met the contract, and that is a programming error, not a conflict — so it
+    /// throws rather than silently proceeding unlocked. Fail closed.
+    /// </summary>
+    private async Task SerializeOnTenantAsync(Guid tenantId, CancellationToken ct)
+    {
+        if (context.Database.CurrentTransaction is null)
+            throw new InvalidOperationException(
+                $"{nameof(IAdministratorGuard)} must be called inside a transaction on the same " +
+                "DbContext that stages the change and then saves it. Its per-tenant lock is " +
+                "transaction-scoped, so without a transaction the check-then-save race it exists " +
+                "to close would be left open. Begin a transaction, stage the change, call the " +
+                "guard, save, then commit.");
+
+        // The advisory lock namespace is a single bigint, so the tenant GUID is folded into one
+        // by reinterpreting its first 8 bytes. Two tenants could in principle collide; that is
+        // harmless. A collision means the two tenants briefly serialize against each other —
+        // a contention cost on an already rare administrative path, never a wrong answer, since
+        // every query below is still tenant-scoped.
+        var lockKey = BitConverter.ToInt64(tenantId.ToByteArray(), 0);
+
+        await context.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT pg_advisory_xact_lock({lockKey})", ct);
     }
 
     /// <summary>
