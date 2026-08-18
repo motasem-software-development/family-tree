@@ -195,6 +195,56 @@ public sealed class RoleEndpointsTests(PostgresFixture fixture) : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Editing_a_role_to_drop_a_recovery_permission_from_the_last_administrator_is_rejected()
+    {
+        await AuthenticateAsync();
+
+        var create = await _client.PostAsJsonAsync("/api/v1/roles",
+            new SaveRoleRequest("أمناء الحساب", null, ["User.Edit", "Role.Edit"]));
+        create.StatusCode.Should().Be(HttpStatusCode.Created);
+        var custom = (await create.Content.ReadFromJsonAsync<RoleResponse>())!;
+
+        var users = await _client.GetFromJsonAsync<List<UserResponse>>("/api/v1/users");
+        var admin = users!.Single(u => u.Email == ApiFactory.AdminEmail);
+
+        // Make the custom role the sole role of the tenant's only active administrator. This
+        // is permitted: the role still carries both recovery permissions (User.Edit + Role.Edit).
+        var swap = await _client.PutAsJsonAsync($"/api/v1/users/{admin.Id}",
+            new UpdateUserRequest(ApiFactory.AdminEmail, [custom.Id]));
+        swap.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        // Now edit the role itself to drop Role.Edit. RoleService.UpdateAsync replaces the
+        // grant set by RemoveRange + re-Add, so this stages a *Deleted* RolePermission — the
+        // one change-tracker state the guard's own unit tests never produce — and it strips
+        // the tenant's last administrator through a path the user-facing guards never see.
+        // (The bearer token predates the swap and still carries Role.Edit, so the endpoint's
+        // permission policy is not what is being measured here.)
+        var response = await _client.PutAsJsonAsync($"/api/v1/roles/{custom.Id}",
+            new SaveRoleRequest("أمناء الحساب", null, ["User.Edit"]));
+
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await CodeOf(response)).Should().Be("LAST_ADMINISTRATOR");
+    }
+
+    [Fact]
+    public async Task Editing_a_role_that_endangers_nobody_still_succeeds()
+    {
+        await AuthenticateAsync();
+
+        var create = await _client.PostAsJsonAsync("/api/v1/roles",
+            new SaveRoleRequest("أمناء الحساب", null, ["User.Edit", "Role.Edit"]));
+        var custom = (await create.Content.ReadFromJsonAsync<RoleResponse>())!;
+
+        // The mirror of the test above: nobody holds this role, so dropping Role.Edit from it
+        // takes administration away from no one. Without this the guard would be
+        // indistinguishable from "a role granting User.Edit can never be edited".
+        var response = await _client.PutAsJsonAsync($"/api/v1/roles/{custom.Id}",
+            new SaveRoleRequest("أمناء الحساب", null, ["User.Edit"]));
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
     public async Task A_role_that_still_has_members_cannot_be_deleted()
     {
         await AuthenticateAsync();

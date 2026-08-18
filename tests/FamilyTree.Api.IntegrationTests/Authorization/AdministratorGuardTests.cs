@@ -162,4 +162,40 @@ public sealed class AdministratorGuardTests(PostgresFixture fixture) : IAsyncLif
 
         await act.Should().NotThrowAsync();
     }
+
+    [Fact]
+    public async Task The_guard_rejects_revoking_a_recovery_permission_from_the_only_administrators_role()
+    {
+        // The tracker state a role EDIT produces, and the only one the other tests here never
+        // stage: RoleService.UpdateAsync replaces a role's grants with RemoveRange + re-Add,
+        // so a dropped permission arrives as a *Deleted* RolePermission — not the Deleted
+        // UserRole, Added RolePermission or Modified ApplicationUser covered above.
+        await using var scope = _factory.CreateTenantScope(_tenantId);
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var guard = scope.ServiceProvider.GetRequiredService<IAdministratorGuard>();
+        await using var tx = await context.Database.BeginTransactionAsync();
+
+        var admin = await context.Users.IgnoreQueryFilters()
+            .SingleAsync(u => u.NormalizedEmail == ApiFactory.AdminEmail.ToUpperInvariant());
+        var adminRoleIds = await context.UserRoles
+            .Where(ur => ur.UserId == admin.Id).Select(ur => ur.RoleId).ToListAsync();
+
+        var roleEditId = await context.Permissions
+            .Where(p => p.Code == Permissions.Role.Edit).Select(p => p.Id).SingleAsync();
+
+        // Satisfied before staging, so the rejection below is attributable to the pending
+        // deletion rather than to some pre-existing gap in the fixture.
+        await guard.Invoking(g => g.EnsureAdministratorRemainsAsync()).Should().NotThrowAsync();
+
+        var grants = await context.RolePermissions
+            .Where(rp => adminRoleIds.Contains(rp.RoleId) && rp.PermissionId == roleEditId)
+            .ToListAsync();
+        grants.Should().NotBeEmpty();
+        context.RolePermissions.RemoveRange(grants);
+
+        var act = () => guard.EnsureAdministratorRemainsAsync();
+
+        (await act.Should().ThrowAsync<ConflictException>())
+            .Which.Code.Should().Be("LAST_ADMINISTRATOR");
+    }
 }
