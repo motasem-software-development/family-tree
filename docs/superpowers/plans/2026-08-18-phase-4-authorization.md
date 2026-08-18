@@ -3112,3 +3112,27 @@ git commit -m "feat: force a password change at first sign-in and document Phase
 - **Task 2's middleware ordering** assumes `Program.cs` calls `UseAuthorization()`. The task says to adapt and report if the pipeline is composed differently.
 - **`RolePermission.Create` and `Permission.Description`** are used in Tasks 6, 9, and 10 without my having read those two files. Both tasks open with an explicit step to verify the real signatures first.
 - **The `18` permission count** in Task 9 is read from `Permissions.All` as of writing; the task says to re-verify before relying on it.
+
+---
+
+## Task 13 — verification findings
+
+Run on 2026-08-18 against the seeded `al-saqqa` tenant: PostgreSQL in Docker, API on `http://localhost:5000`, Vite dev server on `http://localhost:5176`, Chromium via Playwright. The dev database was one migration behind — `20260818004541_AddMustChangePassword` had never been applied, and the API crashed at startup on `column a.must_change_password does not exist` until `dotnet ef database update` ran. Worth knowing that Phase 4 needs a migration step on any environment that was current as of Phase 3.
+
+Observations, in the order the checklist lists them.
+
+1. **Signed in as the seeded administrator — passed.** `<html dir="rtl" lang="ar">`. The shell renders **المستخدمون** → `/users` and **الأدوار والصلاحيات** → `/roles` as real anchors, while the still-unbuilt destinations (dashboard, audit log, public sharing, settings) remain disabled buttons.
+2. **Created a user with the Viewer role and a temporary password — passed.** The new row reads `viewer.test@example.com`, `Viewer`, `نشط` plus the badge `بانتظار تغيير كلمة المرور`, and `لم يسجّل الدخول بعد` for last login.
+3. **Signed in as that user — passed only after manual navigation. Two defects.** The credentials were accepted (`POST /api/v1/auth/login` → 200, tokens written to `sessionStorage`), but the browser stayed on `/login` with the form still showing. **`LoginPage` has no post-login navigation at all** — no `Navigate`, no `navigate()`, no redirect on `user` — so a successful sign-in leaves the user staring at the login form. This predates Phase 4 and is not Task 13's doing, but it blocks this checklist item outright. Navigating to `/members` by hand did the right thing: `ProtectedRoute` redirected to `/change-password`, the Arabic title and subtitle rendered from `ar.json`, and every further attempt to reach `/users` bounced straight back. A mismatched confirmation produced `كلمتا المرور غير متطابقتين.` with no request sent.
+4. **Changed the password — the server side passed exactly as the ruling predicted; the client side did not navigate.** The API log shows `POST /api/v1/me/password` → 204 followed immediately by `POST /api/v1/auth/login` → 200, which is the ruling's re-login working: fresh tokens replace the ones the endpoint just revoked, and the new access token carries no stale `must_change_password` claim. Every subsequent request was served rather than 403'd, which is the proof the ruling exists to produce. **But the page stayed on `/change-password`** — the redirect guard pushes a flagged user *to* that route and nothing ever pushes them *off* it once the flag clears. Navigating to `/` by hand landed on the tree with the nav correctly showing only **شجرة العائلة** and **الأفراد**; Users and Roles were absent, as a Viewer holding neither `User.View` nor `Role.View` should see.
+5. **Custom role lifecycle — passed.** Created `أمين الأرشيف` with `FamilyTree.View` and `Member.View`; the permission checkboxes rendered Arabic labels from the i18n catalog keyed by code, never the server's null `description`. The four seeded roles showed **no** Edit or Delete controls — only `الأدوار الأساسية غير قابلة للتعديل.` — while the custom role showed both. Assigned it to the Viewer user, then attempted deletion: refused with `لا يمكن حذف هذا الدور لأنه معيّن لمستخدمين.`
+6. **Deactivating the seeded administrator — passed.** Refused with `لا يمكن تنفيذ هذا التغيير لأنه لن يبقى أحد قادرًا على إدارة المستخدمين والأدوار.` The guard fired against the live database, not just in tests.
+7. **Right-to-left rendering — passed.** Both new pages render RTL under `dir="rtl"`. Arabic pluralization is live and correct: the user count read `مستخدمان` (dual) at two users, and the role count `5 أدوار`.
+
+**Defects this pass found, all fixed in the fix round that follows:**
+
+- **`LoginPage` never navigates after a successful sign-in** (pre-existing, but it breaks item 3).
+- **`ChangePasswordPage` never navigates after a successful change** (introduced here) — together with the above, the entire forced-change flow required typing URLs by hand.
+- **No way to sign out from `/change-password`** — the screen renders no shell and no sign-out control, and every other protected route bounces back, so a flagged user who cannot recall their temporary password has no exit. The server was deliberately built to keep logout reachable for exactly this case (`PasswordChangeGateMiddleware`'s `IAllowAnonymous` exemption); the frontend never offered the path.
+
+Test data created during this pass was cleaned up afterwards: the custom role was deleted and the test user unassigned from it and deactivated. The user row itself remains, because the API deliberately has no delete-user endpoint.
