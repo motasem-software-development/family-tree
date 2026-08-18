@@ -21,7 +21,8 @@ public sealed class UserService(
     ApplicationDbContext context,
     ITenantContext tenant,
     IPasswordHasher<ApplicationUser> passwordHasher,
-    TimeProvider timeProvider) : IUserService
+    TimeProvider timeProvider,
+    IAdministratorGuard guard) : IUserService
 {
     /// <summary>PostgreSQL SQLSTATE for a unique violation.</summary>
     private const string UniqueViolation = "23505";
@@ -77,6 +78,60 @@ public sealed class UserService(
             // the same code so two concurrent creates give one caller a clean conflict.
             throw new ConflictException("USER_EMAIL_TAKEN", "That email address is already in use.");
         }
+
+        return (await GetAsync(user.Id, ct))!;
+    }
+
+    public async Task<UserResponse> UpdateAsync(
+        Guid id, UpdateUserRequest request, CancellationToken ct = default)
+    {
+        // IAdministratorGuard needs an ambient transaction on this same DbContext: it takes a
+        // per-tenant advisory lock held for the transaction's lifetime to close the TOCTOU
+        // window where two concurrent requests each remove a different administrator.
+        await using var transaction = await context.Database.BeginTransactionAsync(ct);
+
+        var user = await context.Users.FirstOrDefaultAsync(u => u.Id == id, ct)
+            ?? throw new NotFoundException("USER_NOT_FOUND", "No such user.");
+
+        var email = ValidateEmail(request.Email);
+        var roleIds = await ValidateRoleIdsAsync(request.RoleIds, ct);
+        var normalized = email.ToUpperInvariant();
+
+        if (normalized != user.NormalizedEmail
+            && await context.Users.AnyAsync(u => u.NormalizedEmail == normalized, ct))
+            throw new ConflictException("USER_EMAIL_TAKEN", "That email address is already in use.");
+
+        user.Email = email;
+        user.NormalizedEmail = normalized;
+        user.UserName = email;
+        user.NormalizedUserName = normalized;
+
+        // Roles are replaced wholesale through tracked entities, not ExecuteDeleteAsync /
+        // ExecuteUpdateAsync: those bypass the change tracker and would make the guard below
+        // fail open, reporting an administrator remains when the change tracker (and thus the
+        // guard) never saw the removal.
+        var existing = await context.UserRoles.Where(ur => ur.UserId == user.Id).ToListAsync(ct);
+        context.UserRoles.RemoveRange(existing);
+        foreach (var roleId in roleIds)
+            context.UserRoles.Add(UserRole.Create(user.Id, roleId));
+
+        // Staged, not saved: the guard evaluates the state this request is asking for.
+        await guard.EnsureAdministratorRemainsAsync(ct);
+
+        try
+        {
+            await context.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException ex)
+            when (ex.InnerException is PostgresException { SqlState: UniqueViolation })
+        {
+            // The check above is check-then-act and can lose a race. The `await using`
+            // transaction above is never committed on this path, so it rolls back on dispose
+            // and leaves no partial change behind.
+            throw new ConflictException("USER_EMAIL_TAKEN", "That email address is already in use.");
+        }
+
+        await transaction.CommitAsync(ct);
 
         return (await GetAsync(user.Id, ct))!;
     }

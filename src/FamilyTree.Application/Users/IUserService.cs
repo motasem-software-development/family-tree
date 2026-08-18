@@ -10,4 +10,6 @@ public interface IUserService
     Task<UserResponse?> GetAsync(Guid id, CancellationToken ct = default);
 
     Task<UserResponse> CreateAsync(CreateUserRequest request, CancellationToken ct = default);
+
+    Task<UserResponse> UpdateAsync(Guid id, UpdateUserRequest request, CancellationToken ct = default);
 }

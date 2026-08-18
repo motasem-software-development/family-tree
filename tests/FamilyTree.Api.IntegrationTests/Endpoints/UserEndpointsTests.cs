@@ -165,4 +165,76 @@ public sealed class UserEndpointsTests(PostgresFixture fixture) : IAsyncLifetime
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         (await CodeOf(response)).Should().Be("PASSWORD_TOO_SHORT");
     }
+
+    [Fact]
+    public async Task Updating_replaces_the_role_set()
+    {
+        await AuthenticateAsync();
+        var viewerRoleId = await RoleIdAsync("Viewer");
+        var editorRoleId = await RoleIdAsync("Editor");
+
+        var create = await _client.PostAsJsonAsync("/api/v1/users",
+            new CreateUserRequest("cousin@example.com", "Temp0rary!Password", [viewerRoleId]));
+        var user = (await create.Content.ReadFromJsonAsync<UserResponse>())!;
+
+        var response = await _client.PutAsJsonAsync($"/api/v1/users/{user.Id}",
+            new UpdateUserRequest("cousin@example.com", [editorRoleId]));
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var updated = (await response.Content.ReadFromJsonAsync<UserResponse>())!;
+        updated.Roles.Should().ContainSingle().Which.Name.Should().Be("Editor");
+    }
+
+    [Fact]
+    public async Task Updating_an_unknown_user_returns_404()
+    {
+        await AuthenticateAsync();
+        var viewerRoleId = await RoleIdAsync("Viewer");
+
+        var response = await _client.PutAsJsonAsync(
+            "/api/v1/users/0199a0b1-0000-7000-8000-000000000001",
+            new UpdateUserRequest("nobody@example.com", [viewerRoleId]));
+
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task Stripping_the_last_administrators_roles_is_rejected()
+    {
+        await AuthenticateAsync();
+        var viewerRoleId = await RoleIdAsync("Viewer");
+
+        var users = await _client.GetFromJsonAsync<List<UserResponse>>("/api/v1/users");
+        var admin = users!.Single(u => u.Email == ApiFactory.AdminEmail);
+
+        // Viewer holds neither User.Edit nor Role.Edit, so this would leave the tenant unable
+        // to manage itself.
+        var response = await _client.PutAsJsonAsync($"/api/v1/users/{admin.Id}",
+            new UpdateUserRequest(ApiFactory.AdminEmail, [viewerRoleId]));
+
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await CodeOf(response)).Should().Be("LAST_ADMINISTRATOR");
+    }
+
+    [Fact]
+    public async Task Demoting_an_administrator_is_allowed_when_another_remains()
+    {
+        await AuthenticateAsync();
+        var viewerRoleId = await RoleIdAsync("Viewer");
+        var superAdminRoleId = await RoleIdAsync("Super Admin");
+
+        var create = await _client.PostAsJsonAsync("/api/v1/users",
+            new CreateUserRequest("second@example.com", "Temp0rary!Password", [superAdminRoleId]));
+        create.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        var users = await _client.GetFromJsonAsync<List<UserResponse>>("/api/v1/users");
+        var admin = users!.Single(u => u.Email == ApiFactory.AdminEmail);
+
+        var response = await _client.PutAsJsonAsync($"/api/v1/users/{admin.Id}",
+            new UpdateUserRequest(ApiFactory.AdminEmail, [viewerRoleId]));
+
+        // The mirror of the previous test: the guard must permit exactly the case that is safe,
+        // otherwise it is indistinguishable from "administrators can never be demoted".
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
 }

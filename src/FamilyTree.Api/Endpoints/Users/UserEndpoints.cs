@@ -27,6 +27,11 @@ public static class UserEndpoints
         })
             .RequirePermission(Permissions.User.Create);
 
+        group.MapPut("/{id:guid}", async (
+            Guid id, UpdateUserRequest request, IUserService users, CancellationToken ct) =>
+            Results.Ok(await users.UpdateAsync(id, request, ct)))
+            .RequirePermission(Permissions.User.Edit);
+
         return app;
     }
 }
