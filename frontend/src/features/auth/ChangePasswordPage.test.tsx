@@ -19,6 +19,16 @@ const meResponse = () =>
     mustChangePassword: true,
   })
 
+const meResponseCleared = () =>
+  jsonResponse({
+    id: '0193...',
+    email: 'pending@example.com',
+    tenantId: '0193...',
+    familyTreeName: 'عائلة السقا',
+    permissions: [],
+    mustChangePassword: false,
+  })
+
 const renderPage = () => render(<Providers><ChangePasswordPage /></Providers>)
 
 describe('ChangePasswordPage', () => {
@@ -131,5 +141,71 @@ describe('ChangePasswordPage', () => {
     const loginCall = fetchMock.mock.calls[loginCallIndex] as [string, RequestInit]
     const loginBody = JSON.parse(loginCall[1].body as string) as { email: string; password: string }
     expect(loginBody).toEqual({ email: 'pending@example.com', password: 'NewPassw0rd!' })
+  })
+
+  it('shows the Arabic message for the same failure when Arabic is active', async () => {
+    await i18n.changeLanguage('ar')
+    const fetchMock = vi.fn().mockImplementation((path: string) => {
+      if (path === '/api/v1/me') return Promise.resolve(meResponse())
+      if (path === '/api/v1/me/password') return Promise.resolve(jsonResponse({ code: 'PASSWORD_INCORRECT' }, 400))
+      throw new Error(`unexpected fetch: ${path}`)
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderPage()
+
+    await userEvent.type(screen.getByLabelText('كلمة المرور الحالية'), 'WrongPassw0rd!')
+    await userEvent.type(screen.getByLabelText('كلمة المرور الجديدة'), 'NewPassw0rd!')
+    await userEvent.type(screen.getByLabelText('تأكيد كلمة المرور'), 'NewPassw0rd!')
+    await userEvent.click(screen.getByRole('button', { name: 'تغيير كلمة المرور' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('كلمة المرور الحالية غير صحيحة.')
+  })
+
+  it('lets a stranded user sign out from the change-password screen', async () => {
+    const fetchMock = vi.fn().mockImplementation((path: string) => {
+      if (path === '/api/v1/me') return Promise.resolve(meResponse())
+      if (path === '/api/v1/auth/logout') return Promise.resolve(new Response(null, { status: 204 }))
+      throw new Error(`unexpected fetch: ${path}`)
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderPage()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Sign out' }))
+
+    await waitFor(() => expect(tokenStorage.read()).toBeNull())
+  })
+
+  it('navigates away once the mustChangePassword flag clears after a successful change', async () => {
+    let meCallCount = 0
+    const fetchMock = vi.fn().mockImplementation((path: string) => {
+      if (path === '/api/v1/me') {
+        meCallCount += 1
+        return Promise.resolve(meCallCount === 1 ? meResponse() : meResponseCleared())
+      }
+      if (path === '/api/v1/me/password') return Promise.resolve(new Response(null, { status: 204 }))
+      if (path === '/api/v1/auth/login') {
+        return Promise.resolve(
+          jsonResponse({ accessToken: 'new-access', refreshToken: 'new-refresh' }),
+        )
+      }
+      throw new Error(`unexpected fetch: ${path}`)
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderPage()
+
+    // The redirect must not fire before the change completes: confirm the form is still up first.
+    expect(await screen.findByRole('button', { name: 'Change password' })).toBeInTheDocument()
+
+    await userEvent.type(screen.getByLabelText('Current password'), 'OldPassw0rd!')
+    await userEvent.type(screen.getByLabelText('New password'), 'NewPassw0rd!')
+    await userEvent.type(screen.getByLabelText('Confirm password'), 'NewPassw0rd!')
+    await userEvent.click(screen.getByRole('button', { name: 'Change password' }))
+
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Change password' })).not.toBeInTheDocument(),
+    )
   })
 })

@@ -61,4 +61,22 @@ describe('LoginPage', () => {
     expect(await screen.findByRole('alert'))
       .toHaveTextContent('البريد الإلكتروني أو كلمة المرور غير صحيحة.')
   })
+
+  it('redirects away from the login form when already signed in', async () => {
+    tokenStorage.write({ accessToken: 'abc', refreshToken: 'def' })
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(
+      jsonResponse({
+        id: '0193...',
+        email: 'admin@example.com',
+        tenantId: '0193...',
+        familyTreeName: 'عائلة السقا',
+        permissions: [],
+        mustChangePassword: false,
+      }),
+    ))
+
+    renderPage()
+
+    await waitFor(() => expect(screen.queryByLabelText('Email')).not.toBeInTheDocument())
+  })
 })

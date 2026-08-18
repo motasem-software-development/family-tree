@@ -1,5 +1,6 @@
 import { useState, type CSSProperties, type FormEvent } from 'react'
 import { useTranslation } from 'react-i18next'
+import { Navigate } from 'react-router-dom'
 import { ApiError, apiFetch } from '../../services/apiClient'
 import { useAuth } from './AuthContext'
 
@@ -25,7 +26,7 @@ const labelStyle: CSSProperties = {
 
 export const ChangePasswordPage = () => {
   const { t } = useTranslation()
-  const { user, login } = useAuth()
+  const { user, login, logout, mustChangePassword } = useAuth()
 
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
@@ -33,6 +34,13 @@ export const ChangePasswordPage = () => {
   const [mismatch, setMismatch] = useState(false)
   const [errorCode, setErrorCode] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+
+  // A user only ever lands here with the flag set (ProtectedRoute sends them here precisely
+  // because it is true), so this cannot fire before the change actually completes: it only
+  // becomes true once the re-login below invalidates ['me'] and the refetch comes back clear.
+  if (user && !mustChangePassword) {
+    return <Navigate to="/" replace />
+  }
 
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault()
@@ -146,6 +154,7 @@ export const ChangePasswordPage = () => {
 
         {mismatch && (
           <p
+            role="alert"
             style={{
               margin: '0 0 var(--space-5)',
               padding: '10px 12px',
@@ -193,6 +202,28 @@ export const ChangePasswordPage = () => {
           }}
         >
           {submitting ? t('auth.changingPassword') : t('auth.changePassword')}
+        </button>
+
+        {/* The server deliberately keeps this route reachable without a valid session claim
+            (PasswordChangeGateMiddleware's IAllowAnonymous carve-out) so a user who cannot
+            recall the temporary password an administrator gave them is never stranded here. */}
+        <button
+          type="button"
+          onClick={() => void logout()}
+          style={{
+            width: '100%',
+            height: 'var(--control-h-sm)',
+            marginTop: 'var(--space-3)',
+            border: '1px solid var(--border)',
+            borderRadius: 'var(--r-md)',
+            background: 'var(--surface)',
+            color: 'var(--text-2)',
+            fontFamily: 'inherit',
+            fontSize: 13,
+            cursor: 'pointer',
+          }}
+        >
+          {t('auth.signOut')}
         </button>
       </form>
     </div>

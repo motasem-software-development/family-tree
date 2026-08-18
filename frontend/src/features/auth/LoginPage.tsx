@@ -1,5 +1,6 @@
 import { useState, type CSSProperties, type FormEvent } from 'react'
 import { useTranslation } from 'react-i18next'
+import { Navigate } from 'react-router-dom'
 import { ApiError } from '../../services/apiClient'
 import { useAuth } from './AuthContext'
 
@@ -41,12 +42,19 @@ const labelStyle: CSSProperties = {
 
 export const LoginPage = () => {
   const { t, i18n } = useTranslation()
-  const { login } = useAuth()
+  const { user, login } = useAuth()
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [errorCode, setErrorCode] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+
+  // Already signed in (e.g. a returning visit to /login, or the moment sign-in resolves):
+  // hand off to the declarative guard rather than showing the form again. ProtectedRoute then
+  // takes it from here — a flagged user lands on /change-password automatically.
+  if (user) {
+    return <Navigate to="/" replace />
+  }
 
   const toggleLanguage = () => {
     void i18n.changeLanguage(i18n.language.startsWith('ar') ? 'en' : 'ar')
