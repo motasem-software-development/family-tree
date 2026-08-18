@@ -59,6 +59,12 @@ app.UseExceptionHandler();
 app.UseSerilogRequestLogging();
 app.UseAuthentication();
 app.UseAuthorization();
+// Order is load-bearing, not stylistic. The gate decides from context.User: moved above
+// UseAuthentication, context.User is the unauthenticated anonymous principal, IsBlocked()
+// returns false on its very first check, and the gate fails OPEN — every flagged user's token
+// would work everywhere — while nearly the whole suite still passes, because most tests
+// authenticate as an unflagged administrator. Keep this registration after UseAuthentication
+// and UseAuthorization.
 app.UseMiddleware<PasswordChangeGateMiddleware>();
 
 if (app.Environment.IsDevelopment())

@@ -128,6 +128,15 @@ public sealed class AdministratorGuard(
     /// dropped before the guard has read anything. A caller with no ambient transaction has
     /// therefore not met the contract, and that is a programming error, not a conflict — so it
     /// throws rather than silently proceeding unlocked. Fail closed.
+    ///
+    /// One further assumption is invisible from here and load-bearing: the re-reads that follow
+    /// the lock only observe what an earlier transaction committed under READ COMMITTED, this
+    /// connection's default. Under REPEATABLE READ or SERIALIZABLE the snapshot is taken at the
+    /// transaction's first statement — before the lock was granted — so every query below would
+    /// return the pre-lock state, the second caller would decide on data the first has already
+    /// superseded, the lock would become decorative, and the TOCTOU this whole design exists to
+    /// close would reopen with no test failing. If the isolation level of the callers'
+    /// transactions is ever raised, this guard must be revisited.
     /// </summary>
     private async Task SerializeOnTenantAsync(Guid tenantId, CancellationToken ct)
     {

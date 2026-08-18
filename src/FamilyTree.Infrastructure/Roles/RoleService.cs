@@ -139,6 +139,14 @@ public sealed class RoleService(
 
         role.EnsureNotSystem();
 
+        // No IAdministratorGuard call here, and its absence is deliberate rather than an
+        // oversight: the ROLE_IN_USE check below refuses to delete a role that any user still
+        // holds, so a role that reaches the delete is a role nobody holds — it carries nobody's
+        // permissions, and removing it can strip administration from no one. UpdateAsync needs
+        // the guard precisely because it can change the permissions of a role people DO hold.
+        // If deletion ever learns to cascade its assignments away, this reasoning dies with it
+        // and the guard must be added.
+
         // Refuse rather than cascade: silently unassigning people would change what they can
         // do without anyone asking for that.
         if (await context.UserRoles.AnyAsync(ur => ur.RoleId == role.Id, ct))

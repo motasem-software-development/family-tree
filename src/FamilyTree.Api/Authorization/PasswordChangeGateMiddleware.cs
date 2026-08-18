@@ -45,6 +45,14 @@ public sealed class PasswordChangeGateMiddleware(RequestDelegate next)
         // route (e.g. logout) without meaning to invoke the gate: that route was never meant
         // to require the change first, and blocking it strands the user with no way to sign
         // out of the very session that is asking them to change their password.
+        //
+        // This is correct today only because the carve-out's exposure is exactly /api/v1/auth/*
+        // and /health. The rule it actually states, though, is broader: ANY endpoint marked
+        // AllowAnonymous is silently exempt from the password gate, forever, without anyone
+        // editing this file. Phase 5's public share links are the obvious next candidate — an
+        // anonymous share route would also become reachable by a flagged user's bearer token.
+        // Whoever adds one must decide deliberately whether that is intended, and narrow this
+        // to an explicit allow-list if it is not.
         if (context.GetEndpoint()?.Metadata.GetMetadata<Microsoft.AspNetCore.Authorization.IAllowAnonymous>() is not null)
             return false;
 
