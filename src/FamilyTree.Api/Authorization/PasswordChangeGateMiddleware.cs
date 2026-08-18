@@ -41,6 +41,13 @@ public sealed class PasswordChangeGateMiddleware(RequestDelegate next)
 
         if (!context.User.HasClaim(AuthClaims.MustChangePassword, "true")) return false;
 
+        // A flagged user's client may still send its bearer token to an anonymous-allowed
+        // route (e.g. logout) without meaning to invoke the gate: that route was never meant
+        // to require the change first, and blocking it strands the user with no way to sign
+        // out of the very session that is asking them to change their password.
+        if (context.GetEndpoint()?.Metadata.GetMetadata<Microsoft.AspNetCore.Authorization.IAllowAnonymous>() is not null)
+            return false;
+
         return !Allowed.Any(a =>
             string.Equals(context.Request.Method, a.Method, StringComparison.OrdinalIgnoreCase) &&
             context.Request.Path.Equals(a.Path, StringComparison.OrdinalIgnoreCase));

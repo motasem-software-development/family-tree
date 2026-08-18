@@ -5,4 +5,5 @@ public sealed record CurrentUserResponse(
     string Email,
     Guid TenantId,
     string FamilyTreeName,
-    IReadOnlyCollection<string> Permissions);
+    IReadOnlyCollection<string> Permissions,
+    bool MustChangePassword);

@@ -1,10 +1,14 @@
 using System.Security.Claims;
 using FamilyTree.Api.Authorization;
+using FamilyTree.Api.Errors;
+using FamilyTree.Application.Auth;
 using FamilyTree.Application.Common;
 using FamilyTree.Contracts.Auth;
 using FamilyTree.Domain.Authorization;
 using FamilyTree.Infrastructure.Auth;
+using FamilyTree.Infrastructure.Identity;
 using FamilyTree.Infrastructure.Persistence;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
 namespace FamilyTree.Api.Endpoints.Me;
@@ -29,10 +33,54 @@ public static class MeEndpoints
                 .Select(c => c.Value)
                 .ToArray();
 
+            var user = await context.Users.FirstOrDefaultAsync(u => u.Id == tenant.UserId, ct);
+
             return Results.Ok(new CurrentUserResponse(
-                tenant.UserId, email, tenant.TenantId, tree.Name, permissions));
+                tenant.UserId, email, tenant.TenantId, tree.Name, permissions,
+                user?.MustChangePassword ?? false));
         })
         .RequirePermission(Permissions.FamilyTree.View)
+        .WithTags("Me");
+
+        app.MapPost("/api/v1/me/password", async (
+            ChangePasswordRequest request,
+            ITenantContext tenant,
+            ApplicationDbContext context,
+            IPasswordHasher<ApplicationUser> passwordHasher,
+            TimeProvider timeProvider,
+            CancellationToken ct) =>
+        {
+            var user = await context.Users.FirstOrDefaultAsync(u => u.Id == tenant.UserId, ct);
+            if (user?.PasswordHash is null)
+                return Results.Unauthorized();
+
+            var verification = passwordHasher.VerifyHashedPassword(
+                user, user.PasswordHash, request.CurrentPassword);
+
+            if (verification == PasswordVerificationResult.Failed)
+                return ProblemResults.Coded(StatusCodes.Status400BadRequest,
+                    "PASSWORD_INCORRECT", "The current password is incorrect.");
+
+            if (request.NewPassword.Length < PasswordPolicy.MinimumLength)
+                return ProblemResults.Coded(StatusCodes.Status400BadRequest,
+                    "PASSWORD_TOO_SHORT",
+                    $"A password must be at least {PasswordPolicy.MinimumLength} characters.");
+
+            user.PasswordHash = passwordHasher.HashPassword(user, request.NewPassword);
+            user.MustChangePassword = false;
+
+            // Every refresh token predates the new password, so each one is a credential the
+            // user just chose to rotate away from. Revoking them all is what makes "change my
+            // password" also mean "sign my other devices out".
+            var now = timeProvider.GetUtcNow();
+            var tokens = await context.RefreshTokens.Where(t => t.UserId == user.Id).ToListAsync(ct);
+            foreach (var token in tokens)
+                token.Revoke(now, replacedByTokenHash: null);
+
+            await context.SaveChangesAsync(ct);
+            return Results.NoContent();
+        })
+        .RequireAuthorization()
         .WithTags("Me");
 
         return app;

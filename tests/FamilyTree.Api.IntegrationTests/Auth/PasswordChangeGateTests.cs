@@ -101,4 +101,21 @@ public sealed class PasswordChangeGateTests(PostgresFixture fixture) : IAsyncLif
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
     }
+
+    [Fact]
+    public async Task A_flagged_user_can_still_reach_logout_even_with_a_bearer_token_attached()
+    {
+        await FlagAdminAsync();
+        await AuthenticateAsync();
+
+        // The client still carries its Authorization header — logout allows anonymous access,
+        // but that must not make it collateral damage of the gate. A flagged user sitting on
+        // the change-password screen must still be able to sign out.
+        var response = await _client.PostAsJsonAsync("/api/v1/auth/logout",
+            new RefreshRequest("does-not-matter"));
+
+        // Logout succeeds with 204 (no body). If the gate wrongly intercepted the request it
+        // would come back 403 PASSWORD_CHANGE_REQUIRED instead.
+        response.StatusCode.Should().Be(HttpStatusCode.NoContent);
+    }
 }
