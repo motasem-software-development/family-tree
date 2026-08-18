@@ -14,3 +14,14 @@ public sealed class NotFoundException(string code, string message) : DomainExcep
 
 /// <summary>A rule that depends on current state, not on the request: 409 rather than 400.</summary>
 public sealed class ConflictException(string code, string message) : DomainException(code, message);
+
+/// <summary>
+/// The request is well-formed but the result would exceed a hard limit. Carries a
+/// <see cref="Reason"/> because only some causes have a remedy the caller can act on, and a
+/// client must not offer the wrong one (design §5.3).
+/// </summary>
+public sealed class TooLargeException(string code, string message, string reason)
+    : DomainException(code, message)
+{
+    public string Reason { get; } = reason;
+}

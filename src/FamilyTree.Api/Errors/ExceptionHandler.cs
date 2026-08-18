@@ -21,6 +21,7 @@ public sealed class DomainExceptionHandler(ILogger<DomainExceptionHandler> logge
         {
             NotFoundException => (StatusCodes.Status404NotFound, "Resource not found"),
             ConflictException => (StatusCodes.Status409Conflict, "Request conflicts with the current state"),
+            TooLargeException => (StatusCodes.Status413PayloadTooLarge, "Result exceeds a hard limit"),
             _ => (StatusCodes.Status400BadRequest, "Request violates a business rule")
         };
 
@@ -35,6 +36,11 @@ public sealed class DomainExceptionHandler(ILogger<DomainExceptionHandler> logge
             Detail = status == StatusCodes.Status404NotFound ? null : domainException.Message,
             Extensions = { ["code"] = domainException.Code }
         };
+
+        // Only some causes have a remedy the caller can act on; the reason is how a client
+        // knows whether to offer one (design §5.3).
+        if (domainException is TooLargeException tooLarge)
+            problem.Extensions["reason"] = tooLarge.Reason;
 
         httpContext.Response.StatusCode = problem.Status.Value;
         // Match the content type Results.Problem (used by ProblemResults.Coded) produces, so
