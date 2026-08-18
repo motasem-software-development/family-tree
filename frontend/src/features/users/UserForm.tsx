@@ -1,6 +1,6 @@
 import { useState, type CSSProperties, type FormEvent } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useRoleOptionsQuery } from './useRoleOptions'
+import { useRolesQuery } from '../roles/useRoles'
 import type { User } from './types'
 
 interface UserFormProps {
@@ -54,7 +54,7 @@ const buttonStyle = (primary: boolean, busy: boolean): CSSProperties => ({
 
 export function UserForm({ user, isSaving, onSubmit, onCancel }: UserFormProps) {
   const { t } = useTranslation()
-  const { data: roleOptions } = useRoleOptionsQuery()
+  const { data: roleOptions } = useRolesQuery()
   const [email, setEmail] = useState(user?.email ?? '')
   const [password, setPassword] = useState('')
   const [roleIds, setRoleIds] = useState<string[]>(user?.roles.map((role) => role.id) ?? [])

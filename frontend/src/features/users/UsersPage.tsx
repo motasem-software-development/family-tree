@@ -138,7 +138,7 @@ export function UsersPage() {
   const familyName = currentUser?.familyTreeName ?? ''
 
   return (
-    <AppShell familyName={familyName} statLine={String(all.length)}>
+    <AppShell familyName={familyName} statLine={t('users.count', { count: all.length })}>
       <div style={{ flex: 1, minWidth: 0, overflow: 'auto', padding: 'var(--space-8)' }}>
         <div style={{ maxWidth: 900, margin: '0 auto' }}>
           <div

@@ -132,7 +132,69 @@
     "save": "Save",
     "saving": "Saving…",
     "cancel": "Cancel",
-    "confirmDeactivate": "Deactivate {{email}}?"
+    "confirmDeactivate": "Deactivate {{email}}?",
+    "count_one": "{{count}} user",
+    "count_other": "{{count}} users"
+  },
+  "roles": {
+    "title": "Roles and permissions",
+    "loading": "Loading roles…",
+    "empty": "No roles yet.",
+    "add": "Add role",
+    "name": "Role name",
+    "description": "Description",
+    "permissions": "Permissions",
+    "members": "Users",
+    "systemRole": "Built-in role",
+    "systemRoleHint": "Built-in roles cannot be changed.",
+    "edit": "Edit",
+    "delete": "Delete",
+    "save": "Save",
+    "saving": "Saving…",
+    "cancel": "Cancel",
+    "confirmDelete": "Delete the role {{name}}?",
+    "count_one": "{{count}} role",
+    "count_other": "{{count}} roles"
+  },
+  "permissions": {
+    "FamilyTree": {
+      "View": "View the family tree",
+      "Edit": "Edit family tree settings"
+    },
+    "Member": {
+      "View": "View family members",
+      "Create": "Add family members",
+      "Edit": "Edit family members",
+      "Move": "Move family members",
+      "Delete": "Delete family members"
+    },
+    "User": {
+      "View": "View users",
+      "Create": "Add users",
+      "Edit": "Edit users",
+      "Deactivate": "Deactivate users"
+    },
+    "Role": {
+      "View": "View roles and permissions",
+      "Create": "Add roles",
+      "Edit": "Edit roles",
+      "Delete": "Delete roles"
+    },
+    "Audit": {
+      "View": "View audit history"
+    },
+    "PublicLink": {
+      "Create": "Create public sharing links",
+      "Revoke": "Revoke public sharing links"
+    }
+  },
+  "permissionGroups": {
+    "FamilyTree": "Family tree",
+    "Member": "Members",
+    "User": "Users",
+    "Role": "Roles",
+    "Audit": "Audit history",
+    "PublicLink": "Public sharing"
   },
   "errors": {
     "INVALID_CREDENTIALS": "The email or password is incorrect.",

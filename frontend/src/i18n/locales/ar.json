@@ -148,7 +148,77 @@
     "save": "حفظ",
     "saving": "جارٍ الحفظ…",
     "cancel": "إلغاء",
-    "confirmDeactivate": "تعطيل {{email}}؟"
+    "confirmDeactivate": "تعطيل {{email}}؟",
+    "count_zero": "لا مستخدمين",
+    "count_one": "مستخدم واحد",
+    "count_two": "مستخدمان",
+    "count_few": "{{count}} مستخدمين",
+    "count_many": "{{count}} مستخدماً",
+    "count_other": "{{count}} مستخدم"
+  },
+  "roles": {
+    "title": "الأدوار والصلاحيات",
+    "loading": "جارٍ تحميل الأدوار…",
+    "empty": "لا توجد أدوار بعد.",
+    "add": "إضافة دور",
+    "name": "اسم الدور",
+    "description": "الوصف",
+    "permissions": "الصلاحيات",
+    "members": "عدد المستخدمين",
+    "systemRole": "دور أساسي",
+    "systemRoleHint": "الأدوار الأساسية غير قابلة للتعديل.",
+    "edit": "تعديل",
+    "delete": "حذف",
+    "save": "حفظ",
+    "saving": "جارٍ الحفظ…",
+    "cancel": "إلغاء",
+    "confirmDelete": "حذف الدور {{name}}؟",
+    "count_zero": "لا أدوار",
+    "count_one": "دور واحد",
+    "count_two": "دوران",
+    "count_few": "{{count}} أدوار",
+    "count_many": "{{count}} دوراً",
+    "count_other": "{{count}} دور"
+  },
+  "permissions": {
+    "FamilyTree": {
+      "View": "عرض شجرة العائلة",
+      "Edit": "تعديل إعدادات شجرة العائلة"
+    },
+    "Member": {
+      "View": "عرض أفراد العائلة",
+      "Create": "إضافة أفراد العائلة",
+      "Edit": "تعديل أفراد العائلة",
+      "Move": "نقل أفراد العائلة",
+      "Delete": "حذف أفراد العائلة"
+    },
+    "User": {
+      "View": "عرض المستخدمين",
+      "Create": "إضافة مستخدمين",
+      "Edit": "تعديل المستخدمين",
+      "Deactivate": "تعطيل المستخدمين"
+    },
+    "Role": {
+      "View": "عرض الأدوار والصلاحيات",
+      "Create": "إضافة أدوار",
+      "Edit": "تعديل الأدوار",
+      "Delete": "حذف الأدوار"
+    },
+    "Audit": {
+      "View": "عرض سجل التغييرات"
+    },
+    "PublicLink": {
+      "Create": "إنشاء روابط مشاركة عامة",
+      "Revoke": "إلغاء روابط المشاركة العامة"
+    }
+  },
+  "permissionGroups": {
+    "FamilyTree": "شجرة العائلة",
+    "Member": "الأفراد",
+    "User": "المستخدمون",
+    "Role": "الأدوار",
+    "Audit": "سجل التغييرات",
+    "PublicLink": "المشاركة العامة"
   },
   "errors": {
     "INVALID_CREDENTIALS": "البريد الإلكتروني أو كلمة المرور غير صحيحة.",

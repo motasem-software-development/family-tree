@@ -213,14 +213,12 @@ export const AppShell = ({
             </Link>
           )}
           {hasPermission('Role.View') && (
-            <PendingNavItem
-              label={t('nav.roles')}
-              icon={
-                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="M12 3l7 3v6c0 4-3 7.5-7 9-4-1.5-7-5-7-9V6z" />
-                </svg>
-              }
-            />
+            <Link to="/roles" style={navItemStyle(pathname === '/roles', true)}>
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M12 3l7 3v6c0 4-3 7.5-7 9-4-1.5-7-5-7-9V6z" />
+              </svg>
+              {t('nav.roles')}
+            </Link>
           )}
           {hasPermission('Audit.View') && (
             <PendingNavItem
