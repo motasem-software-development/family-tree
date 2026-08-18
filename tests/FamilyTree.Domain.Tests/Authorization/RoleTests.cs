@@ -70,4 +70,39 @@ public class RoleTests
         act.Should().Throw<DomainException>()
            .Which.Code.Should().Be("ROLE_IS_SYSTEM");
     }
+
+    [Fact]
+    public void Update_rejects_updating_a_system_role()
+    {
+        var role = Role.CreateSystem(TenantId, "Viewer", null, Now);
+
+        var act = () => role.Update("Something Else", "New description", Now);
+
+        act.Should().Throw<DomainException>()
+           .Which.Code.Should().Be("ROLE_IS_SYSTEM");
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void Update_rejects_a_blank_name(string name)
+    {
+        var role = Role.Create(TenantId, "Genealogy Editor", null, Now);
+
+        var act = () => role.Update(name, "New description", Now);
+
+        act.Should().Throw<DomainException>()
+           .Which.Code.Should().Be("ROLE_NAME_REQUIRED");
+    }
+
+    [Fact]
+    public void Update_sets_both_name_and_description_on_a_custom_role()
+    {
+        var role = Role.Create(TenantId, "Genealogy Editor", "Original description", Now);
+
+        role.Update("Family Stewards", "Updated description", Now);
+
+        role.Name.Should().Be("Family Stewards");
+        role.Description.Should().Be("Updated description");
+    }
 }

@@ -11,4 +11,10 @@ public interface IRoleService
 
     /// <summary>The global permission catalog. Not tenant-scoped — every tenant sees all codes.</summary>
     Task<IReadOnlyList<PermissionResponse>> ListPermissionsAsync(CancellationToken ct = default);
+
+    Task<RoleResponse> CreateAsync(SaveRoleRequest request, CancellationToken ct = default);
+
+    Task<RoleResponse> UpdateAsync(Guid id, SaveRoleRequest request, CancellationToken ct = default);
+
+    Task DeleteAsync(Guid id, CancellationToken ct = default);
 }

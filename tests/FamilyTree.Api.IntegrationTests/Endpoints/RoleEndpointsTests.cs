@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using FamilyTree.Api.IntegrationTests.Fixtures;
 using FamilyTree.Contracts.Auth;
 using FamilyTree.Contracts.Roles;
+using FamilyTree.Contracts.Users;
 using FluentAssertions;
 
 namespace FamilyTree.Api.IntegrationTests.Endpoints;
@@ -101,5 +102,114 @@ public sealed class RoleEndpointsTests(PostgresFixture fixture) : IAsyncLifetime
         var response = await _client.GetAsync("/api/v1/roles/0199a0b1-0000-7000-8000-000000000001");
 
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task Creating_a_custom_role_stores_its_permissions()
+    {
+        await AuthenticateAsync();
+
+        var response = await _client.PostAsJsonAsync("/api/v1/roles",
+            new SaveRoleRequest("أمناء العائلة", "يديرون الأفراد", ["Member.View", "Member.Edit"]));
+
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
+        var created = (await response.Content.ReadFromJsonAsync<RoleResponse>())!;
+        created.IsSystem.Should().BeFalse();
+        created.UserCount.Should().Be(0);
+        created.Permissions.Should().BeEquivalentTo("Member.View", "Member.Edit");
+    }
+
+    [Fact]
+    public async Task An_unknown_permission_code_is_rejected()
+    {
+        await AuthenticateAsync();
+
+        var response = await _client.PostAsJsonAsync("/api/v1/roles",
+            new SaveRoleRequest("أمناء العائلة", null, ["Member.Teleport"]));
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await CodeOf(response)).Should().Be("PERMISSION_NOT_FOUND");
+    }
+
+    [Fact]
+    public async Task A_duplicate_role_name_is_rejected()
+    {
+        await AuthenticateAsync();
+
+        var response = await _client.PostAsJsonAsync("/api/v1/roles",
+            new SaveRoleRequest("Viewer", null, ["Member.View"]));
+
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await CodeOf(response)).Should().Be("ROLE_NAME_TAKEN");
+    }
+
+    [Fact]
+    public async Task A_system_role_cannot_be_updated()
+    {
+        await AuthenticateAsync();
+        var roles = await _client.GetFromJsonAsync<List<RoleResponse>>("/api/v1/roles");
+        var viewer = roles!.Single(r => r.Name == "Viewer");
+
+        var response = await _client.PutAsJsonAsync($"/api/v1/roles/{viewer.Id}",
+            new SaveRoleRequest("Viewer", null, ["Member.View", "Member.Delete"]));
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await CodeOf(response)).Should().Be("ROLE_IS_SYSTEM");
+    }
+
+    [Fact]
+    public async Task A_system_role_cannot_be_deleted()
+    {
+        await AuthenticateAsync();
+        var roles = await _client.GetFromJsonAsync<List<RoleResponse>>("/api/v1/roles");
+        var viewer = roles!.Single(r => r.Name == "Viewer");
+
+        var response = await _client.DeleteAsync($"/api/v1/roles/{viewer.Id}");
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await CodeOf(response)).Should().Be("ROLE_IS_SYSTEM");
+    }
+
+    [Fact]
+    public async Task A_custom_role_can_be_updated_and_deleted()
+    {
+        await AuthenticateAsync();
+
+        var create = await _client.PostAsJsonAsync("/api/v1/roles",
+            new SaveRoleRequest("أمناء العائلة", null, ["Member.View"]));
+        var role = (await create.Content.ReadFromJsonAsync<RoleResponse>())!;
+
+        var update = await _client.PutAsJsonAsync($"/api/v1/roles/{role.Id}",
+            new SaveRoleRequest("أمناء الشجرة", "وصف محدث", ["Member.View", "Member.Create"]));
+        update.StatusCode.Should().Be(HttpStatusCode.OK);
+        var updated = (await update.Content.ReadFromJsonAsync<RoleResponse>())!;
+        updated.Name.Should().Be("أمناء الشجرة");
+        updated.Description.Should().Be("وصف محدث");
+        updated.Permissions.Should().BeEquivalentTo("Member.View", "Member.Create");
+
+        var delete = await _client.DeleteAsync($"/api/v1/roles/{role.Id}");
+        delete.StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        var after = await _client.GetAsync($"/api/v1/roles/{role.Id}");
+        after.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task A_role_that_still_has_members_cannot_be_deleted()
+    {
+        await AuthenticateAsync();
+
+        var create = await _client.PostAsJsonAsync("/api/v1/roles",
+            new SaveRoleRequest("أمناء العائلة", null, ["Member.View"]));
+        var role = (await create.Content.ReadFromJsonAsync<RoleResponse>())!;
+
+        var user = await _client.PostAsJsonAsync("/api/v1/users",
+            new CreateUserRequest("cousin@example.com", "Temp0rary!Password", [role.Id]));
+        user.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        var response = await _client.DeleteAsync($"/api/v1/roles/{role.Id}");
+
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await CodeOf(response)).Should().Be("ROLE_IN_USE");
     }
 }

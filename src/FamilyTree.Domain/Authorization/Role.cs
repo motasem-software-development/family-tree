@@ -28,6 +28,19 @@ public sealed class Role : Entity, ITenantOwned
         Touch(now);
     }
 
+    /// <summary>
+    /// Replaces the editable state of a custom role. Name and description are replaced
+    /// together because the edit form submits both — a partial update would need a merge rule
+    /// the API deliberately does not have (design spec §4.9).
+    /// </summary>
+    public void Update(string name, string? description, DateTimeOffset now)
+    {
+        EnsureNotSystem();
+        Name = ValidateName(name);
+        Description = description;
+        Touch(now);
+    }
+
     /// <summary>Throws when the role is system-owned. Guards all modification paths including rename and delete.</summary>
     public void EnsureNotSystem()
     {
