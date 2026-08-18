@@ -28,7 +28,7 @@ printing and framing.
 | Page format | Two formats, selected at export time: `sheet` (one page sized to the tree) and `a4` (tiled, printable anywhere). |
 | Primary combination | `xmind` + `sheet`. It is designed in full detail here and implemented first; the other three are variations over the same scene. |
 | Renderer | SkiaSharp + HarfBuzzSharp, drawing directly to `SKDocument.CreatePdf`. §4.1 records the alternatives and why they lost. |
-| Centre node | The export centres the requested `rootId`, defaulting to the family tree's stored root. §2.3 explains why this matters. |
+| Centre node | The export centres the requested `rootId`, defaulting to the stored root. `rootId` selects a subtree and does not re-root, so no value reproduces the reference exactly — §2.3. |
 | Delivery | Synchronous streamed response. No job queue in V1. |
 | Permission | Existing `FamilyTree.View`. No new permission code. |
 | Fonts | Noto Sans Arabic Bold (Arabic) and Noto Sans Bold (Latin), both SIL OFL, embedded as resources. |
@@ -82,11 +82,21 @@ in its `"orientation": "connector-start-is-parent"` field, and §7.2 of the V1 d
 that four of 348 edges carried no recoverable direction at all. Whether the stored hierarchy
 or the reference's centring is genealogically correct is **not decided here**.
 
-The export does not need that question answered. XMind's centre node is a display choice, not
-a claim about ancestry, and the existing `GET /api/v1/family-tree/view` already accepts a
-`rootId`. The export inherits the same parameter: centre on the requested member, default to
-the stored root. Pointed at سليمان it reproduces the reference; left alone it exports the
-genealogical whole.
+The export does not need that question answered. It inherits `rootId` and `maxDepth` from the
+existing `GET /api/v1/family-tree/view`, defaulting to the stored root.
+
+**`rootId` selects a subtree, it does not re-root.** `FamilyTreeAssembler.Assemble` returns the
+requested member and its descendants, so no value of `rootId` reproduces the reference exactly:
+`rootId=<سليمان>` yields her 93 stored descendants, whereas the reference shows all 349 with
+سليمان merely *displayed* in the centre and her stored parent داوود folded in as one more
+branch. Producing that picture would require mindmap-style re-rooting — walking up from the
+focus node and re-hanging the parent side as an additional branch — which is a distinct feature
+from subtree selection and is **out of scope** here. It is a plausible later addition, and
+nothing in this design prevents it: re-rooting would transform the tree before pass 1 and
+change no other stage.
+
+The consequence for verification is stated in §9: the definition of done is written against
+the **default** export of the stored root, not against a pixel match with `familytree.pdf`.
 
 This is recorded so that a future reader who compares an export against `familytree.pdf` and
 finds a different name in the middle understands why, and does not treat it as a rendering
@@ -285,11 +295,15 @@ data.
 ### 5.1 Endpoint
 
 ```
-GET /api/v1/family-tree/export.pdf?rootId=<guid>&style=<xmind|clean>&page=<sheet|a4>
+GET /api/v1/family-tree/export.pdf
+      ?rootId=<guid>&maxDepth=<int>&style=<xmind|clean>&page=<sheet|a4>
 ```
 
 Requires `FamilyTree.View`. All query parameters are optional; defaults are the stored root,
-`xmind`, and `sheet`.
+unlimited depth, `xmind`, and `sheet`. `rootId` and `maxDepth` pass straight through to the
+same `FamilyTreeAssembler.Assemble` the view endpoint uses, so the export and the on-screen
+outline always agree about what the tree contains. Per §2.3, `rootId` selects a subtree; it
+does not re-root.
 
 No new permission is introduced. The export reveals exactly the data `/family-tree/view`
 already returns, so a separate `Export` permission would add a lockout surface — one more thing
@@ -369,11 +383,20 @@ CMaps, and was built to turn a diagram of exactly this shape back into a member 
 
 Running it over **our own export** and asserting it reconstructs the same members with the same
 parent-child edges validates geometry, glyph encoding, connector direction, and text
-searchability in a single test. This is a stronger criterion than any pixel comparison, and it
-costs almost nothing because the reconstruction code already exists and is already tested.
+searchability in a single test — a stronger criterion than any pixel comparison.
 
-A narrower companion test runs `pdftotext` over the output and asserts every name is recovered,
-which pins the `/ToUnicode` guarantee specifically.
+It is not free, and the plan must budget for it. `Geometry.cs` classifies paths by exact
+operator signatures tuned to XMind's emission (`lclclclc` rounded rects, specific tick and
+elbow patterns) and asserts raw point distributions, with a comment promising it "fails loudly
+if a future fixture change widens it." Skia constructs paths differently and will use Noto
+rather than Arial, so the first run will most likely fail in *classification*, not because the
+export is wrong. Generalising the classifier to accept both emitters is planned work, carried
+as its own task, and the reference fixture's existing assertions must keep passing afterwards.
+
+Because of that dependency, the **unconditional** gate is the narrower test: run `pdftotext`
+over the output and assert every name is recovered. It pins the `/ToUnicode` guarantee, depends
+on no classifier, and can therefore go green in step 2 of the delivery sequence while the
+round-trip lands behind it.
 
 ### 7.3 Integration
 
@@ -402,10 +425,15 @@ variations, and the seam at `TreeScene` is what lets them land without reopening
 
 ## 9. Definition of done
 
-- Exporting the seeded tree with `style=xmind&page=sheet&rootId=<سليمان>` produces a document
-  whose structure matches `familytree.pdf`: four coloured branches, the heaviest on the right,
-  centre box, tapered ribbons, elbow connectors, label-on-tick nodes.
-- `tools/FamilyTree.Import` reconstructs the exported PDF to the same hierarchy as the source.
+- Exporting the seeded tree with the defaults (`style=xmind&page=sheet`, stored root داوود)
+  produces a document carrying all 349 members with the reference's structural vocabulary:
+  four coloured branches — داوود also has exactly four children — the heaviest (سلمان, 251)
+  alone on one side and the other three stacked opposite, a centre box, tapered ribbons,
+  elbow connectors, and label-on-tick nodes.
+- The output is *not* compared against `familytree.pdf` node-for-node. The two centre different
+  members (§2.3), so the criterion is structural vocabulary and completeness, not equality.
+- `tools/FamilyTree.Import` reconstructs the exported PDF to the same hierarchy as the source,
+  after the classifier adaptation described in §7.2.
 - All Arabic names render with correct contextual shaping and are selectable and searchable.
 - The endpoint enforces `FamilyTree.View` and tenant isolation.
 - The API container renders successfully, verified in a running image, not only locally.
