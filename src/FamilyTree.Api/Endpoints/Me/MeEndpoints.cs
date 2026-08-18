@@ -4,7 +4,6 @@ using FamilyTree.Api.Errors;
 using FamilyTree.Application.Auth;
 using FamilyTree.Application.Common;
 using FamilyTree.Contracts.Auth;
-using FamilyTree.Domain.Authorization;
 using FamilyTree.Infrastructure.Auth;
 using FamilyTree.Infrastructure.Identity;
 using FamilyTree.Infrastructure.Persistence;
@@ -39,7 +38,19 @@ public static class MeEndpoints
                 tenant.UserId, email, tenant.TenantId, tree.Name, permissions,
                 user?.MustChangePassword ?? false));
         })
-        .RequirePermission(Permissions.FamilyTree.View)
+        // Authentication only, deliberately — never a permission. A user's role set is
+        // optional and a custom role need not grant anything in particular, so requiring a
+        // permission here makes identity unreadable for accounts that are otherwise perfectly
+        // valid: /me 403s, the client has no user, ProtectedRoute redirects to /login, and the
+        // sign-in form renders again with no error even though login itself succeeded — an
+        // unbreakable loop with no diagnostic. It is worse for a newly created user, who is
+        // always flagged for a password change: PasswordChangeGateMiddleware permits exactly
+        // GET /api/v1/me and POST /api/v1/me/password, so a /me that can 403 contradicts the
+        // gate's own design, and ChangePasswordPage needs the email /me carries to sign back
+        // in. Identity is what you must be able to read in order to learn what you may do.
+        // The tree name is not a leak: the caller is an authenticated member of that tenant.
+        // Do not add .RequirePermission(...) here.
+        .RequireAuthorization()
         .WithTags("Me");
 
         app.MapPost("/api/v1/me/password", async (

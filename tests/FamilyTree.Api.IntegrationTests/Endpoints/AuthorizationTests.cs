@@ -38,13 +38,18 @@ public sealed class AuthorizationTests(PostgresFixture fixture) : IAsyncLifetime
             mustChangePassword: false).Value;
     }
 
+    // These three exercise the permission-policy machinery through GET /api/v1/family-tree,
+    // which requires FamilyTree.View. They used GET /api/v1/me until /me was deliberately
+    // reduced to authentication only (see MeEndpoints) — /me can no longer answer 403, so it
+    // cannot serve as the vehicle for a policy test.
+
     [Fact]
     public async Task A_token_without_the_required_permission_returns_403()
     {
         _client.DefaultRequestHeaders.Authorization =
             new AuthenticationHeaderValue("Bearer", TokenWith(Permissions.Audit.View));
 
-        var response = await _client.GetAsync("/api/v1/me");
+        var response = await _client.GetAsync("/api/v1/family-tree");
 
         // Authenticated but not permitted — 403, distinct from the 401 of no token at all.
         response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
@@ -56,7 +61,7 @@ public sealed class AuthorizationTests(PostgresFixture fixture) : IAsyncLifetime
         _client.DefaultRequestHeaders.Authorization =
             new AuthenticationHeaderValue("Bearer", TokenWith());
 
-        var response = await _client.GetAsync("/api/v1/me");
+        var response = await _client.GetAsync("/api/v1/family-tree");
 
         response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
@@ -67,10 +72,23 @@ public sealed class AuthorizationTests(PostgresFixture fixture) : IAsyncLifetime
         _client.DefaultRequestHeaders.Authorization =
             new AuthenticationHeaderValue("Bearer", TokenWith(Permissions.FamilyTree.View));
 
-        var response = await _client.GetAsync("/api/v1/me");
+        var response = await _client.GetAsync("/api/v1/family-tree");
 
         // The policy admits the request. The tenant in this hand-minted token owns no tree,
         // so the endpoint answers 404 — never 403, and never another tenant's data.
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task Me_is_authentication_only_and_never_answers_403()
+    {
+        // The counterpart of the three above: a token with no permission at all still reads
+        // its own identity. The hand-minted tenant owns no tree, so 404 — but never 403.
+        _client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", TokenWith());
+
+        var response = await _client.GetAsync("/api/v1/me");
+
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 

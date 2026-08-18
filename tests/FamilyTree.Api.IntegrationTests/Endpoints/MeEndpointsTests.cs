@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using FluentAssertions;
 using FamilyTree.Api.IntegrationTests.Fixtures;
 using FamilyTree.Contracts.Auth;
+using FamilyTree.Contracts.Users;
 
 namespace FamilyTree.Api.IntegrationTests.Endpoints;
 
@@ -69,6 +70,41 @@ public sealed class MeEndpointsTests(PostgresFixture fixture) : IAsyncLifetime
         me.TenantId.Should().NotBeEmpty();
         me.FamilyTreeName.Should().Be("عائلة السقا");
         me.Permissions.Should().Contain("Member.Create").And.Contain("Role.Delete");
+    }
+
+    [Fact]
+    public async Task Me_answers_a_user_who_holds_no_permissions_at_all()
+    {
+        // /me must never depend on a permission. A user's role set is optional, so a real
+        // account can hold nothing at all — and if /me answered 403 for them, the frontend
+        // would have no identity to read, ProtectedRoute would bounce them back to /login,
+        // and the sign-in form would render again with no error: an unbreakable loop. Worse
+        // for a newly created user, who is always flagged for a password change: the gate
+        // permits exactly GET /me and POST /me/password, and the change-password screen needs
+        // the email /me carries in order to sign back in.
+        await AuthenticateAsync();
+
+        var create = await _client.PostAsJsonAsync("/api/v1/users",
+            new CreateUserRequest("roleless@example.com", "Temp0rary!Password", []));
+        create.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        using var theirs = _factory.CreateClient();
+        var login = await theirs.PostAsJsonAsync("/api/v1/auth/login",
+            new LoginRequest("roleless@example.com", "Temp0rary!Password"));
+        login.StatusCode.Should().Be(HttpStatusCode.OK);
+        var tokens = (await login.Content.ReadFromJsonAsync<LoginResponse>())!;
+        theirs.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", tokens.AccessToken);
+
+        var response = await theirs.GetAsync("/api/v1/me");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var me = (await response.Content.ReadFromJsonAsync<CurrentUserResponse>())!;
+        me.Email.Should().Be("roleless@example.com");
+        me.Permissions.Should().BeEmpty();
+        me.MustChangePassword.Should().BeTrue();
+        // The tree name is not a leak: this is an authenticated member of that very tenant.
+        me.FamilyTreeName.Should().Be("عائلة السقا");
     }
 
     [Fact]
