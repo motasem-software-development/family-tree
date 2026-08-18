@@ -248,7 +248,7 @@
     "FAMILY_TREE_NAME_TOO_LONG": "اسم شجرة العائلة طويل جدًا (٢٠٠ حرف كحد أقصى).",
     "PASSWORD_CHANGE_REQUIRED": "يجب تغيير كلمة المرور قبل المتابعة.",
     "PASSWORD_INCORRECT": "كلمة المرور الحالية غير صحيحة.",
-    "PASSWORD_TOO_SHORT": "كلمة المرور قصيرة جدًا (١٢ حرفًا على الأقل).",
+    "PASSWORD_TOO_SHORT": "كلمة المرور قصيرة جدًا ({{passwordMinimum}} حرفًا على الأقل).",
     "USER_EMAIL_REQUIRED": "البريد الإلكتروني مطلوب.",
     "USER_EMAIL_INVALID": "البريد الإلكتروني غير صالح.",
     "USER_EMAIL_TAKEN": "هذا البريد الإلكتروني مستخدم بالفعل.",

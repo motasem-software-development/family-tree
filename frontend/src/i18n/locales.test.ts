@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest'
+import { PASSWORD_MINIMUM_LENGTH } from '../config/passwordPolicy'
+import i18n, { SUPPORTED_LANGUAGES } from './index'
 import ar from './locales/ar.json'
 import en from './locales/en.json'
 
@@ -55,6 +57,24 @@ describe('locale resources', () => {
     expect(pluralCategories(en, base)).toEqual(required('en'))
     expect(pluralCategories(ar, base)).toEqual(required('ar'))
   })
+
+  it.each(SUPPORTED_LANGUAGES)(
+    'take the password minimum from the single frontend constant in %s',
+    (lng) => {
+      // The number lives in one place in the frontend and is interpolated. Written out as a
+      // literal, changing PasswordPolicy.MinimumLength on the server would make both
+      // user-visible strings silently lie, in both languages, with nothing failing.
+      const raw = i18n.getResource(lng, 'translation', 'errors.PASSWORD_TOO_SHORT') as string
+      expect(raw).toContain('{{passwordMinimum}}')
+      expect(raw).not.toMatch(/\d|[٠-٩]/)
+
+      // Rendered through the same call shape the error surfaces use, options and all: the
+      // value arrives from interpolation.defaultVariables, so no call site has to pass it.
+      expect(
+        i18n.t('errors.PASSWORD_TOO_SHORT', { lng, defaultValue: i18n.t('errors.UNKNOWN') }),
+      ).toContain(String(PASSWORD_MINIMUM_LENGTH))
+    },
+  )
 
   it('leave no value blank', () => {
     // Uses the same flatten traversal as the key-parity test above so that a

@@ -224,7 +224,7 @@
     "FAMILY_TREE_NAME_TOO_LONG": "That family tree name is too long (200 characters maximum).",
     "PASSWORD_CHANGE_REQUIRED": "You must change your password before continuing.",
     "PASSWORD_INCORRECT": "The current password is incorrect.",
-    "PASSWORD_TOO_SHORT": "That password is too short (12 characters minimum).",
+    "PASSWORD_TOO_SHORT": "That password is too short ({{passwordMinimum}} characters minimum).",
     "USER_EMAIL_REQUIRED": "An email address is required.",
     "USER_EMAIL_INVALID": "That email address is not valid.",
     "USER_EMAIL_TAKEN": "That email address is already in use.",
