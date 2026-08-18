@@ -4,6 +4,7 @@ using FamilyTree.Api.Endpoints.Auth;
 using FamilyTree.Api.Endpoints.FamilyMembers;
 using FamilyTree.Api.Endpoints.FamilyTrees;
 using FamilyTree.Api.Endpoints.Me;
+using FamilyTree.Api.Endpoints.Users;
 using FamilyTree.Api.Errors;
 using FamilyTree.Api.Middleware;
 using FamilyTree.Application.Common;
@@ -67,6 +68,7 @@ app.MapAuthEndpoints();
 app.MapMeEndpoints();
 app.MapFamilyMemberEndpoints();
 app.MapFamilyTreeEndpoints();
+app.MapUserEndpoints();
 
 // Seeding is idempotent and runs on startup. Schema migration is NOT run here — per the
 // technical specification §48, production schema changes belong to CI/CD, never to app startup.
