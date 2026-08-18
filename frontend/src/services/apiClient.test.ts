@@ -91,6 +91,20 @@ describe('apiFetch', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
+  it('does not attempt a refresh on a 401 from the login endpoint', async () => {
+    // A 401 from login means the credentials were wrong, never that the access token is stale.
+    // Attempting a refresh here is meaningless and, worse, can consume/revoke a still-good
+    // refresh token from an unrelated session held in this browser.
+    tokenStorage.write({ accessToken: 'expired', refreshToken: 'stale' })
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ code: 'INVALID_CREDENTIALS' }, 401))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(
+      apiFetch('/api/v1/auth/login', { method: 'POST', body: JSON.stringify({ email: 'a@b.com', password: 'x' }) }),
+    ).rejects.toMatchObject({ code: 'INVALID_CREDENTIALS', status: 401 })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
   it('shares a single refresh across concurrent 401s and replays both requests', async () => {
     tokenStorage.write({ accessToken: 'expired', refreshToken: 'refresh-abc' })
 

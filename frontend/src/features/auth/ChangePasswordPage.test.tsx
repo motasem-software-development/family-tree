@@ -143,7 +143,7 @@ describe('ChangePasswordPage', () => {
     expect(loginBody).toEqual({ email: 'pending@example.com', password: 'NewPassw0rd!' })
   })
 
-  it('reports the change as done when the change succeeded but the re-login failed', async () => {
+  it('reports the change as done when the change succeeded but the re-login failed with 503', async () => {
     // The password HAS changed and every refresh token is revoked by this point. Reporting the
     // login error here would say the operation failed when it did not, and a retry would then
     // fail with PASSWORD_INCORRECT, because the "current password" field holds a password that
@@ -169,6 +169,38 @@ describe('ChangePasswordPage', () => {
     expect(screen.queryByText('Something went wrong. Please try again.')).not.toBeInTheDocument()
     // Retrying would submit a "current password" the server no longer recognises.
     expect(screen.getByRole('button', { name: 'Change password' })).toBeDisabled()
+  })
+
+  it('reports the change as done when the change succeeded but the re-login failed with 401, without attempting a token refresh', async () => {
+    // Realistic trigger: an administrator resets the password in the window between the 204
+    // from /me/password and this re-login attempt, so the re-login itself answers 401. That is
+    // a credentials failure, not a stale-access-token signal, so it must not fall into apiFetch's
+    // refresh-and-replay path — refreshing here would spend the just-revoked refresh token,
+    // fail, and tear down the session via endSession() before the user ever sees the message
+    // below.
+    const fetchMock = vi.fn().mockImplementation((path: string) => {
+      if (path === '/api/v1/me') return Promise.resolve(meResponse())
+      if (path === '/api/v1/me/password') return Promise.resolve(new Response(null, { status: 204 }))
+      if (path === '/api/v1/auth/login') return Promise.resolve(jsonResponse({ code: 'INVALID_CREDENTIALS' }, 401))
+      throw new Error(`unexpected fetch: ${path}`)
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderPage()
+
+    await userEvent.type(screen.getByLabelText('Current password'), 'OldPassw0rd!')
+    await userEvent.type(screen.getByLabelText('New password'), 'NewPassw0rd!')
+    await userEvent.type(screen.getByLabelText('Confirm password'), 'NewPassw0rd!')
+    await userEvent.click(screen.getByRole('button', { name: 'Change password' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Your password was changed, but signing you in again did not work. Sign out, then sign in with your new password.',
+    )
+    expect(screen.queryByText('Something went wrong. Please try again.')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Change password' })).toBeDisabled()
+    // A 401 from login must never attempt a refresh — the mock above has no handler for
+    // /api/v1/auth/refresh and would throw if it were called.
+    expect(fetchMock).not.toHaveBeenCalledWith('/api/v1/auth/refresh', expect.anything())
   })
 
   it('shows the Arabic message for the same failure when Arabic is active', async () => {

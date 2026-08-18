@@ -13,6 +13,7 @@ export class ApiError extends Error {
 }
 
 const REFRESH_PATH = '/api/v1/auth/refresh'
+const LOGIN_PATH = '/api/v1/auth/login'
 
 const withAuth = (init: RequestInit, accessToken?: string): RequestInit => {
   const headers = new Headers(init.headers)
@@ -109,7 +110,10 @@ const tryRefresh = (): Promise<boolean> => {
 /**
  * Single entry point for every API call. On 401 it refreshes once and replays the request;
  * a second failure surfaces to the caller. The refresh endpoint is excluded so a stale
- * refresh token cannot start a loop.
+ * refresh token cannot start a loop. The login endpoint is excluded too: a 401 there means
+ * the submitted credentials were wrong, never that the access token is stale, so refreshing
+ * is meaningless and would needlessly spend a still-good refresh token from an unrelated
+ * session held in this browser.
  */
 export const apiFetch = async <T>(path: string, init: RequestInit = {}): Promise<T> => {
   const attempt = async (): Promise<Response> =>
@@ -117,7 +121,7 @@ export const apiFetch = async <T>(path: string, init: RequestInit = {}): Promise
 
   let response = await attempt()
 
-  if (response.status === 401 && path !== REFRESH_PATH) {
+  if (response.status === 401 && path !== REFRESH_PATH && path !== LOGIN_PATH) {
     if (await tryRefresh()) {
       response = await attempt()
     }
