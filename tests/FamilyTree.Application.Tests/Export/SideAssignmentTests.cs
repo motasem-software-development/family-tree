@@ -51,15 +51,16 @@ public sealed class SideAssignmentTests
         top.Should().OnlyContain(node => sides.ContainsKey(node));
     }
 
-    // Ties must not depend on an unstable sort, or two runs of the same tree produce
-    // different pictures.
+    // When branches have equal weight, ties are broken by original order: first branch takes Right,
+    // second takes Left. This ensures reproducible layout across runs.
     [Fact]
-    public void Equal_weight_branches_assign_deterministically()
+    public void Equal_weight_branches_break_ties_by_original_order()
     {
-        var first = SideAssignment.Assign(TopLevel(Leaves("a", 5), Leaves("b", 5)));
-        var second = SideAssignment.Assign(TopLevel(Leaves("a", 5), Leaves("b", 5)));
+        var top = TopLevel(Leaves("a", 5), Leaves("b", 5));
+        var sides = SideAssignment.Assign(top);
 
-        first.Values.Should().Equal(second.Values);
+        sides[top[0]].Should().Be(Side.Right);
+        sides[top[1]].Should().Be(Side.Left);
     }
 
     [Fact]
