@@ -204,15 +204,13 @@ export const AppShell = ({
             {t('nav.members')}
           </Link>
           {hasPermission('User.View') && (
-            <PendingNavItem
-              label={t('nav.users')}
-              icon={
-                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <circle cx="9" cy="8" r="3" />
-                  <path d="M3 19c0-3.3 2.7-5 6-5s6 1.7 6 5M17 8h4M19 6v4" />
-                </svg>
-              }
-            />
+            <Link to="/users" style={navItemStyle(pathname === '/users', true)}>
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <circle cx="9" cy="8" r="3" />
+                <path d="M3 19c0-3.3 2.7-5 6-5s6 1.7 6 5M17 8h4M19 6v4" />
+              </svg>
+              {t('nav.users')}
+            </Link>
           )}
           {hasPermission('Role.View') && (
             <PendingNavItem

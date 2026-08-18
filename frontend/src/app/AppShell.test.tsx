@@ -58,12 +58,16 @@ describe('AppShell', () => {
     expect(screen.queryByText(i18n.t('nav.audit'))).not.toBeInTheDocument()
   })
 
-  it('shows a permitted destination, but disabled until its phase ships', () => {
+  it('links to the users page once its permission is granted', () => {
     permissions = ['User.View']
     renderShell()
 
-    // Visible so the operator knows it exists; inert so it cannot lead nowhere.
-    expect(screen.getByRole('button', { name: i18n.t('nav.users') })).toBeDisabled()
+    // Task 11 shipped the Users page: the nav item is now a real link, not the inert
+    // placeholder button this test used to assert.
+    expect(screen.getByRole('link', { name: i18n.t('nav.users') })).toHaveAttribute(
+      'href',
+      '/users',
+    )
   })
 
   it('renders the screen it wraps', () => {

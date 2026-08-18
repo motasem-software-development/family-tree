@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import { LoginPage } from '../features/auth/LoginPage'
 import { MembersPage } from '../features/members/MembersPage'
 import { TreePage } from '../features/tree/TreePage'
+import { UsersPage } from '../features/users/UsersPage'
 import { ProtectedRoute } from './ProtectedRoute'
 
 /**
@@ -24,6 +25,14 @@ export const AppRoutes = () => (
       element={
         <ProtectedRoute>
           <MembersPage />
+        </ProtectedRoute>
+      }
+    />
+    <Route
+      path="/users"
+      element={
+        <ProtectedRoute>
+          <UsersPage />
         </ProtectedRoute>
       }
     />

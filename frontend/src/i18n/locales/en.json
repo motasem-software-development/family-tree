@@ -111,6 +111,29 @@
     "confirmDelete": "Delete {{name}}?",
     "loading": "Loading members…"
   },
+  "users": {
+    "title": "Users",
+    "loading": "Loading users…",
+    "empty": "No users yet.",
+    "add": "Add user",
+    "email": "Email",
+    "password": "Temporary password",
+    "roles": "Roles",
+    "status": "Status",
+    "active": "Active",
+    "inactive": "Deactivated",
+    "lastLogin": "Last sign-in",
+    "neverSignedIn": "Has not signed in yet",
+    "pendingPasswordChange": "Password change pending",
+    "edit": "Edit",
+    "deactivate": "Deactivate",
+    "activate": "Activate",
+    "resetPassword": "Reset password",
+    "save": "Save",
+    "saving": "Saving…",
+    "cancel": "Cancel",
+    "confirmDeactivate": "Deactivate {{email}}?"
+  },
   "errors": {
     "INVALID_CREDENTIALS": "The email or password is incorrect.",
     "ACCOUNT_INACTIVE": "This account has been deactivated.",
@@ -127,6 +150,21 @@
     "CONCURRENCY_CONFLICT": "Someone else changed this member. Reload and try again.",
     "FAMILY_TREE_NOT_FOUND": "This family tree could not be found.",
     "FAMILY_TREE_NAME_REQUIRED": "A family tree name is required.",
-    "FAMILY_TREE_NAME_TOO_LONG": "That family tree name is too long (200 characters maximum)."
+    "FAMILY_TREE_NAME_TOO_LONG": "That family tree name is too long (200 characters maximum).",
+    "PASSWORD_CHANGE_REQUIRED": "You must change your password before continuing.",
+    "PASSWORD_INCORRECT": "The current password is incorrect.",
+    "PASSWORD_TOO_SHORT": "That password is too short (12 characters minimum).",
+    "USER_EMAIL_REQUIRED": "An email address is required.",
+    "USER_EMAIL_INVALID": "That email address is not valid.",
+    "USER_EMAIL_TAKEN": "That email address is already in use.",
+    "USER_NOT_FOUND": "That user no longer exists. Reload and try again.",
+    "LAST_ADMINISTRATOR": "This change would leave no one able to manage users and roles.",
+    "ROLE_NOT_FOUND": "That role no longer exists. Reload and try again.",
+    "ROLE_IS_SYSTEM": "Built-in roles cannot be changed or deleted.",
+    "ROLE_NAME_REQUIRED": "A role name is required.",
+    "ROLE_NAME_TOO_LONG": "That role name is too long (100 characters maximum).",
+    "ROLE_NAME_TAKEN": "A role with that name already exists.",
+    "ROLE_IN_USE": "This role cannot be deleted because it is assigned to users.",
+    "PERMISSION_NOT_FOUND": "Unknown permission. Reload and try again."
   }
 }
