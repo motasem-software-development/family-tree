@@ -80,7 +80,7 @@ public sealed class SkiaTreeRenderer : ITreeRenderer
     private static SKPath RibbonPath(SceneConnector connector)
     {
         var p = connector.Points;
-        var builder = new SKPathBuilder();
+        using var builder = new SKPathBuilder();
 
         builder.MoveTo(F(p[0]));
         builder.CubicTo(F(p[1]), F(p[2]), F(p[3]));
@@ -95,7 +95,7 @@ public sealed class SkiaTreeRenderer : ITreeRenderer
     private static SKPath ElbowPath(SceneConnector connector)
     {
         var p = connector.Points;
-        var builder = new SKPathBuilder();
+        using var builder = new SKPathBuilder();
 
         builder.MoveTo(F(p[0]));
         for (var i = 1; i < p.Count - 1; i++)
