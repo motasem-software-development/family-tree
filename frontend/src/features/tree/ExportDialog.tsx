@@ -22,7 +22,7 @@ const optionStyle = (checked: boolean): CSSProperties => ({
 })
 
 export const ExportDialog = ({ rootId, fileName, onClose }: ExportDialogProps) => {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const [style, setStyle] = useState<ExportStyle>('xmind')
   const [page, setPage] = useState<ExportPage>('sheet')
   const [isExporting, setIsExporting] = useState(false)
@@ -40,7 +40,7 @@ export const ExportDialog = ({ rootId, fileName, onClose }: ExportDialogProps) =
     setIsExporting(true)
     setFailed(false)
     try {
-      await downloadTreePdf({ rootId, style, page }, fileName)
+      await downloadTreePdf({ rootId, style, page, language: i18n.language }, fileName)
       onClose()
     } catch {
       setFailed(true)

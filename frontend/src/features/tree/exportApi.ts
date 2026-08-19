@@ -7,6 +7,8 @@ export interface ExportOptions {
   rootId?: string
   style: ExportStyle
   page: ExportPage
+  /** Language for the PDF's caption. The diagram itself is never translated. */
+  language: string
 }
 
 /**
@@ -21,7 +23,12 @@ export const downloadTreePdf = async (
   const query = new URLSearchParams({ style: options.style, page: options.page })
   if (options.rootId) query.set('rootId', options.rootId)
 
-  const blob = await apiFetchBlob(`/api/v1/family-tree/export.pdf?${query.toString()}`)
+  // The caption's language comes from the app's own language toggle, not the browser's locale.
+  // Without this header the server falls back to Accept-Language, so someone reading the app in
+  // Arabic on an English-locale browser would get an English caption on an Arabic tree.
+  const blob = await apiFetchBlob(`/api/v1/family-tree/export.pdf?${query.toString()}`, {
+    headers: { 'Accept-Language': options.language },
+  })
   const url = URL.createObjectURL(blob)
 
   try {
