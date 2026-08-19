@@ -42,3 +42,6 @@ Thumbs.db
 
 # Design handoff archive (the extracted bundle in design/ is the tracked copy)
 *-handoff.zip
+
+# Claude Code worktrees — scratch checkouts, never part of the repo
+.claude/worktrees/
