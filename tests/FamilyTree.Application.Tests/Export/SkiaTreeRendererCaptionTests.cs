@@ -127,7 +127,12 @@ public sealed class SkiaTreeRendererCaptionTests
 
         var text = ExtractText(pdf);
 
-        text.Should().Contain("آل سالم");
+        // Deliberately asserted word by word. Multi-word Arabic reaches this string through
+        // pdftotext's RTL reassembly heuristic, which is not the drawn order -- an assertion on
+        // "آل سالم" as one phrase passes or fails on that heuristic rather than on what was
+        // rendered. Run order is proven from glyph geometry in the mixed-script tests instead.
+        text.Should().Contain("آل");
+        text.Should().Contain("سالم");
         text.Should().Contain("17", "the member count must not come out reversed (e.g. '71')");
         text.Should().Contain("3", "the generation count must survive");
         text.Should().Contain("2026-08-18", "the ISO date must not come out mirrored");
