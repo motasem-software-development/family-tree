@@ -130,20 +130,22 @@ public static class Reconstruct
     /// same name typed with a standard Arabic keyboard, silently breaking search/sort/lookup
     /// against user-entered Arabic text.
     /// </para>
-    /// </summary>
-    /// <summary>
-    /// U+06BA (ARABIC LETTER NOON GHUNNA) -> U+0646 (ARABIC LETTER NOON): the same class of
-    /// font-subsetting artifact as the two folds above, found instead in Task 12's round-trip
-    /// fixture, whose text is drawn by <c>SkiaTreeRenderer</c>'s embedded NotoSans build rather
-    /// than XMind's font. HarfBuzz's auto-generated ToUnicode CMap for that embedded subset maps
-    /// final-position Noon's glyph to U+06BA (Urdu Noon Ghunna -- visually undotted, distinct
-    /// from Noon's dot) rather than U+0646/its presentation form. Confirmed a font/shaping
-    /// artifact and not a real letter: the round-trip fixture's Arabic text never contains
-    /// intentional Urdu, and every other occurrence of the same letter in the fixture (medial
-    /// and initial position) decodes to plain U+0646 correctly -- only the final-position glyph
-    /// routes through this non-standard codepoint, mirroring exactly how only one Yeh glyph slot
-    /// carries U+06CC above. Left unfolded, every name ending in Noon (a common Arabic name
-    /// ending) would fail to round-trip through <c>SkiaExportRoundTripTests</c>.
+    ///
+    /// <para>
+    /// <b>A third fold, added in Task 12, for a second emitter.</b> U+06BA (ARABIC LETTER NOON
+    /// GHUNNA) -> U+0646 (ARABIC LETTER NOON) is the same class of font-subsetting artifact as
+    /// the two above, found instead in the round-trip fixture, whose text is drawn by
+    /// <c>SkiaTreeRenderer</c>'s embedded NotoSans build rather than XMind's font. HarfBuzz's
+    /// auto-generated ToUnicode CMap for that embedded subset maps final-position Noon's glyph to
+    /// U+06BA (Urdu Noon Ghunna -- visually undotted, distinct from Noon's dot) rather than
+    /// U+0646 or its presentation form. Confirmed a font/shaping artifact and not a real letter:
+    /// the round-trip fixture's Arabic text never contains intentional Urdu, and every other
+    /// occurrence of the same letter in the fixture (medial and initial position) decodes to
+    /// plain U+0646 correctly -- only the final-position glyph routes through this non-standard
+    /// codepoint, mirroring exactly how only one Yeh glyph slot carries U+06CC above. Left
+    /// unfolded, every name ending in Noon (a common Arabic name ending) would fail to round-trip
+    /// through <c>SkiaExportRoundTripTests</c>.
+    /// </para>
     /// </summary>
     private static string FoldFontArtifacts(string s) => s
         .Replace('ی', 'ي')   // ARABIC LETTER FARSI YEH -> ARABIC LETTER YEH
