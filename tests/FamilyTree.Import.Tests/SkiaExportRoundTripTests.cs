@@ -7,8 +7,12 @@ namespace FamilyTree.Import.Tests;
 
 /// <summary>
 /// The flagship acceptance test (design §7.2): our own reconstruction engine, pointed at our
-/// own export, must recover the same hierarchy. It validates geometry, glyph encoding,
-/// connector direction, and searchability at once.
+/// own export, must recover the same hierarchy. It validates geometry, connector direction,
+/// and glyph encoding together -- but only over the letters the fixture actually uses. The
+/// fixture below deliberately avoids two letters (خ and إ) that this project's own
+/// <see cref="ToUnicodeCMap.Parse"/> decodes incorrectly, so those decoding paths are not
+/// covered by any round-trip today; see the comment on <c>Fixture()</c> for why, and for the
+/// scope boundary that leaves them uncovered.
 ///
 /// <para>
 /// There is no dedicated "read a PDF from a path" or "reconstruct from a path" entry point in

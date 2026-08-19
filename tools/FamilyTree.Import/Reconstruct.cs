@@ -105,9 +105,10 @@ public static class Reconstruct
     }
 
     /// <summary>
-    /// Folds two codepoints that survive <see cref="NormalizationForm.FormKC"/> unchanged but
-    /// are font-subsetting artifacts of this specific source, not intentional Persian/Urdu
-    /// letters: U+06CC (ARABIC LETTER FARSI YEH) -> U+064A (ARABIC LETTER YEH), and U+06BE
+    /// Folds three codepoints that survive <see cref="NormalizationForm.FormKC"/> unchanged
+    /// but are not intentional Persian/Urdu letters. The first two are font-subsetting
+    /// artifacts of this specific source; the third (documented separately below) is a defect
+    /// in this tool's own reader, not in any font. The two font-subsetting artifacts: U+06CC (ARABIC LETTER FARSI YEH) -> U+064A (ARABIC LETTER YEH), and U+06BE
     /// (ARABIC LETTER HEH DOACHASHMEE) -> U+0647 (ARABIC LETTER HEH).
     ///
     /// <para>
