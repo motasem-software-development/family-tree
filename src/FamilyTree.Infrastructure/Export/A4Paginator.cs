@@ -1,18 +1,36 @@
 using FamilyTree.Application.Export;
-using FamilyTree.Domain.Common;
 
 namespace FamilyTree.Infrastructure.Export;
 
 /// <summary>
-/// Tiling across A4 pages, implemented in Task 13. Until then the format is refused explicitly
-/// rather than silently falling back to a single sheet, which would hand the user a page their
-/// printer cannot take while reporting success.
+/// Tiles one scene across A4 pages (design §4.5). Pages overlap by <see cref="Bleed"/> so a
+/// connector crossing a cut appears on both sheets — without it the printed poster cannot be
+/// reassembled, because the reader cannot tell which line continues where.
 /// </summary>
 public static class A4Paginator
 {
-    public static IEnumerable<PageWindow> Pages(TreeScene scene) =>
-        throw new TooLargeException(
-            "EXPORT_TREE_TOO_LARGE",
-            "A4 pagination is not available yet. Export a single sheet instead.",
-            "format-unavailable");
+    private const float PageWidth = 595f;
+    private const float PageHeight = 842f;
+    private const float Bleed = 18f;
+
+    public static IEnumerable<PageWindow> Pages(TreeScene scene)
+    {
+        var width = (float)(scene.Bounds.Width * scene.Scale);
+        var height = (float)(scene.Bounds.Height * scene.Scale);
+
+        // Each step advances by less than a full page, so successive windows overlap by Bleed.
+        var stepX = PageWidth - Bleed;
+        var stepY = PageHeight - Bleed;
+
+        for (var y = 0f; ; y += stepY)
+        {
+            for (var x = 0f; ; x += stepX)
+            {
+                yield return new PageWindow(PageWidth, PageHeight, x, y);
+                if (x + PageWidth >= width) break;
+            }
+
+            if (y + PageHeight >= height) break;
+        }
+    }
 }
