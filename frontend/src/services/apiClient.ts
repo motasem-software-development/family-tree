@@ -15,9 +15,9 @@ export class ApiError extends Error {
 const REFRESH_PATH = '/api/v1/auth/refresh'
 const LOGIN_PATH = '/api/v1/auth/login'
 
-const withAuth = (init: RequestInit, accessToken?: string): RequestInit => {
+const withAuth = (init: RequestInit, accessToken?: string, json = true): RequestInit => {
   const headers = new Headers(init.headers)
-  headers.set('Content-Type', 'application/json')
+  if (json) headers.set('Content-Type', 'application/json')
   if (accessToken) headers.set('Authorization', `Bearer ${accessToken}`)
   return { ...init, headers }
 }
@@ -108,16 +108,17 @@ const tryRefresh = (): Promise<boolean> => {
 }
 
 /**
- * Single entry point for every API call. On 401 it refreshes once and replays the request;
- * a second failure surfaces to the caller. The refresh endpoint is excluded so a stale
+ * The shared request core: attempt, refresh once on 401, replay. Both apiFetch and
+ * apiFetchBlob route through this so the refresh rules live in exactly one place — a second
+ * copy would drift the moment either is touched. The refresh endpoint is excluded so a stale
  * refresh token cannot start a loop. The login endpoint is excluded too: a 401 there means
  * the submitted credentials were wrong, never that the access token is stale, so refreshing
  * is meaningless and would needlessly spend a still-good refresh token from an unrelated
  * session held in this browser.
  */
-export const apiFetch = async <T>(path: string, init: RequestInit = {}): Promise<T> => {
+const request = async (path: string, init: RequestInit, json: boolean): Promise<Response> => {
   const attempt = async (): Promise<Response> =>
-    fetch(path, withAuth(init, tokenStorage.read()?.accessToken))
+    fetch(path, withAuth(init, tokenStorage.read()?.accessToken, json))
 
   let response = await attempt()
 
@@ -128,7 +129,19 @@ export const apiFetch = async <T>(path: string, init: RequestInit = {}): Promise
   }
 
   if (!response.ok) throw await errorFrom(response)
+  return response
+}
+
+/** Single entry point for every JSON API call. See `request` for the refresh-and-replay rules. */
+export const apiFetch = async <T>(path: string, init: RequestInit = {}): Promise<T> => {
+  const response = await request(path, init, true)
 
   if (response.status === 204) return undefined as T
   return (await response.json()) as T
+}
+
+/** Binary responses (the PDF export): no JSON content type, no body parsing. */
+export const apiFetchBlob = async (path: string, init: RequestInit = {}): Promise<Blob> => {
+  const response = await request(path, init, false)
+  return await response.blob()
 }

@@ -69,7 +69,21 @@
     "membersCount_one": "{{count}} member",
     "membersCount_other": "{{count}} members",
     "generationsCount_one": "{{count}} generation",
-    "generationsCount_other": "{{count}} generations"
+    "generationsCount_other": "{{count}} generations",
+    "export": {
+      "button": "Export PDF",
+      "title": "Export family tree",
+      "style": "Style",
+      "styleXmind": "Mind map",
+      "styleClean": "Clean design",
+      "page": "Page",
+      "pageSheet": "Single sheet",
+      "pageA4": "A4 pages",
+      "confirm": "Export",
+      "cancel": "Cancel",
+      "busy": "Exporting…",
+      "failed": "Export failed"
+    }
   },
   "panel": {
     "parent": "Parent",

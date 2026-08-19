@@ -12,6 +12,7 @@ import {
   useTreeQuery,
   useUpdateMember,
 } from '../members/useMembers'
+import { ExportDialog } from './ExportDialog'
 import { ancestorIds, findNode, flattenTree, treeStats, type ExpandedMap } from './flattenTree'
 import { ContextMenu, MemberModal, Toast, type MenuAnchor, type ModalKind } from './MemberActions'
 import { MemberPanel } from './MemberPanel'
@@ -47,6 +48,7 @@ export const TreePage = () => {
   const [nameValue, setNameValue] = useState('')
   const [errorCode, setErrorCode] = useState<string | null>(null)
   const [toast, setToast] = useState('')
+  const [exportOpen, setExportOpen] = useState(false)
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const createMember = useCreateMember()
@@ -311,6 +313,40 @@ export const TreePage = () => {
           onNameChange={setNameValue}
           onCancel={closeModal}
           onConfirm={confirm}
+        />
+      )}
+
+      <button
+        type="button"
+        onClick={() => setExportOpen(true)}
+        style={{
+          position: 'fixed',
+          top: 76,
+          insetInlineEnd: 24,
+          height: 36,
+          padding: '0 14px',
+          border: '1px solid var(--border-strong)',
+          borderRadius: 'var(--r-md)',
+          background: 'var(--surface)',
+          fontFamily: 'inherit',
+          fontSize: 13,
+          fontWeight: 500,
+          cursor: 'pointer',
+          boxShadow: 'var(--shadow-med)',
+          zIndex: 30,
+        }}
+      >
+        {t('tree.export.button')}
+      </button>
+
+      {exportOpen && (
+        // Whole-tree export is the unsurprising default: the dialog gives no cue about which
+        // member is "selected", so scoping silently to it would produce a truncated PDF with
+        // no explanation. ExportDialog still accepts a rootId for whoever wires subtree export
+        // to an explicit affordance later.
+        <ExportDialog
+          fileName={`${familyName || 'family-tree'}.pdf`}
+          onClose={() => setExportOpen(false)}
         />
       )}
 

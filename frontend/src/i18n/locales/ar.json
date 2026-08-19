@@ -81,7 +81,21 @@
     "generationsCount_two": "جيلان",
     "generationsCount_few": "{{count}} أجيال",
     "generationsCount_many": "{{count}} جيلاً",
-    "generationsCount_other": "{{count}} جيل"
+    "generationsCount_other": "{{count}} جيل",
+    "export": {
+      "button": "تصدير PDF",
+      "title": "تصدير شجرة العائلة",
+      "style": "النمط",
+      "styleXmind": "خريطة ذهنية",
+      "styleClean": "تصميم واضح",
+      "page": "الصفحة",
+      "pageSheet": "صفحة واحدة",
+      "pageA4": "صفحات A4",
+      "confirm": "تصدير",
+      "cancel": "إلغاء",
+      "busy": "جارٍ التصدير…",
+      "failed": "تعذّر التصدير"
+    }
   },
   "panel": {
     "parent": "الأب",
