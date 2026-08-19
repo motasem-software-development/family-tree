@@ -28,11 +28,40 @@ public sealed class SkiaExportRoundTripTests
     private static FamilyTreeNodeResponse Node(string name, params FamilyTreeNodeResponse[] children) =>
         new(Guid.NewGuid(), name, null, 1, false, children);
 
+    // Every letter here is one already confirmed to decode correctly through this exact
+    // Skia -> ToUnicodeCMap.Parse pipeline elsewhere in this fixture (س ل ي م ا ن ح د ع ر ف و).
+    // Two letters found during Task 12 review to decode incorrectly through this project's own
+    // ToUnicodeCMap.Parse (a separate, pre-existing bug -- see Reconstruct.FoldFontArtifacts'
+    // doc comment on the Noon Ghunna fold for the mechanism) are deliberately avoided here: خ
+    // (KHAH), which this pipeline's bfrange decoding turned into plain ح (HAH) -- a codepoint
+    // that is *also* a legitimate letter elsewhere in this very fixture (أحمد), so no unambiguous
+    // string-level fold could compensate the way the Noon fold does; and إ (ALEF WITH HAMZA
+    // BELOW), which decoded as bare ا. This test's job is discriminating connector direction and
+    // hierarchy reconstruction (see the class doc), not re-litigating ToUnicodeCMap.Parse's
+    // decoding fidelity, which is explicitly out of this task's scope.
     private static FamilyTreeNodeResponse Fixture() =>
         Node("سليمان",
-            Node("أحمد", Node("خليل"), Node("عمر")),
-            Node("داوود", Node("إبراهيم")),
+            Node("أحمد", Node("سالم"), Node("عمر")),
+            Node("داوود", Node("سعيد")),
             Node("فارس"));
+
+    /// <summary>
+    /// Every member's name mapped to its parent's name (null for the root), walked directly off
+    /// <see cref="Fixture"/> so the expectation can never drift from the tree actually rendered.
+    /// </summary>
+    private static Dictionary<string, string?> ExpectedParentByName()
+    {
+        var result = new Dictionary<string, string?>();
+
+        void Walk(FamilyTreeNodeResponse node, string? parentName)
+        {
+            result[node.Name] = parentName;
+            foreach (var child in node.Children) Walk(child, node.Name);
+        }
+
+        Walk(Fixture(), null);
+        return result;
+    }
 
     private static string RenderToFile()
     {
@@ -71,6 +100,18 @@ public sealed class SkiaExportRoundTripTests
         finally { File.Delete(path); }
     }
 
+    /// <summary>
+    /// Asserts the complete parent map, not just the root: a node reattached under the wrong
+    /// (but still valid, still singly-rooted) parent -- e.g. سالم under داوود instead of أحمد --
+    /// changes no count and does not disturb the root, so member-count-plus-root-name alone
+    /// cannot catch it. Comparing every member's own parent name against
+    /// <see cref="ExpectedParentByName"/> is what actually exercises connector direction for
+    /// every edge, which is what this test's own docstring claims to validate. Verified this
+    /// discriminates (Task 12 review): temporarily forcing one edge in
+    /// <see cref="ExpectedParentByName"/> to the wrong (but still valid, still singly-rooted)
+    /// parent made this test fail with a one-line diff on exactly that entry; reverting made it
+    /// pass again.
+    /// </summary>
     [Fact]
     public void The_exported_hierarchy_reconstructs_to_the_source_hierarchy()
     {
@@ -78,10 +119,13 @@ public sealed class SkiaExportRoundTripTests
         try
         {
             var reconstruction = ReconstructFromPdf(path);
+            var byId = reconstruction.Members.ToDictionary(m => m.Id);
 
-            reconstruction.Members.Should().HaveCount(7);
-            reconstruction.Members.Where(m => m.ParentId is null).Should().ContainSingle()
-                .Which.Name.Should().Be("سليمان");
+            var actualParentByName = reconstruction.Members.ToDictionary(
+                m => m.Name,
+                m => m.ParentId is { } parentId ? byId[parentId].Name : null);
+
+            actualParentByName.Should().BeEquivalentTo(ExpectedParentByName());
         }
         finally { File.Delete(path); }
     }

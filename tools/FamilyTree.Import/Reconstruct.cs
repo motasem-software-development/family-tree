@@ -132,19 +132,29 @@ public static class Reconstruct
     /// </para>
     ///
     /// <para>
-    /// <b>A third fold, added in Task 12, for a second emitter.</b> U+06BA (ARABIC LETTER NOON
-    /// GHUNNA) -> U+0646 (ARABIC LETTER NOON) is the same class of font-subsetting artifact as
-    /// the two above, found instead in the round-trip fixture, whose text is drawn by
-    /// <c>SkiaTreeRenderer</c>'s embedded NotoSans build rather than XMind's font. HarfBuzz's
-    /// auto-generated ToUnicode CMap for that embedded subset maps final-position Noon's glyph to
-    /// U+06BA (Urdu Noon Ghunna -- visually undotted, distinct from Noon's dot) rather than
-    /// U+0646 or its presentation form. Confirmed a font/shaping artifact and not a real letter:
-    /// the round-trip fixture's Arabic text never contains intentional Urdu, and every other
-    /// occurrence of the same letter in the fixture (medial and initial position) decodes to
-    /// plain U+0646 correctly -- only the final-position glyph routes through this non-standard
-    /// codepoint, mirroring exactly how only one Yeh glyph slot carries U+06CC above. Left
-    /// unfolded, every name ending in Noon (a common Arabic name ending) would fail to round-trip
-    /// through <c>SkiaExportRoundTripTests</c>.
+    /// <b>A third fold, added in Task 12 -- but a different kind of bug than the two above.</b>
+    /// U+06BA (ARABIC LETTER NOON GHUNNA) -> U+0646 (ARABIC LETTER NOON) compensates for a defect
+    /// observed in <i>this tool's own</i> CMap decoding, not in the exported PDF's font or its
+    /// embedded <c>/ToUnicode</c> table. The round-trip fixture's PDF was independently
+    /// re-extracted at the byte level with PyMuPDF: 349 text tokens, 77 occurrences of plain
+    /// U+0646 (NOON), zero U+06BA anywhere, and zero presentation-form codepoints in either
+    /// FE70-FEFF or FB50-FDFF -- <c>"سليمان"</c> decodes there as
+    /// <c>0x633 0x644 0x64a 0x645 0x627 0x646</c>, a correct final Noon. The PDF this project
+    /// writes is clean; the corruption happens when <see cref="ToUnicodeCMap.Parse"/> reads it
+    /// back. The suspected (not yet isolated) cause: <c>Parse</c>'s bfrange triple-form handler
+    /// computes each destination codepoint by a linear offset from the range's start
+    /// (<c>dstStart + (glyphId - lo)</c>), which assumes destination codepoints run contiguously
+    /// alongside the glyph-id range within that block. Where the embedded font's own bfrange
+    /// layout does not hold that assumption for one glyph, that arithmetic can silently compute
+    /// the wrong codepoint for just that glyph while its neighbours in the same range still
+    /// decode correctly -- matching exactly the "only final-position Noon is affected, every
+    /// other position decodes fine" symptom measured here. The proper fix belongs in
+    /// <see cref="ToUnicodeCMap.Parse"/>; this fold is a narrowly-scoped workaround for our own
+    /// reader pending that fix, not a correction to anything this project writes. Confirmed safe
+    /// to fold unconditionally in the meantime: the round-trip fixture's Arabic text never
+    /// contains intentional Urdu, so nothing here is a legitimate Noon Ghunna. Left unfolded,
+    /// every name ending in Noon (a common Arabic name ending) would fail to round-trip through
+    /// <c>SkiaExportRoundTripTests</c> even though the PDF itself already has the right text.
     /// </para>
     /// </summary>
     private static string FoldFontArtifacts(string s) => s
