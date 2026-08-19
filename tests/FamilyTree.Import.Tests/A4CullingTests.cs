@@ -79,13 +79,26 @@ public sealed class A4CullingTests
     /// actually drawn against the unculled single-sheet render of the same tree is what makes
     /// that failure mode loud.
     /// </summary>
+    /// <para>
+    /// Counted, not set-compared. A set of glyph ids is far too coarse to notice a losing cull:
+    /// this tree draws thousands of glyphs from a few dozen distinct ids, so whole names can
+    /// vanish from the poster while every id still appears somewhere. A shrunken cull window
+    /// that dropped 658 glyphs -- around 4% of all ink -- passed the set version of this test.
+    /// Tiling may legitimately draw a glyph MORE times than one sheet does, since an item
+    /// straddling a page boundary is drawn on both pages, so the assertion is one-sided.
+    /// </para>
     [Fact]
     public void A_tiled_a4_export_draws_every_glyph_its_single_sheet_export_draws()
     {
-        var sheetIds = AllDrawnGlyphs(Render("sheet")).Select(g => g.GlyphId).ToHashSet();
-        var a4Ids = AllDrawnGlyphs(Render("a4")).Select(g => g.GlyphId).ToHashSet();
+        static Dictionary<int, int> CountById(IEnumerable<Glyph> glyphs) =>
+            glyphs.GroupBy(g => g.GlyphId).ToDictionary(g => g.Key, g => g.Count());
 
-        sheetIds.Should().NotBeEmpty();
-        sheetIds.Except(a4Ids).Should().BeEmpty();
+        var sheet = CountById(AllDrawnGlyphs(Render("sheet")));
+        var a4 = CountById(AllDrawnGlyphs(Render("a4")));
+
+        sheet.Should().NotBeEmpty();
+        foreach (var (glyphId, sheetCount) in sheet)
+            a4.GetValueOrDefault(glyphId).Should().BeGreaterThanOrEqualTo(
+                sheetCount, "glyph {0} is drawn {1}x on one sheet", glyphId, sheetCount);
     }
 }

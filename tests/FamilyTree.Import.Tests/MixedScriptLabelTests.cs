@@ -28,12 +28,18 @@ public sealed class MixedScriptLabelTests
     private static FamilyTreeNodeResponse Node(string name, params FamilyTreeNodeResponse[] children) =>
         new(Guid.NewGuid(), name, null, 1, false, children);
 
+    // The caption pre-splits its own text into single-script runs, so an ARABIC-FIRST mixed label
+    // is the only input that reaches the renderer's RTL run-ordering branch. Rendering both
+    // orders keeps that branch covered; with only the Latin-first label it was reachable in
+    // production and exercised by nothing.
+    private const string ArabicFirstLabel = "سالم Ali";
+
     private static byte[] RenderMixedScriptTree() =>
         new TreeRendererAdapter().Render(
-            [Node("سليمان", Node(MixedLabel), Node("عمر"))],
+            [Node("سليمان", Node(MixedLabel), Node(ArabicFirstLabel), Node("عمر"))],
             ExportStyle.Xmind,
             "sheet",
-            new PdfCaption("آل السقا", 3, 2, new DateOnly(2026, 8, 18), CaptionLanguage.Ar));
+            new PdfCaption("آل السقا", 4, 2, new DateOnly(2026, 8, 18), CaptionLanguage.Ar));
 
     private static PageContent Page(byte[] pdf)
     {
@@ -109,5 +115,38 @@ public sealed class MixedScriptLabelTests
     public void A_whitespace_only_string_still_measures_a_real_width()
     {
         SkiaTextMeasurer.Measure(" ", 13.34).Should().BeGreaterThan(0);
+    }
+
+    /// <summary>
+    /// The RTL branch: when a mixed label STARTS in Arabic, the runs are laid right-to-left, so
+    /// the Latin run sits to the left of the Arabic one. Getting this backwards would not draw a
+    /// single wrong glyph -- every id and font would still be correct -- so only the positions
+    /// can catch it.
+    /// </summary>
+    [Fact]
+    public void An_arabic_first_mixed_label_places_its_latin_run_left_of_its_arabic_run()
+    {
+        var page = Page(RenderMixedScriptTree());
+
+        // "Ali" appears in both labels; the Arabic-first one is the label drawn further down.
+        var latin = page.Glyphs.Where(g => g.Text is "A" or "l" or "i").ToList();
+        // Arabic reaches the content stream as contextual presentation forms as well as base
+        // letters, so both ranges count -- U+0600..U+06FF and U+FB50..U+FEFF.
+        var arabic = page.Glyphs
+            .Where(g => g.Text.Length > 0 && g.Text[0] is (>= '؀' and <= 'ۿ')
+                or (>= 'ﭐ' and <= '﻿')).ToList();
+
+        latin.Should().NotBeEmpty();
+        arabic.Should().NotBeEmpty();
+
+        var row = latin.OrderByDescending(g => g.Y).First().Y;
+        var latinOnRow = latin.Where(g => Math.Abs(g.Y - row) < 1).ToList();
+        var arabicOnRow = arabic.Where(g => Math.Abs(g.Y - row) < 1).ToList();
+
+        latinOnRow.Should().NotBeEmpty();
+        arabicOnRow.Should().NotBeEmpty("the same label carries both scripts on one baseline");
+        latinOnRow.Max(g => g.X).Should().BeLessThan(
+            arabicOnRow.Min(g => g.X),
+            "an Arabic-first label reads right-to-left, so its Latin run is drawn leftmost");
     }
 }
