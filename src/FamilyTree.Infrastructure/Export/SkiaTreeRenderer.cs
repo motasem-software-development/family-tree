@@ -9,7 +9,7 @@ public enum ExportPageFormat { Sheet, A4 }
 
 public interface ITreeRenderer
 {
-    byte[] Render(TreeScene scene, ExportPageFormat format);
+    byte[] Render(TreeScene scene, ExportPageFormat format, PdfCaption? caption = null);
 }
 
 /// <summary>
@@ -20,8 +20,20 @@ public interface ITreeRenderer
 public sealed class SkiaTreeRenderer : ITreeRenderer
 {
     private const float CornerRadius = 6f;
+    private const float CaptionFontSize = 8f;
+    private const float CaptionBottomPadding = 10f;
 
-    public byte[] Render(TreeScene scene, ExportPageFormat format)
+    // The palette's own centre grey (design LayoutOptions.BranchPalette.CentreColor):
+    // restrained, not attention-seeking -- this is furniture, not data (design §4.6).
+    private static readonly SKColor CaptionColor = SKColor.Parse("#8793A5");
+
+    /// <param name="caption">
+    /// Null draws no caption. When present it is drawn in the bottom margin, in device points,
+    /// outside the scene's own Translate/Scale -- it must not shrink or grow with the tree
+    /// (design §4.6). Sheet format captions its one page; A4 captions only its last page, since
+    /// every-page captioning would need paginator geometry changes this task did not make.
+    /// </param>
+    public byte[] Render(TreeScene scene, ExportPageFormat format, PdfCaption? caption = null)
     {
         using var stream = new MemoryStream();
 
@@ -31,15 +43,26 @@ public sealed class SkiaTreeRenderer : ITreeRenderer
             Title = "Family Tree"
         }))
         {
-            foreach (var page in Paginate(scene, format))
+            var pages = Paginate(scene, format).ToList();
+
+            for (var i = 0; i < pages.Count; i++)
             {
+                var page = pages[i];
                 var canvas = document.BeginPage(page.Width, page.Height);
                 canvas.Clear(SKColors.White);
+
+                canvas.Save();
                 canvas.Translate(-page.OffsetX, -page.OffsetY);
                 canvas.Scale((float)scene.Scale);
 
                 foreach (var connector in scene.Connectors) DrawConnector(canvas, connector);
                 foreach (var node in scene.Nodes) DrawNode(canvas, node);
+
+                canvas.Restore();
+
+                var isLastPage = i == pages.Count - 1;
+                if (caption is not null && (format == ExportPageFormat.Sheet || isLastPage))
+                    DrawCaption(canvas, page, caption);
 
                 document.EndPage();
             }
@@ -48,6 +71,16 @@ public sealed class SkiaTreeRenderer : ITreeRenderer
         }
 
         return stream.ToArray();
+    }
+
+    private static void DrawCaption(SKCanvas canvas, PageWindow page, PdfCaption caption)
+    {
+        var text = CaptionLocalizer.Format(caption);
+        var width = (float)SkiaTextMeasurer.Measure(text, CaptionFontSize);
+        var x = (page.Width - width) / 2f;
+        var baseline = page.Height - CaptionBottomPadding;
+
+        DrawShapedText(canvas, text, x, baseline, CaptionFontSize, CaptionColor);
     }
 
     private static IEnumerable<PageWindow> Paginate(TreeScene scene, ExportPageFormat format) =>
@@ -135,13 +168,25 @@ public sealed class SkiaTreeRenderer : ITreeRenderer
 
     private static void DrawLabel(SKCanvas canvas, SceneNode node)
     {
-        var typeface = EmbeddedFonts.For(node.Label);
-        using var font = new SKFont(typeface, (float)node.FontSize);
-        using var paint = new SKPaint { Color = SKColors.Black, IsAntialias = true };
+        var baseline = (float)(node.Y + node.FontSize * 0.35);
+        DrawShapedText(
+            canvas, node.Label, (float)node.X, baseline, (float)node.FontSize, SKColors.Black);
+    }
+
+    /// <summary>
+    /// Shapes and paints one line of text -- node label or bottom-margin caption alike -- at a
+    /// given origin. Shared so the caption gets the same Arabic-shaping and searchability
+    /// handling as every node label, rather than a second, divergent text path.
+    /// </summary>
+    private static void DrawShapedText(
+        SKCanvas canvas, string text, float x, float baselineY, float fontSize, SKColor color)
+    {
+        var typeface = EmbeddedFonts.For(text);
+        using var font = new SKFont(typeface, fontSize);
+        using var paint = new SKPaint { Color = color, IsAntialias = true };
         using var shaper = new SKShaper(typeface);
 
-        var baseline = (float)(node.Y + node.FontSize * 0.35);
-        var shaped = shaper.Shape(node.Label, (float)node.X, baseline, font);
+        var shaped = shaper.Shape(text, x, baselineY, font);
 
         // Shaping is what joins Arabic correctly, but two things stand between a shaped glyph
         // run and a *searchable* one:
@@ -169,7 +214,7 @@ public sealed class SkiaTreeRenderer : ITreeRenderer
         var marks = MarkIndices(shaped, font);
         DrawMarksAsPaths(canvas, shaped, font, paint, marks);
 
-        using var blob = BuildShapedTextBlob(node.Label, shaped, font, marks);
+        using var blob = BuildShapedTextBlob(text, shaped, font, marks);
         if (blob is not null) canvas.DrawText(blob, 0, 0, paint);
     }
 

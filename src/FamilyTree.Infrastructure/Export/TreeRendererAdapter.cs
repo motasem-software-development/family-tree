@@ -9,7 +9,10 @@ public sealed class TreeRendererAdapter : ITreeRendererAdapter
     private static readonly ILayoutStrategy Clean = new CleanLayoutStrategy();
 
     public byte[] Render(
-        IReadOnlyList<FamilyTreeNodeResponse> roots, ExportStyle style, string pageFormat)
+        IReadOnlyList<FamilyTreeNodeResponse> roots,
+        ExportStyle style,
+        string pageFormat,
+        PdfCaption? caption = null)
     {
         var options = LayoutOptions.Default;
 
@@ -27,6 +30,6 @@ public sealed class TreeRendererAdapter : ITreeRendererAdapter
             ? SceneScaler.FitToSheet(scene, options.Metrics)
             : scene;
 
-        return new SkiaTreeRenderer().Render(fitted, format);
+        return new SkiaTreeRenderer().Render(fitted, format, caption);
     }
 }

@@ -34,6 +34,7 @@ public static class FamilyTreeEndpoints
             int? maxDepth,
             string? style,
             string? page,
+            HttpRequest request,
             IFamilyTreeExporter exporter,
             CancellationToken ct) =>
         {
@@ -45,7 +46,9 @@ public static class FamilyTreeEndpoints
                 ? "a4"
                 : "sheet";
 
-            var result = await exporter.ExportAsync(rootId, maxDepth, chosenStyle, format, ct);
+            var language = CaptionLanguageResolver.Resolve(request);
+
+            var result = await exporter.ExportAsync(rootId, maxDepth, chosenStyle, format, language, ct);
 
             // Results.File percent-encodes a non-ASCII download name into filename* per
             // RFC 5987, which is what lets an Arabic family name survive the header.

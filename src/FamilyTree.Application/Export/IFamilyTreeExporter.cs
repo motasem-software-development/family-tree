@@ -10,7 +10,12 @@ public sealed record ExportResult(byte[] Content, string FamilyTreeName);
 public interface IFamilyTreeExporter
 {
     Task<ExportResult> ExportAsync(
-        Guid? rootId, int? maxDepth, ExportStyle style, string pageFormat, CancellationToken ct);
+        Guid? rootId,
+        int? maxDepth,
+        ExportStyle style,
+        string pageFormat,
+        CaptionLanguage language,
+        CancellationToken ct);
 }
 
 /// <summary>
@@ -19,5 +24,13 @@ public interface IFamilyTreeExporter
 /// </summary>
 public interface ITreeRendererAdapter
 {
-    byte[] Render(IReadOnlyList<FamilyTreeNodeResponse> roots, ExportStyle style, string pageFormat);
+    /// <param name="caption">
+    /// Null draws no caption (design §4.6). Optional, not required, so every existing call site
+    /// that predates the caption keeps compiling and rendering byte-for-byte as before.
+    /// </param>
+    byte[] Render(
+        IReadOnlyList<FamilyTreeNodeResponse> roots,
+        ExportStyle style,
+        string pageFormat,
+        PdfCaption? caption = null);
 }
