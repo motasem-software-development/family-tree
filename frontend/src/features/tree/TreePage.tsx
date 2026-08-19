@@ -23,6 +23,13 @@ const ZOOM_STEP = 0.1
 const ZOOM_MIN = 0.5
 const ZOOM_MAX = 1.5
 const TOAST_MS = 3200
+// MemberPanel's own width (see MemberPanel.tsx's `aside`) plus a clear gap. The export button
+// is a fixed overlay — TreePage has no in-flow toolbar of its own to host it, and the two
+// components that do (AppShell's header, shared by every screen, and TreeCanvas's floating
+// zoom toolbar) are outside this change's scope. Shifting clear of the panel's box keeps the
+// overlap structurally impossible instead of merely unlikely.
+const MEMBER_PANEL_WIDTH = 320
+const EXPORT_BUTTON_GAP = 24
 
 const codeOf = (error: unknown): string => (error instanceof ApiError ? error.code : 'UNKNOWN')
 
@@ -322,7 +329,12 @@ export const TreePage = () => {
         style={{
           position: 'fixed',
           top: 76,
-          insetInlineEnd: 24,
+          // Cleared past MemberPanel's own width when it's on screen, so the two boxes never
+          // share inline-axis space — see the MEMBER_PANEL_WIDTH comment above.
+          insetInlineEnd:
+            panelOpen && selected !== undefined
+              ? MEMBER_PANEL_WIDTH + EXPORT_BUTTON_GAP
+              : EXPORT_BUTTON_GAP,
           height: 36,
           padding: '0 14px',
           border: '1px solid var(--border-strong)',
