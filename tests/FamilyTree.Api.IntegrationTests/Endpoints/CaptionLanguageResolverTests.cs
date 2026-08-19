@@ -53,4 +53,22 @@ public sealed class CaptionLanguageResolverTests
         CaptionLanguageResolver.Resolve(RequestWithAcceptLanguage("ar;q=0.3,en;q=0.9"))
             .Should().Be(CaptionLanguage.En);
     }
+
+    // RFC 9110 §12.5.1: q=0 means "not acceptable", not "lowest priority" -- it must not be
+    // treated as a usable preference at all.
+    [Fact]
+    public void A_zero_quality_preference_is_not_acceptable_and_falls_back_to_arabic()
+    {
+        CaptionLanguageResolver.Resolve(RequestWithAcceptLanguage("en;q=0"))
+            .Should().Be(CaptionLanguage.Ar);
+    }
+
+    // An unknown language ahead of a known one must not sink the whole header to the Ar
+    // default -- the resolver should fall through to the next KNOWN language in quality order.
+    [Fact]
+    public void An_unknown_top_preference_falls_through_to_the_next_known_language()
+    {
+        CaptionLanguageResolver.Resolve(RequestWithAcceptLanguage("de,en;q=0.9"))
+            .Should().Be(CaptionLanguage.En);
+    }
 }

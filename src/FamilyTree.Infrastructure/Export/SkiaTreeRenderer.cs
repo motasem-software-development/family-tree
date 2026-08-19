@@ -21,17 +21,25 @@ public sealed class SkiaTreeRenderer : ITreeRenderer
 {
     private const float CornerRadius = 6f;
     private const float CaptionFontSize = 8f;
+    private const float CaptionMinFontSize = 6f;
     private const float CaptionBottomPadding = 10f;
+    private const float CaptionFitMargin = 2f;
+
+    // Reserved below the scene (sheet) or clipped from the bottom of every tile (A4) so the
+    // caption always has genuinely empty space to sit in, regardless of scale (design §4.6,
+    // Important 4). Comfortably covers an 8pt line at 10pt bottom padding with headroom above.
+    private const float CaptionBandHeight = 28f;
 
     // The palette's own centre grey (design LayoutOptions.BranchPalette.CentreColor):
     // restrained, not attention-seeking -- this is furniture, not data (design §4.6).
     private static readonly SKColor CaptionColor = SKColor.Parse("#8793A5");
 
     /// <param name="caption">
-    /// Null draws no caption. When present it is drawn in the bottom margin, in device points,
-    /// outside the scene's own Translate/Scale -- it must not shrink or grow with the tree
-    /// (design §4.6). Sheet format captions its one page; A4 captions only its last page, since
-    /// every-page captioning would need paginator geometry changes this task did not make.
+    /// Null draws no caption. When present it is drawn in a band reserved below the tree's own
+    /// content, in device points, outside the scene's own Translate/Scale -- it must not shrink
+    /// or grow with the tree, and must not collide with it at any scale (design §4.6). Both
+    /// sheet and A4 caption every page: sheet has exactly one, and every A4 tile reserves its
+    /// own band.
     /// </param>
     public byte[] Render(TreeScene scene, ExportPageFormat format, PdfCaption? caption = null)
     {
@@ -43,15 +51,23 @@ public sealed class SkiaTreeRenderer : ITreeRenderer
             Title = "Family Tree"
         }))
         {
-            var pages = Paginate(scene, format).ToList();
+            var captionBandHeight = caption is null ? 0f : CaptionBandHeight;
+            var pages = Paginate(scene, format, captionBandHeight).ToList();
 
-            for (var i = 0; i < pages.Count; i++)
+            // Every A4 tile shares the same physical width, and there is always at least one
+            // page, so the layout (font size, possible truncation) is resolved once and reused
+            // -- every page's caption reads identically, and widths aren't re-measured per page.
+            var layout = caption is null ? null : ResolveCaptionLayout(caption, pages[0].Width);
+
+            foreach (var page in pages)
             {
-                var page = pages[i];
                 var canvas = document.BeginPage(page.Width, page.Height);
                 canvas.Clear(SKColors.White);
 
                 canvas.Save();
+                if (format == ExportPageFormat.A4 && caption is not null)
+                    canvas.ClipRect(SKRect.Create(page.Width, page.Height - captionBandHeight));
+
                 canvas.Translate(-page.OffsetX, -page.OffsetY);
                 canvas.Scale((float)scene.Scale);
 
@@ -60,9 +76,7 @@ public sealed class SkiaTreeRenderer : ITreeRenderer
 
                 canvas.Restore();
 
-                var isLastPage = i == pages.Count - 1;
-                if (caption is not null && (format == ExportPageFormat.Sheet || isLastPage))
-                    DrawCaption(canvas, page, caption);
+                if (layout is not null) DrawCaption(canvas, page, layout);
 
                 document.EndPage();
             }
@@ -73,21 +87,112 @@ public sealed class SkiaTreeRenderer : ITreeRenderer
         return stream.ToArray();
     }
 
-    private static void DrawCaption(SKCanvas canvas, PageWindow page, PdfCaption caption)
-    {
-        var text = CaptionLocalizer.Format(caption);
-        var width = (float)SkiaTextMeasurer.Measure(text, CaptionFontSize);
-        var x = (page.Width - width) / 2f;
-        var baseline = page.Height - CaptionBottomPadding;
+    /// <param name="Segments">In layout order (not necessarily the caption's logical order --
+    /// see <see cref="RightToLeft"/>).</param>
+    /// <param name="Widths">One shaped width per segment, measured at <see cref="FontSize"/>.</param>
+    private sealed record CaptionLayout(
+        IReadOnlyList<CaptionSegment> Segments,
+        IReadOnlyList<float> Widths,
+        float TotalWidth,
+        float FontSize,
+        bool RightToLeft);
 
-        DrawShapedText(canvas, text, x, baseline, CaptionFontSize, CaptionColor);
+    /// <summary>
+    /// Resolves the caption once per render: shrinks the font toward <see cref="CaptionMinFontSize"/>
+    /// if it doesn't fit at 8pt, then truncates the family tree NAME segment (never a count or
+    /// the date) with an ellipsis if it still doesn't fit at the floor (design §4.6, Important 3).
+    /// </summary>
+    private static CaptionLayout ResolveCaptionLayout(PdfCaption caption, float pageWidth)
+    {
+        // A small safety margin, not just cosmetic: it keeps the fit decision away from an
+        // exact tie, so a sub-point measurement jitter between two otherwise-identical shaping
+        // calls can't flip which side of "fits" / "doesn't fit" a borderline caption lands on.
+        var fitWidth = pageWidth - CaptionFitMargin;
+
+        var segments = CaptionLocalizer.Segments(caption);
+        var fontSize = CaptionFontSize;
+        var widths = MeasureSegments(segments, fontSize);
+        var totalWidth = widths.Sum();
+
+        while (totalWidth > fitWidth && fontSize > CaptionMinFontSize)
+        {
+            fontSize = MathF.Max(CaptionMinFontSize, fontSize - 0.5f);
+            widths = MeasureSegments(segments, fontSize);
+            totalWidth = widths.Sum();
+        }
+
+        if (totalWidth > fitWidth)
+        {
+            var nameIndex = IndexOfName(segments);
+            if (nameIndex >= 0)
+            {
+                var originalName = segments[nameIndex].Text;
+                var mutable = segments.ToList();
+
+                for (var keep = originalName.Length - 1; keep >= 0 && totalWidth > fitWidth; keep--)
+                {
+                    var truncated = keep > 0 ? originalName[..keep] + "…" : "…";
+                    mutable[nameIndex] = mutable[nameIndex] with { Text = truncated };
+                    widths = MeasureSegments(mutable, fontSize);
+                    totalWidth = widths.Sum();
+                }
+
+                segments = mutable;
+            }
+        }
+
+        return new CaptionLayout(
+            segments, widths, totalWidth, fontSize, caption.Language == CaptionLanguage.Ar);
     }
 
-    private static IEnumerable<PageWindow> Paginate(TreeScene scene, ExportPageFormat format) =>
+    private static int IndexOfName(IReadOnlyList<CaptionSegment> segments)
+    {
+        for (var i = 0; i < segments.Count; i++)
+            if (segments[i].Kind == CaptionSegmentKind.Name) return i;
+        return -1;
+    }
+
+    private static float[] MeasureSegments(IReadOnlyList<CaptionSegment> segments, float fontSize) =>
+        segments.Select(s => (float)SkiaTextMeasurer.Measure(s.Text, fontSize)).ToArray();
+
+    /// <summary>
+    /// Draws each segment independently -- shaped, measured, and placed on its own -- in reading
+    /// order for the caption's language: right-to-left for Ar, left-to-right for En. A segment
+    /// is single-script by construction, so shaping it alone cannot reverse it (design §4.6,
+    /// Critical 1/2 fix), and <see cref="EmbeddedFonts.For"/> on that segment's own text picks a
+    /// typeface that actually has its glyphs.
+    /// </summary>
+    private static void DrawCaption(SKCanvas canvas, PageWindow page, CaptionLayout layout)
+    {
+        var baseline = page.Height - CaptionBottomPadding;
+        var left = (page.Width - layout.TotalWidth) / 2f;
+
+        if (layout.RightToLeft)
+        {
+            var x = left + layout.TotalWidth;
+            for (var i = 0; i < layout.Segments.Count; i++)
+            {
+                x -= layout.Widths[i];
+                DrawShapedText(canvas, layout.Segments[i].Text, x, baseline, layout.FontSize, CaptionColor);
+            }
+        }
+        else
+        {
+            var x = left;
+            for (var i = 0; i < layout.Segments.Count; i++)
+            {
+                DrawShapedText(canvas, layout.Segments[i].Text, x, baseline, layout.FontSize, CaptionColor);
+                x += layout.Widths[i];
+            }
+        }
+    }
+
+    private static IEnumerable<PageWindow> Paginate(
+        TreeScene scene, ExportPageFormat format, float captionBandHeight) =>
         format switch
         {
-            ExportPageFormat.Sheet => SheetPaginator.Pages(scene),
-            ExportPageFormat.A4 => A4Paginator.Pages(scene),
+            ExportPageFormat.Sheet => SheetPaginator.Pages(scene, captionBandHeight),
+            ExportPageFormat.A4 => A4Paginator.Pages(scene, captionBandHeight),
             _ => throw new ArgumentOutOfRangeException(nameof(format))
         };
 
@@ -182,40 +287,48 @@ public sealed class SkiaTreeRenderer : ITreeRenderer
         SKCanvas canvas, string text, float x, float baselineY, float fontSize, SKColor color)
     {
         var typeface = EmbeddedFonts.For(text);
-        using var font = new SKFont(typeface, fontSize);
         using var paint = new SKPaint { Color = color, IsAntialias = true };
-        using var shaper = new SKShaper(typeface);
 
-        var shaped = shaper.Shape(text, x, baselineY, font);
+        // See EmbeddedFonts.ShapingLock: concurrent shaping against a shared typeface can
+        // corrupt HarfBuzz's/Skia's own caches -- measured empirically as flaky byte-determinism
+        // under concurrent rendering (production allows two renders in flight at once).
+        lock (EmbeddedFonts.ShapingLock)
+        {
+            using var font = new SKFont(typeface, fontSize);
+            using var shaper = new SKShaper(typeface);
 
-        // Shaping is what joins Arabic correctly, but two things stand between a shaped glyph
-        // run and a *searchable* one:
-        //
-        // 1. SKCanvas.DrawShapedText derives its /ToUnicode CMap by reverse-scanning the font's
-        //    own cmap table from glyph id back to a codepoint — and Noto Sans Arabic's cmap also
-        //    carries legacy presentation-form entries that win that scan, so pdftotext recovers
-        //    glyph-shape codepoints (e.g. U+FE8E) or U+0000, not the letters that were actually
-        //    typed. A hand-built text blob that attaches the source UTF-8 text and HarfBuzz's
-        //    cluster map to the run instead makes Skia's PDF backend build /ToUnicode from the
-        //    real text.
-        //
-        // 2. Some letters (e.g. the dot on ف or ي) shape to a base glyph plus a zero-advance
-        //    mark positioned via GPOS. Every attempt to keep that mark in the text layer —
-        //    interleaved with its base, reordered by X, or drawn as its own zero-width text run
-        //    — leaves either a stray character or a spurious mid-word space in pdftotext's
-        //    output, because the mark's presence as a *text* object (however it's ordered or
-        //    associated) still perturbs pdftotext's spatial word-gap reconstruction. Painting
-        //    marks as plain vector paths instead removes them from the text layer entirely:
-        //    invisible to every extractor, and the remaining base-glyph run is a clean,
-        //    monotonic sequence that matches the font's own declared advances.
-        //
-        // Do not swap this back for DrawShapedText, and do not fold the marks back into the
-        // text run, without re-running the searchability gate.
-        var marks = MarkIndices(shaped, font);
-        DrawMarksAsPaths(canvas, shaped, font, paint, marks);
+            var shaped = shaper.Shape(text, x, baselineY, font);
 
-        using var blob = BuildShapedTextBlob(text, shaped, font, marks);
-        if (blob is not null) canvas.DrawText(blob, 0, 0, paint);
+            // Shaping is what joins Arabic correctly, but two things stand between a shaped
+            // glyph run and a *searchable* one:
+            //
+            // 1. SKCanvas.DrawShapedText derives its /ToUnicode CMap by reverse-scanning the
+            //    font's own cmap table from glyph id back to a codepoint — and Noto Sans
+            //    Arabic's cmap also carries legacy presentation-form entries that win that scan,
+            //    so pdftotext recovers glyph-shape codepoints (e.g. U+FE8E) or U+0000, not the
+            //    letters that were actually typed. A hand-built text blob that attaches the
+            //    source UTF-8 text and HarfBuzz's cluster map to the run instead makes Skia's
+            //    PDF backend build /ToUnicode from the real text.
+            //
+            // 2. Some letters (e.g. the dot on ف or ي) shape to a base glyph plus a zero-advance
+            //    mark positioned via GPOS. Every attempt to keep that mark in the text layer —
+            //    interleaved with its base, reordered by X, or drawn as its own zero-width text
+            //    run — leaves either a stray character or a spurious mid-word space in
+            //    pdftotext's output, because the mark's presence as a *text* object (however
+            //    it's ordered or associated) still perturbs pdftotext's spatial word-gap
+            //    reconstruction. Painting marks as plain vector paths instead removes them from
+            //    the text layer entirely: invisible to every extractor, and the remaining
+            //    base-glyph run is a clean, monotonic sequence that matches the font's own
+            //    declared advances.
+            //
+            // Do not swap this back for DrawShapedText, and do not fold the marks back into the
+            // text run, without re-running the searchability gate.
+            var marks = MarkIndices(shaped, font);
+            DrawMarksAsPaths(canvas, shaped, font, paint, marks);
+
+            using var blob = BuildShapedTextBlob(text, shaped, font, marks);
+            if (blob is not null) canvas.DrawText(blob, 0, 0, paint);
+        }
     }
 
     /// <summary>Zero-advance glyphs (dots, combining marks) painted as outlines, not text.</summary>

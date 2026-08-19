@@ -8,8 +8,15 @@ namespace FamilyTree.Infrastructure.Export;
 /// Sans has no Arabic coverage). Noto is SIL OFL and metrically close, so the reference's
 /// column and row proportions survive (design §3.3).
 ///
-/// Typefaces load once and are shared: they are immutable and thread-safe, and reloading per
-/// request would re-parse the font on every export.
+/// Typefaces load once and are shared: the immutable font DATA is thread-safe to read, but
+/// measured empirically (Round-2 review, byte-determinism test flaking under xUnit's parallel
+/// test execution): concurrent <c>SKShaper.Shape</c>/<c>SKFont.MeasureText</c> calls against the
+/// same shared <see cref="SKTypeface"/> from multiple threads can corrupt HarfBuzz's/Skia's own
+/// internal shaping caches, producing different glyph runs for identical input text. Every
+/// caller that shapes or measures text through this class's typefaces must hold
+/// <see cref="ShapingLock"/> for the duration of that call -- see
+/// <c>SkiaTreeRenderer.DrawShapedText</c> and <c>SkiaTextMeasurer.Measure</c>. Reloading per
+/// request instead of locking would avoid the race but re-parse the font on every export.
 /// </summary>
 public static class EmbeddedFonts
 {
@@ -18,6 +25,11 @@ public static class EmbeddedFonts
 
     private static readonly Lazy<SKTypeface> LatinFont =
         new(() => Load("NotoSans-Bold.ttf"), LazyThreadSafetyMode.ExecutionAndPublication);
+
+    /// <summary>Guards every shaping/measurement call against these typefaces -- see the class
+    /// remarks. Not guarding font *selection* (<see cref="For"/>), only the HarfBuzz/Skia calls
+    /// that walk the typeface's internal tables.</summary>
+    public static readonly object ShapingLock = new();
 
     public static SKTypeface Arabic => ArabicFont.Value;
     public static SKTypeface Latin => LatinFont.Value;

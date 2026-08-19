@@ -18,9 +18,15 @@ public static class SkiaTextMeasurer
         if (string.IsNullOrEmpty(text)) return 0;
 
         var typeface = EmbeddedFonts.For(text);
-        using var font = new SKFont(typeface, (float)fontSize);
-        using var shaper = new SKShaper(typeface);
 
-        return shaper.Shape(text, font).Width;
+        // See EmbeddedFonts.ShapingLock: concurrent shaping against a shared typeface can
+        // corrupt HarfBuzz's/Skia's own caches.
+        lock (EmbeddedFonts.ShapingLock)
+        {
+            using var font = new SKFont(typeface, (float)fontSize);
+            using var shaper = new SKShaper(typeface);
+
+            return shaper.Shape(text, font).Width;
+        }
     }
 }

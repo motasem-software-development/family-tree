@@ -13,14 +13,26 @@ public static class A4Paginator
     private const float PageHeight = 842f;
     private const float Bleed = 18f;
 
-    public static IEnumerable<PageWindow> Pages(TreeScene scene)
+    /// <param name="captionBandHeight">
+    /// Device-point height reserved at the bottom of EVERY tile for a caption (design §4.6).
+    /// Zero (the default) reproduces the pre-caption tiling exactly. The physical page stays a
+    /// full 595×842 sheet -- the renderer clips scene content out of the bottom
+    /// <paramref name="captionBandHeight"/> of each tile -- but the vertical *content* window
+    /// each tile pulls from the scene shrinks to <c>PageHeight - captionBandHeight</c>, and rows
+    /// step by that reduced height (still overlapping by <see cref="Bleed"/>): whatever a tile's
+    /// clip cuts off its bottom, the next tile's top picks back up, so nothing is lost.
+    /// </param>
+    public static IEnumerable<PageWindow> Pages(TreeScene scene, float captionBandHeight = 0f)
     {
         var width = (float)(scene.Bounds.Width * scene.Scale);
         var height = (float)(scene.Bounds.Height * scene.Scale);
 
-        // Each step advances by less than a full page, so successive windows overlap by Bleed.
+        var contentHeight = PageHeight - captionBandHeight;
+
+        // Each step advances by less than a full content window, so successive windows overlap
+        // by Bleed.
         var stepX = PageWidth - Bleed;
-        var stepY = PageHeight - Bleed;
+        var stepY = contentHeight - Bleed;
 
         for (var y = 0f; ; y += stepY)
         {
@@ -30,7 +42,7 @@ public static class A4Paginator
                 if (x + PageWidth >= width) break;
             }
 
-            if (y + PageHeight >= height) break;
+            if (y + contentHeight >= height) break;
         }
     }
 }
