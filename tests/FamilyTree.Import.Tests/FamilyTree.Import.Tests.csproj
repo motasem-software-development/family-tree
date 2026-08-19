@@ -18,6 +18,9 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\tools\FamilyTree.Import\FamilyTree.Import.csproj" />
+    <ProjectReference Include="..\..\src\FamilyTree.Application\FamilyTree.Application.csproj" />
+    <ProjectReference Include="..\..\src\FamilyTree.Infrastructure\FamilyTree.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\FamilyTree.Contracts\FamilyTree.Contracts.csproj" />
   </ItemGroup>
 
 </Project>
