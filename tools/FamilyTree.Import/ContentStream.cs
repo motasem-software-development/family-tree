@@ -3,7 +3,16 @@ using System.Text;
 
 namespace FamilyTree.Import;
 
-public readonly record struct Glyph(int GlyphId, string Text, double X, double Y, double Size);
+/// <param name="Font">
+/// The page-local font resource name (e.g. <c>F6</c>) this glyph was drawn with, from the
+/// stream's own <c>Tf</c> operator. Empty when the stream selected no font. Trailing optional
+/// parameter so existing positional construction keeps compiling -- and load-bearing for
+/// anything that reasons about glyph IDENTITY, since two Identity-H subsets in one document both
+/// number their glyphs from zero and a <see cref="GlyphId"/> alone therefore does not identify a
+/// glyph.
+/// </param>
+public readonly record struct Glyph(
+    int GlyphId, string Text, double X, double Y, double Size, string Font = "");
 
 public sealed record PdfPath(IReadOnlyList<(double X, double Y)> Points, string Ops, char Terminator);
 
@@ -21,7 +30,7 @@ public static class ContentStream
 {
     private static readonly double[] Identity = { 1, 0, 0, 1, 0, 0 };
 
-    public static PageContent Read(byte[] content, ToUnicodeCMap cmap)
+    public static PageContent Read(byte[] content, IGlyphDecoder decoder)
     {
         var tokens = Encoding.Latin1.GetString(content)
             .Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
@@ -33,6 +42,7 @@ public static class ContentStream
         var ctmStack = new Stack<double[]>();
         var tm = (double[])Identity.Clone();
         var fontSize = 0d;
+        var fontResource = "";
 
         var activePoints = new List<(double X, double Y)>();
         var activeOps = new StringBuilder();
@@ -74,7 +84,12 @@ public static class ContentStream
                     }
 
                 case "Tf":
+                    // "/F6 17.78 Tf" -- the resource name is two tokens back. It is page-local
+                    // and is what makes the glyph ids that follow interpretable at all.
                     fontSize = ParseNum(tokens[i - 1]);
+                    fontResource = i >= 2 && tokens[i - 2].StartsWith('/')
+                        ? tokens[i - 2][1..]
+                        : "";
                     break;
 
                 case "Tj":
@@ -85,7 +100,13 @@ public static class ContentStream
                         var hex = tokens[i - 1].Trim('<', '>');
                         var glyphId = Convert.ToInt32(hex[..Math.Min(4, hex.Length)], 16);
                         var full = Multiply(tm, ctm);
-                        glyphs.Add(new Glyph(glyphId, cmap.Lookup(glyphId) ?? "", full[4], full[5], fontSize));
+                        glyphs.Add(new Glyph(
+                            glyphId,
+                            decoder.Lookup(fontResource, glyphId) ?? "",
+                            full[4],
+                            full[5],
+                            fontSize,
+                            fontResource));
                         break;
                     }
 

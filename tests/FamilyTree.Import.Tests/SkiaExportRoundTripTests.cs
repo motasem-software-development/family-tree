@@ -67,22 +67,41 @@ public sealed class SkiaExportRoundTripTests
         return result;
     }
 
-    private static string RenderToFile()
+    /// <summary>
+    /// Renders through <see cref="TreeRendererAdapter"/> WITH a caption -- the literal artifact
+    /// production emits. An earlier version of this method hand-reassembled the strategy, the
+    /// scaler and the renderer and passed NO caption, so the flagship acceptance test rendered a
+    /// document shape production never produces (final review, Important 3): every real export
+    /// has a caption, and a caption embeds a SECOND font, which is exactly the condition that
+    /// broke glyph decoding. Going through the adapter also means this test cannot drift from
+    /// production's own composition of those three steps.
+    /// </summary>
+    private static string RenderToFile(CaptionLanguage language = CaptionLanguage.Ar)
     {
-        var scene = SceneScaler.FitToSheet(
-            new XmindLayoutStrategy().Build(
-                [Fixture()], LayoutOptions.Default, SkiaTextMeasurer.Delegate),
-            LayoutOptions.Default.Metrics);
+        // A fixed date, not the clock: the rendered bytes must not vary between runs.
+        var caption = new PdfCaption(
+            "آل سالم", 7, 3, new DateOnly(2026, 8, 18), language);
+
+        var pdf = new TreeRendererAdapter().Render(
+            [Fixture()], ExportStyle.Xmind, "sheet", caption);
 
         var path = Path.Combine(Path.GetTempPath(), $"roundtrip-{Guid.NewGuid():N}.pdf");
-        File.WriteAllBytes(path, new SkiaTreeRenderer().Render(scene, ExportPageFormat.Sheet));
+        File.WriteAllBytes(path, pdf);
         return path;
     }
 
+    /// <summary>
+    /// Decodes glyphs through <see cref="PdfFonts.ParseFirstPage"/>, which keys each
+    /// <c>/ToUnicode</c> map to the font resource that owns it. A captioned export embeds TWO
+    /// Identity-H subsets whose glyph ids both start near zero, so the merging
+    /// <see cref="ToUnicodeCMap.Parse(IEnumerable{byte[]})"/> lets one font's map decode the
+    /// other font's glyphs (final review, Important 3).
+    /// </summary>
     private static PageContent ReadFirstPage(string path)
     {
-        var streams = PdfStreams.Inflate(File.ReadAllBytes(path));
-        return ContentStream.Read(PdfStreams.ContentStreamOf(streams), ToUnicodeCMap.Parse(streams));
+        var pdf = File.ReadAllBytes(path);
+        var streams = PdfStreams.Inflate(pdf);
+        return ContentStream.Read(PdfStreams.ContentStreamOf(streams), PdfFonts.ParseFirstPage(pdf));
     }
 
     private static Reconstruction ReconstructFromPdf(string path)
@@ -116,10 +135,18 @@ public sealed class SkiaExportRoundTripTests
     /// parent made this test fail with a one-line diff on exactly that entry; reverting made it
     /// pass again.
     /// </summary>
-    [Fact]
-    public void The_exported_hierarchy_reconstructs_to_the_source_hierarchy()
+    /// <summary>
+    /// Run for BOTH caption languages, because the caption is what embeds the second font and the
+    /// two languages embed different amounts of it: measured before the per-font keying fix, an Ar
+    /// caption mis-decoded ح as 8, and an En caption additionally mis-decoded ن as m and ل as e
+    /// (final review, Important 3).
+    /// </summary>
+    [Theory]
+    [InlineData(CaptionLanguage.Ar)]
+    [InlineData(CaptionLanguage.En)]
+    public void The_exported_hierarchy_reconstructs_to_the_source_hierarchy(CaptionLanguage language)
     {
-        var path = RenderToFile();
+        var path = RenderToFile(language);
         try
         {
             var reconstruction = ReconstructFromPdf(path);

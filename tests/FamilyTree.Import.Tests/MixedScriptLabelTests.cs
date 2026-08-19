@@ -38,7 +38,28 @@ public sealed class MixedScriptLabelTests
     private static PageContent Page(byte[] pdf)
     {
         var streams = PdfStreams.Inflate(pdf);
-        return ContentStream.Read(PdfStreams.ContentStreamOf(streams), ToUnicodeCMap.Parse(streams));
+        return ContentStream.Read(PdfStreams.ContentStreamOf(streams), PdfFonts.ParseFirstPage(pdf));
+    }
+
+    /// <summary>
+    /// The direct evidence: a mixed-script label's Latin glyphs and its Arabic glyphs must be
+    /// drawn with DIFFERENT font resources. One typeface for the whole label is the defect
+    /// itself, and it is invisible to anything that reads extracted text.
+    /// </summary>
+    [Fact]
+    public void The_latin_and_arabic_parts_of_one_label_are_drawn_with_different_fonts()
+    {
+        var page = Page(RenderMixedScriptTree());
+
+        var arabicFonts = page.Glyphs.Where(g => g.Text.Length > 0 && g.Text[0] is >= '؀' and <= 'ۿ')
+            .Select(g => g.Font).Distinct().ToList();
+        var latinFonts = page.Glyphs.Where(g => g.Text is "A" or "l" or "i")
+            .Select(g => g.Font).Distinct().ToList();
+
+        arabicFonts.Should().NotBeEmpty();
+        latinFonts.Should().NotBeEmpty("the Latin run of the label must actually be drawn");
+        latinFonts.Intersect(arabicFonts).Should().BeEmpty(
+            "a run drawn with the typeface that covers the other script is exactly the defect");
     }
 
     /// <summary>

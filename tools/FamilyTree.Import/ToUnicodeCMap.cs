@@ -3,12 +3,29 @@ using System.Text;
 
 namespace FamilyTree.Import;
 
-public sealed class ToUnicodeCMap
+/// <summary>
+/// ONE font's glyph-id -> text mapping.
+///
+/// <para>
+/// <see cref="Parse(IEnumerable{byte[]})"/> merges every CMap stream it is handed into a single
+/// map, which is only safe for a document with exactly one embedded font: Identity-H subsets
+/// number their glyphs from zero, so two fonts' id spaces overlap and the later stream silently
+/// overwrites the earlier (final review, Important 3). Prefer <see cref="PdfFonts.ParseFirstPage"/>,
+/// which keys a map per font resource. The merging overload remains for callers that genuinely
+/// have a single font, and for tests that hand this class raw CMap bytes with no PDF structure
+/// around them.
+/// </para>
+/// </summary>
+public sealed class ToUnicodeCMap : IGlyphDecoder
 {
     private readonly Dictionary<int, string> _map = new();
 
     public int Count => _map.Count;
     public string? Lookup(int glyphId) => _map.GetValueOrDefault(glyphId);
+
+    /// <summary>Ignores the font resource name: this map already IS one font's, or a merge of
+    /// several that the caller has accepted as interchangeable.</summary>
+    string? IGlyphDecoder.Lookup(string? fontResourceName, int glyphId) => Lookup(glyphId);
 
     public static ToUnicodeCMap Parse(IEnumerable<byte[]> streams)
     {
