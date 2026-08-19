@@ -27,15 +27,35 @@ public static class ColumnAssignment
     /// Defaults to <see cref="ColumnAlignment.Leading"/> so the xmind style keeps reproducing the
     /// reference; the clean style asks for <see cref="ColumnAlignment.Trailing"/>.
     /// </param>
+    /// <summary>
+    /// The widest label at each depth across a whole set of branches. Passing the result to
+    /// <see cref="Assign"/> for every one of those branches makes them share columns, so a
+    /// generation lines up across the entire side instead of only within one branch.
+    /// </summary>
+    public static IReadOnlyDictionary<int, double> WidestByDepth(IEnumerable<PackedNode> branches)
+    {
+        var widest = new Dictionary<int, double>();
+        foreach (var branch in branches)
+            foreach (var node in branch.Descend())
+                widest[node.Depth] = Math.Max(widest.GetValueOrDefault(node.Depth), node.Width);
+
+        return widest;
+    }
+
+    /// <param name="sharedColumns">
+    /// Column widths to use instead of measuring this branch alone — see
+    /// <see cref="WidestByDepth"/>. Null measures only this branch, which lets a wide name in one
+    /// branch avoid pushing its siblings outward, at the cost of branches not lining up.
+    /// </param>
     /// <returns>The branch's outer extent, as a signed x in scene coordinates.</returns>
     public static double Assign(
         PackedNode branchRoot, double startX, int direction, LayoutMetrics metrics,
-        ColumnAlignment alignment = ColumnAlignment.Leading)
+        ColumnAlignment alignment = ColumnAlignment.Leading,
+        IReadOnlyDictionary<int, double>? sharedColumns = null)
     {
-        var widestByDepth = new Dictionary<int, double>();
-        foreach (var node in branchRoot.Descend())
-            widestByDepth[node.Depth] = Math.Max(
-                widestByDepth.GetValueOrDefault(node.Depth), node.Width);
+        var widestByDepth = sharedColumns is null
+            ? WidestByDepth([branchRoot])
+            : sharedColumns;
 
         var leadingEdgeByDepth = new Dictionary<int, double>();
         var cursor = startX;

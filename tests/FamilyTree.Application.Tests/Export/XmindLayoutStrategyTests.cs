@@ -133,4 +133,36 @@ public sealed class XmindLayoutStrategyTests
         scene.Connectors.Should().BeEmpty();
         scene.Bounds.Width.Should().Be(0);
     }
+
+    /// <summary>
+    /// Arabic names read right to left, so a generation reads as one line only when the labels
+    /// share the edge their children hang off -- the right edge on a branch growing right, the
+    /// left edge on one growing left. The reference PDF does the opposite (its right-hand side
+    /// puts 188 labels on only 63 shared LEFT edges), and copying that is what made the export
+    /// look ragged; this deliberately departs from the reference.
+    /// </summary>
+    [Fact]
+    public void Each_generation_shares_the_edge_its_children_hang_off()
+    {
+        string[] branches = ["aaaaaaaa", "bb", "cccccc", "d", "eeeeeeeeee", "ff"];
+        var scene = Build(Node("r", branches.Select(b => Node(b, Node($"{b}-child"))).ToArray()));
+
+        var byLabel = scene.Nodes.ToDictionary(n => n.Label);
+        var centre = byLabel["r"];
+
+        var right = branches.Select(l => byLabel[l]).Where(n => n.X > centre.X).ToList();
+        var left = branches.Select(l => byLabel[l]).Where(n => n.X < centre.X).ToList();
+
+        right.Should().NotBeEmpty("the layout puts branches on both sides");
+        left.Should().NotBeEmpty();
+
+        right.Select(n => Math.Round(n.X + n.Width, 6)).Distinct()
+            .Should().ContainSingle("a branch growing right hangs its children off the right edge");
+        left.Select(n => Math.Round(n.X, 6)).Distinct()
+            .Should().ContainSingle("a branch growing left hangs its children off the left edge");
+
+        right.Select(n => n.Width).Distinct().Should().HaveCountGreaterThan(
+            1, "the labels must differ in width, or the assertion proves nothing");
+        left.Select(n => n.Width).Distinct().Should().HaveCountGreaterThan(1);
+    }
 }

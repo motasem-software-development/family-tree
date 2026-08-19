@@ -104,10 +104,15 @@ public sealed class XmindLayoutStrategy : ILayoutStrategy
                 : -metrics.ColumnGap * 2;
 
             var cursor = -total / 2;
+            // One column table for the whole side: without it each branch sizes its own columns,
+            // so two top-level branches whose names differ in width can never line up.
+            var columns = ColumnAssignment.WidestByDepth(onSide);
+
             foreach (var branch in onSide)
             {
                 branch.Shift(cursor - branch.Top);
-                ColumnAssignment.Assign(branch, startX, direction, metrics);
+                ColumnAssignment.Assign(
+                    branch, startX, direction, metrics, ColumnAlignment.Trailing, columns);
                 cursor = branch.Bottom + metrics.SiblingGroupGap;
             }
         }
