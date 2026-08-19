@@ -79,6 +79,7 @@ message text is not part of the contract.
 | `INVALID_REFRESH_TOKEN` | 401 | Refresh token unknown, rotated, or revoked |
 | `ACCOUNT_INACTIVE` | 401 | The authenticated account has been deactivated |
 | `TENANT_INACTIVE` | 401 | The authenticated account's tenant subscription is inactive |
+| `EXPORT_TREE_TOO_LARGE` | 413 | Tree exceeds the export member cap, or cannot fit one sheet legibly. The `reason` extension is `member-cap` or `sheet-overflow`. |
 
 ## User and role management
 
@@ -112,3 +113,22 @@ Matching is a case-insensitive substring (`ILIKE '%q%'`), accelerated by a trigr
 `%` and `_` in the query are matched literally. A blank query returns an empty page. `limit` is
 clamped to 1..50 and a negative `offset` is treated as 0 — bad paging values are corrected
 rather than rejected, so no new error code applies to this endpoint.
+
+## PDF export
+
+`GET /api/v1/family-tree/export.pdf?rootId=<guid>&maxDepth=<n>&style=<xmind|clean>&page=<sheet|a4>`
+requires `FamilyTree.View` and streams a PDF poster of the tree.
+
+`style` chooses between the mind-map replica of `familytree.pdf` and a cleaner single-direction
+design; `page` chooses one tall sheet or tiled A4. `rootId` selects a **subtree** — it does not
+re-root, so no value reproduces the reference's centring of سليمان. Design:
+`docs/superpowers/specs/2026-08-18-tree-pdf-export-design.md`.
+
+Arabic is shaped with HarfBuzz against embedded Noto fonts, and the output keeps a `/ToUnicode`
+map, so names in the PDF stay selectable and searchable.
+
+A single sheet is capped at 14,400 pt by the PDF format. Past that the diagram is scaled down;
+below a 6 pt font it is refused with `EXPORT_TREE_TOO_LARGE` rather than emitted illegibly.
+
+The API image installs `libfontconfig1` and `libfreetype6` for SkiaSharp; without them the
+endpoint throws at first use even though startup succeeds.
