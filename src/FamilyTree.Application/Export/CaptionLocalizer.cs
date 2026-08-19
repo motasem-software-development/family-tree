@@ -9,13 +9,19 @@ namespace FamilyTree.Application.Export;
 public enum CaptionSegmentKind { Name, Other }
 
 /// <summary>
-/// One homogeneous run of the caption -- either the family tree name, or a fixed piece of text
-/// that is entirely Arabic or entirely Latin/digits/punctuation. Segments are homogeneous by
-/// construction here, not by scanning the assembled string later: the caption is always
-/// mixed-script (Arabic words, Latin digits, an ISO date), and shaping that as one buffer lets
-/// HarfBuzz's single script/direction guess for the whole run reverse the embedded digits and
-/// pick one font for glyphs the other script doesn't have. A renderer shapes, measures, and
-/// lays out each segment independently instead (design §4.6).
+/// One logical field of the caption -- the family tree name, a separator, a count, a label, or
+/// the date. A segment's <see cref="Text"/> is NOT assumed to be script-homogeneous: the family
+/// tree name in particular is free-form user input and may itself mix Arabic and Latin. The
+/// renderer is responsible for splitting each segment's text into script-homogeneous runs
+/// before shaping (Round-2 review, finding 3) -- treating a segment as a shaping unit, rather
+/// than assuming its text is single-script, is what let a mixed-script name reproduce the
+/// original whole-string-shaping defect inside a single "already fixed" segment.
+///
+/// No padding space is baked into a segment's own text at its boundaries: the caption's
+/// mixed-script layout puts each segment on whichever visual side its script and the caption's
+/// reading direction dictate, and a space living inside one segment's text landed on only one
+/// side of the join (Round-2 review, finding 1). Spacing between segments is the renderer's
+/// job, not this class's.
 /// </summary>
 public sealed record CaptionSegment(string Text, CaptionSegmentKind Kind = CaptionSegmentKind.Other);
 
@@ -34,27 +40,28 @@ public static class CaptionLocalizer
     private const string GenerationsEn = "generations";
     private const string ExportedEn = "Exported";
 
-    /// <summary>Plain-text rendering of the caption in logical (reading, not visual) order.
-    /// Nothing in production drawing uses this directly -- the renderer shapes
-    /// <see cref="Segments"/> itself -- it exists for callers that just want the caption as one
-    /// string (tests, diagnostics), built from the same segments so there is one source of
-    /// truth for the caption's content.</summary>
+    /// <summary>Plain-text rendering of the caption in logical (reading, not visual) order,
+    /// segments joined with a single space. Nothing in production drawing uses this directly --
+    /// the renderer lays out <see cref="Segments"/> itself, with its own measured inter-segment
+    /// gap -- it exists for callers that just want the caption as one string (tests,
+    /// diagnostics), built from the same segments so there is one source of truth for the
+    /// caption's content.</summary>
     public static string Format(PdfCaption caption) =>
-        string.Concat(Segments(caption).Select(s => s.Text));
+        string.Join(' ', Segments(caption).Select(s => s.Text));
 
     /// <summary>
-    /// The caption broken into script-homogeneous segments, in logical (reading) order for
+    /// The caption broken into logical-field segments, in logical (reading) order for
     /// <see cref="PdfCaption.Language"/>. A renderer lays these out itself -- right-to-left for
-    /// Ar, left-to-right for En -- accumulating each segment's own measured width; because every
-    /// segment is single-script, shaping it alone cannot reverse it, and picking a font per
-    /// segment (rather than per whole caption) means Latin words never land on an Arabic-only
-    /// typeface, or vice versa.
+    /// Ar, left-to-right for En -- splitting each segment into script-homogeneous runs, shaping
+    /// and font-selecting each run on its own (so a segment being single-script or mixed makes
+    /// no difference to correctness), and spacing adjacent segments with its own measured gap
+    /// rather than a space character living inside either segment's text.
     /// </summary>
     public static IReadOnlyList<CaptionSegment> Segments(PdfCaption caption)
     {
         var date = caption.ExportDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
         var name = new CaptionSegment(caption.FamilyTreeName, CaptionSegmentKind.Name);
-        const string separator = " · ";
+        const string separator = "·";
 
         return caption.Language switch
         {
@@ -70,20 +77,20 @@ public static class CaptionLocalizer
             ],
 
             // Ar is the default (frontend/src/i18n default 'ar'), so it is also what an
-            // unrecognised enum value falls back to. The count and the date are their own
-            // segments, split away from the surrounding Arabic label -- "42 أفراد" is not
-            // homogeneous, but "42 " and "أفراد" each are.
+            // unrecognised enum value falls back to. The count and its label are separate
+            // segments -- not because either is script-mixed on its own, but so the renderer's
+            // uniform inter-segment gap (not a baked-in space) is what separates them.
             _ =>
             [
                 name,
                 new CaptionSegment(separator),
-                new CaptionSegment($"{caption.MemberCount} "),
+                new CaptionSegment($"{caption.MemberCount}"),
                 new CaptionSegment(MembersAr),
                 new CaptionSegment(separator),
-                new CaptionSegment($"{caption.GenerationCount} "),
+                new CaptionSegment($"{caption.GenerationCount}"),
                 new CaptionSegment(GenerationsAr),
                 new CaptionSegment(separator),
-                new CaptionSegment($"{ExportedAr} "),
+                new CaptionSegment(ExportedAr),
                 new CaptionSegment(date)
             ]
         };

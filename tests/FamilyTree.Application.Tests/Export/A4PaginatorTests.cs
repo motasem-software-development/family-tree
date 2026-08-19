@@ -100,4 +100,69 @@ public sealed class A4PaginatorTests
 
         rawUnitsAtHalfScale.Should().BeEquivalentTo(scaledPages);
     }
+
+    // Round-2 review, finding 6: captionBandHeight > 0 was never exercised at the paginator
+    // level, and reusing the existing (band-free) formulas here would be wrong -- they compute
+    // from p.Height (842), which is the physical page, not the content window (842 - band) once
+    // a band is reserved. These tests compute from the content window explicitly instead.
+    private const float Band = 28f; // matches SkiaTreeRenderer.CaptionBandHeight
+
+    [Fact]
+    public void A_reserved_band_does_not_change_the_physical_page_size()
+    {
+        A4Paginator.Pages(Scene(400, 2400), Band)
+            .Should().OnlyContain(p => p.Width == 595f && p.Height == 842f,
+                "the physical sheet is always full A4 -- the band is a content-window concept, not a page-size one");
+    }
+
+    [Fact]
+    public void Consecutive_rows_overlap_by_the_bleed_with_a_caption_band_reserved()
+    {
+        var pages = A4Paginator.Pages(Scene(400, 2400), Band).ToList();
+        pages.Count.Should().BeGreaterThan(1, "the scene must actually tile for this to be meaningful");
+
+        var contentHeight = 842f - Band;
+        var first = pages[0];
+        var second = pages[1];
+
+        (first.OffsetY + contentHeight - second.OffsetY).Should().BeApproximately(18f, 1e-4f);
+    }
+
+    [Fact]
+    public void Every_part_of_the_scene_is_covered_by_some_page_with_a_caption_band_reserved()
+    {
+        var pages = A4Paginator.Pages(Scene(1400, 2000), Band).ToList();
+        var contentHeight = 842f - Band;
+
+        pages.Max(p => p.OffsetX + p.Width).Should().BeGreaterThanOrEqualTo(1400);
+        pages.Max(p => p.OffsetY + contentHeight).Should().BeGreaterThanOrEqualTo(2000);
+    }
+
+    // The band only shrinks the vertical content window; column (X) tiling is untouched.
+    [Fact]
+    public void A_caption_band_does_not_change_column_stepping()
+    {
+        var withBand = A4Paginator.Pages(Scene(1600, 400), Band).ToList();
+        var withoutBand = A4Paginator.Pages(Scene(1600, 400)).ToList();
+
+        withBand.Select(p => p.OffsetX).Should().BeEquivalentTo(withoutBand.Select(p => p.OffsetX));
+    }
+
+    // A reserved band means less usable content window per row, so a scene that fit in N
+    // band-free rows needs at least as many rows once a band is reserved.
+    [Fact]
+    public void A_reserved_band_produces_at_least_as_many_rows_as_no_band()
+    {
+        var withoutBand = A4Paginator.Pages(Scene(400, 2400)).Select(p => p.OffsetY).Distinct().Count();
+        var withBand = A4Paginator.Pages(Scene(400, 2400), Band).Select(p => p.OffsetY).Distinct().Count();
+
+        withBand.Should().BeGreaterThanOrEqualTo(withoutBand);
+    }
+
+    [Fact]
+    public void Zero_band_height_reproduces_the_band_free_tiling_exactly()
+    {
+        A4Paginator.Pages(Scene(1400, 2000), captionBandHeight: 0f)
+            .Should().BeEquivalentTo(A4Paginator.Pages(Scene(1400, 2000)));
+    }
 }

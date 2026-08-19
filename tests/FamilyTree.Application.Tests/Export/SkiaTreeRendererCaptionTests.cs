@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.RegularExpressions;
 using FamilyTree.Application.Export;
 using FamilyTree.Contracts.FamilyTrees;
@@ -28,6 +29,14 @@ public sealed class SkiaTreeRendererCaptionTests
             new XmindLayoutStrategy().Build([Tree()], LayoutOptions.Default, SkiaTextMeasurer.Delegate),
             LayoutOptions.Default.Metrics);
 
+    private static TreeScene OneMemberScene(string name)
+    {
+        var tree = new FamilyTreeNodeResponse(Guid.NewGuid(), name, null, 1, false, []);
+        return SceneScaler.FitToSheet(
+            new XmindLayoutStrategy().Build([tree], LayoutOptions.Default, SkiaTextMeasurer.Delegate),
+            LayoutOptions.Default.Metrics);
+    }
+
     /// <summary>Bypasses layout entirely: an empty, deliberately large scene, so A4 tiling
     /// produces several pages without needing a real tree to fill them (mirrors
     /// A4PaginatorTests' own approach).</summary>
@@ -48,6 +57,17 @@ public sealed class SkiaTreeRendererCaptionTests
         {
             if (File.Exists(path)) File.Delete(path);
         }
+    }
+
+    /// <summary>The physical page width straight from the PDF's own <c>/MediaBox</c> -- used to
+    /// check the caption's computed run geometry actually fits the page that was produced, not
+    /// just a page width computed independently.</summary>
+    private static float MediaBoxWidth(byte[] pdf)
+    {
+        var raw = System.Text.Encoding.Latin1.GetString(pdf);
+        var match = Regex.Match(raw, @"/MediaBox\s*\[\s*0\s+0\s+([\d.]+)\s+([\d.]+)\s*\]");
+        match.Success.Should().BeTrue("the PDF must declare a MediaBox");
+        return float.Parse(match.Groups[1].Value, CultureInfo.InvariantCulture);
     }
 
     [Fact]
@@ -136,30 +156,116 @@ public sealed class SkiaTreeRendererCaptionTests
         text.Should().NotContain("\0");
     }
 
-    // Design §4.6, Important 3 fix: a caption wider than the page shrinks toward the 6pt floor
-    // and, failing that, truncates the NAME (never the counts or date) with an ellipsis -- a
-    // tiny one-member tree with a long name is exactly the scenario the review measured as
-    // clipped off both edges.
+    // Design §4.6, Round-2 review finding 1 regression guard: inter-segment spacing is an
+    // explicit measured gap, never a character baked into either segment's own text. Proven on
+    // the caption's computed run geometry -- the exact numbers DrawCaption draws with -- rather
+    // than extracted text, since /ToUnicode is hand-built from the source string and proves
+    // nothing about glyph *position* (Round-2 review).
     [Fact]
-    public void A_caption_wider_than_a_small_page_is_shrunk_and_the_name_is_truncated()
+    public void The_gap_around_the_member_count_is_equal_on_both_sides()
     {
-        var tinyTree = new FamilyTreeNodeResponse(Guid.NewGuid(), "Ahmad Al-Sayed", null, 1, false, []);
-        var tinyScene = SceneScaler.FitToSheet(
-            new XmindLayoutStrategy().Build(
-                [tinyTree], LayoutOptions.Default, SkiaTextMeasurer.Delegate),
-            LayoutOptions.Default.Metrics);
+        var caption = new PdfCaption("آل سالم", 42, 5, new DateOnly(2026, 8, 18), CaptionLanguage.Ar);
 
+        // A page far wider than the caption's natural size, so no shrink/truncate branch can
+        // interfere with this measurement.
+        var visual = SkiaTreeRenderer.ComputeCaptionRunPositionsForTesting(caption, 2000f)
+            .OrderBy(r => r.X)
+            .ToList();
+
+        var digitIndex = visual.FindIndex(r => r.Text == "42");
+        digitIndex.Should().BeInRange(1, visual.Count - 2, "the digit run must have a neighbour on both sides");
+
+        var before = visual[digitIndex - 1];
+        var digit = visual[digitIndex];
+        var after = visual[digitIndex + 1];
+
+        var gapBefore = digit.X - (before.X + before.Width);
+        var gapAfter = after.X - (digit.X + digit.Width);
+
+        gapBefore.Should().BeGreaterThan(0f);
+        gapAfter.Should().BeGreaterThan(0f);
+        gapBefore.Should().BeApproximately(gapAfter, 0.01f,
+            "an asymmetric gap around the digit run is exactly the Round-2 defect");
+    }
+
+    // Design §4.6, Round-2 review finding 2 regression guard: shrinking the font and truncating
+    // the name were not enough on their own -- a minimum-width caption could still exceed a
+    // small page. The page must grow to fit instead, and the date must never be the thing that
+    // gets clipped.
+    [Fact]
+    public void A_small_page_grows_to_fit_an_english_caption_without_clipping_anything()
+    {
+        var tinyScene = OneMemberScene("A");
+        var caption = Caption();
+
+        var pdf = new SkiaTreeRenderer().Render(tinyScene, ExportPageFormat.Sheet, caption);
+        var pageWidth = MediaBoxWidth(pdf);
+
+        var runs = SkiaTreeRenderer.ComputeCaptionRunPositionsForTesting(caption, pageWidth);
+        runs.Should().NotBeEmpty();
+        runs.Min(r => r.X).Should().BeGreaterThanOrEqualTo(0f, "no run may start off the left edge");
+        runs.Max(r => r.X + r.Width).Should()
+            .BeLessThanOrEqualTo(pageWidth, "no run may end off the right edge");
+
+        var text = ExtractText(pdf);
+        text.Should().Contain("Al-Hassan Family");
+        text.Should().Contain("4 members");
+        text.Should().Contain("2 generations");
+        text.Should().Contain("Exported 2026-08-18", "the date must never be the thing that gets clipped");
+    }
+
+    // Design §4.6, Round-2 review finding 2: growing the page is bounded (CaptionMaxWidth) --
+    // an enormous name still falls back to shrink-then-ellipsise, now measured against that
+    // bound rather than the tree's own (possibly tiny) natural width.
+    [Fact]
+    public void An_enormous_name_still_falls_back_to_truncation_on_a_capped_page()
+    {
+        var tinyScene = OneMemberScene("A");
         var caption = new PdfCaption(
-            "A Very Long Family Name That Will Not Fit On A One-Member Sheet",
+            string.Concat(Enumerable.Repeat("Very Long Family Name ", 15)),
             1, 1, new DateOnly(2026, 8, 18), CaptionLanguage.En);
 
         var pdf = new SkiaTreeRenderer().Render(tinyScene, ExportPageFormat.Sheet, caption);
+        var pageWidth = MediaBoxWidth(pdf);
+
+        var runs = SkiaTreeRenderer.ComputeCaptionRunPositionsForTesting(caption, pageWidth);
+        runs.Max(r => r.X + r.Width).Should().BeLessThanOrEqualTo(pageWidth + 0.5f);
 
         var text = ExtractText(pdf);
-
-        // The counts and date are never truncated -- only the name is.
         text.Should().Contain("1 members");
-        text.Should().Contain("Exported 2026-08-18");
-        text.Should().Contain("…", "the name had to be shortened to fit the page");
+        text.Should().Contain("Exported 2026-08-18", "the date is never truncated, even when the name is");
+        text.Should().Contain("…", "an enormous name still needs the ellipsis fallback");
+    }
+
+    // Design §4.6, Round-2 review finding 3 regression guard: the family tree name is free-form
+    // user input and may itself mix Arabic and Latin. Checked on FONT SELECTION per run, not on
+    // extracted text -- /ToUnicode is hand-built from the source string, so extracted text looks
+    // identical whether or not the right glyphs were actually drawn (Round-2 review).
+    [Fact]
+    public void A_mixed_script_name_splits_into_runs_each_on_its_own_correct_font()
+    {
+        const string name = "The Smith آل Family Association";
+        var runs = EmbeddedFonts.SplitByScript(name);
+
+        runs.Should().HaveCountGreaterThan(1, "the name mixes Latin and Arabic");
+        string.Concat(runs).Should().Be(name, "splitting must not lose or reorder any character");
+
+        foreach (var run in runs)
+        {
+            var expectArabic = run.Any(c => c is >= '؀' and <= 'ۿ');
+            (EmbeddedFonts.For(run) == EmbeddedFonts.Arabic).Should().Be(expectArabic,
+                $"run '{run}' must be drawn with the font that actually has its glyphs");
+        }
+    }
+
+    // A plain multi-word Arabic name (no Latin at all) must stay a single run: the
+    // word-separating space is not itself in any Arabic code range, but treating it as a script
+    // boundary would make the caption's run layout -- which glues a segment's own runs together
+    // left to right in encounter order -- silently swap the two words (found while fixing
+    // finding 3).
+    [Fact]
+    public void A_plain_arabic_name_with_a_space_does_not_split_at_all()
+    {
+        EmbeddedFonts.SplitByScript("آل سالم").Should().ContainSingle().Which.Should().Be("آل سالم");
     }
 }
