@@ -130,5 +130,6 @@ map, so names in the PDF stay selectable and searchable.
 A single sheet is capped at 14,400 pt by the PDF format. Past that the diagram is scaled down;
 below a 6 pt font it is refused with `EXPORT_TREE_TOO_LARGE` rather than emitted illegibly.
 
-The API image installs `libfontconfig1` and `libfreetype6` for SkiaSharp; without them the
-endpoint throws at first use even though startup succeeds.
+The API image installs `libfontconfig1` and `libfreetype6` for SkiaSharp, and the project
+references both `SkiaSharp.NativeAssets.Linux` and `HarfBuzzSharp.NativeAssets.Linux`. All four
+are required: miss any one and startup still succeeds, but the endpoint throws at first use.
