@@ -453,8 +453,76 @@ public sealed class SkiaTreeRenderer : ITreeRenderer
     /// Shapes and paints one line of text -- node label or bottom-margin caption alike -- at a
     /// given origin. Shared so the caption gets the same Arabic-shaping and searchability
     /// handling as every node label, rather than a second, divergent text path.
+    ///
+    /// <para>
+    /// <b>Mixed script.</b> <see cref="EmbeddedFonts.For"/> picks ONE typeface for a whole
+    /// string, so a free-form name mixing scripts ("Ali سالم") resolves the minority script
+    /// against a typeface with no coverage for it and prints .notdef boxes. Task 16 fixed this
+    /// for the caption by splitting segments with <see cref="EmbeddedFonts.SplitByScript"/> and
+    /// calling this method once per run -- but node labels, which are the document's entire
+    /// payload, still arrived here whole (final review, Critical 1). The split now lives HERE,
+    /// so both callers get it from one rule: mixed text is drawn run by run, each run shaped and
+    /// font-selected on its own, with the pen advanced by an explicit measured word gap between
+    /// runs (whitespace does not survive into any run -- see <see cref="EmbeddedFonts.SplitByScript"/>).
+    /// The caption path is unaffected in behaviour: it still splits first, so every string
+    /// reaching here from it is already single-script and takes the single-run path below.
+    /// </para>
+    ///
+    /// <para>
+    /// Run ORDER follows the first run's own script -- the Unicode "first strong character sets
+    /// the base direction" rule (UAX #9 P2/P3), applied at run granularity. As with the caption
+    /// (see <see cref="LayoutSegmentRuns"/>), this is direction-consistent ordering, not a bidi
+    /// engine: it promises each run shapes correctly and that the label reads in its own leading
+    /// script's direction, not that embedded runs resolve exactly as UAX #9 would. Note that
+    /// digits and punctuation count as non-Arabic under <see cref="EmbeddedFonts.IsArabicText"/>,
+    /// so a name beginning with a digit takes the left-to-right ordering.
+    /// </para>
     /// </summary>
     private static void DrawShapedText(
+        SKCanvas canvas, string text, float x, float baselineY, float fontSize, SKColor color)
+    {
+        if (!EmbeddedFonts.IsMixedScript(text))
+        {
+            DrawShapedRun(canvas, text, x, baselineY, fontSize, color);
+            return;
+        }
+
+        var runs = EmbeddedFonts.SplitByScript(text);
+        var widths = runs.Select(run => (float)SkiaTextMeasurer.Measure(run, fontSize)).ToList();
+        var gap = (float)SkiaTextMeasurer.Measure(" ", fontSize);
+
+        // Same total the layout sized this label's column from (SkiaTextMeasurer.Measure takes
+        // the identical sum), which is what lets the right-to-left branch start from the right
+        // edge of the very box the layout reserved.
+        var total = widths.Sum() + gap * MathF.Max(0, runs.Count - 1);
+
+        if (EmbeddedFonts.IsArabicText(runs[0]))
+        {
+            var pen = x + total;
+            for (var i = 0; i < runs.Count; i++)
+            {
+                pen -= widths[i];
+                DrawShapedRun(canvas, runs[i], pen, baselineY, fontSize, color);
+                pen -= gap;
+            }
+        }
+        else
+        {
+            var pen = x;
+            for (var i = 0; i < runs.Count; i++)
+            {
+                DrawShapedRun(canvas, runs[i], pen, baselineY, fontSize, color);
+                pen += widths[i] + gap;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Shapes and paints ONE script-homogeneous run. Every comment below about /ToUnicode and
+    /// mark handling applies per run; <see cref="DrawShapedText"/> is what guarantees a run is
+    /// homogeneous before it gets here.
+    /// </summary>
+    private static void DrawShapedRun(
         SKCanvas canvas, string text, float x, float baselineY, float fontSize, SKColor color)
     {
         var typeface = EmbeddedFonts.For(text);

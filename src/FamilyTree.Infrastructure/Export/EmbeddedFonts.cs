@@ -72,7 +72,52 @@ public static class EmbeddedFonts
     public static SKTypeface For(string text)
     {
         ArgumentNullException.ThrowIfNull(text);
-        return text.Any(IsArabic) ? Arabic : Latin;
+        return IsArabicText(text) ? Arabic : Latin;
+    }
+
+    /// <summary>
+    /// Which of the two typefaces <see cref="For"/> would pick, as a plain bool -- so a caller
+    /// laying runs out can ask for a run's base direction without comparing
+    /// <see cref="SKTypeface"/> references.
+    /// </summary>
+    public static bool IsArabicText(string text)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+        return text.Any(IsArabic);
+    }
+
+    /// <summary>
+    /// True when <paramref name="text"/> contains both Arabic-script and non-Arabic-script
+    /// characters -- i.e. when no single typeface covers it and <see cref="For"/> is therefore
+    /// the wrong question to ask about the string as a whole.
+    ///
+    /// <para>
+    /// This exists as a GATE, not as a convenience. Splitting is only correct to apply where it
+    /// is needed: a single-script string must keep being shaped as one buffer, because shaping a
+    /// buffer is what applies cursive joining and kerning ACROSS the characters in it, and
+    /// because every existing measurement in this codebase (and therefore every column width the
+    /// layout has ever produced) was taken that way. Callers -- <c>SkiaTextMeasurer.Measure</c>
+    /// and <c>SkiaTreeRenderer.DrawShapedText</c> -- consult this first and only fall back to
+    /// <see cref="SplitByScript"/> when it is true, which keeps a plain multi-word Arabic name
+    /// byte-identical to what it rendered before mixed-script handling existed.
+    /// </para>
+    /// </summary>
+    public static bool IsMixedScript(string text)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+
+        var seenArabic = false;
+        var seenOther = false;
+
+        foreach (var c in text)
+        {
+            if (char.IsWhiteSpace(c)) continue;
+            if (IsArabic(c)) seenArabic = true;
+            else seenOther = true;
+            if (seenArabic && seenOther) return true;
+        }
+
+        return false;
     }
 
     /// <summary>
