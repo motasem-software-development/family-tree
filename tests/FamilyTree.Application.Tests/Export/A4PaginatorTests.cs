@@ -50,6 +50,18 @@ public sealed class A4PaginatorTests
     }
 
     [Fact]
+    public void Consecutive_columns_overlap_by_the_bleed()
+    {
+        var pages = A4Paginator.Pages(Scene(1600, 400)).ToList();
+
+        var first = pages[0];
+        var second = pages[1];
+
+        second.OffsetY.Should().Be(first.OffsetY, "the two pages compared must be side by side");
+        (first.OffsetX + first.Width - second.OffsetX).Should().BeApproximately(18f, 1e-4f);
+    }
+
+    [Fact]
     public void Every_part_of_the_scene_is_covered_by_some_page()
     {
         var pages = A4Paginator.Pages(Scene(1400, 2000)).ToList();
