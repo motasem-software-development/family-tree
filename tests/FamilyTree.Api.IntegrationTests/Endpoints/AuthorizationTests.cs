@@ -103,4 +103,16 @@ public sealed class AuthorizationTests(PostgresFixture fixture) : IAsyncLifetime
 
         response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
+
+    [Fact]
+    public async Task Export_returns_403_for_a_caller_lacking_family_tree_view()
+    {
+        // Authenticated, but the export endpoint is guarded by FamilyTree.View like /view is.
+        _client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", TokenWith(Permissions.Member.View));
+
+        var response = await _client.GetAsync("/api/v1/family-tree/export.pdf");
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
 }
