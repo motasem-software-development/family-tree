@@ -38,6 +38,31 @@ describe('apiFetch', () => {
     expect(headers.get('Authorization')).toBeNull()
   })
 
+  // The reason extension distinguishes causes that share one code but not one remedy: an export
+  // refused for sheet-overflow can be retried as A4, one refused for member-cap cannot.
+  it('throws an ApiError carrying the reason extension when the backend sends one', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse({ code: 'EXPORT_TREE_TOO_LARGE', reason: 'sheet-overflow' }, 413),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(apiFetch('/api/v1/family-tree/export.pdf')).rejects.toMatchObject({
+      code: 'EXPORT_TREE_TOO_LARGE',
+      status: 413,
+      reason: 'sheet-overflow',
+    })
+  })
+
+  it('leaves the reason undefined when the backend sends none', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ code: 'MEMBER_NOT_FOUND' }, 404))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const error = await apiFetch('/api/v1/family-members/x').catch((e: unknown) => e)
+
+    expect(error).toBeInstanceOf(ApiError)
+    expect((error as ApiError).reason).toBeUndefined()
+  })
+
   it('throws an ApiError carrying the backend code', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       jsonResponse({ code: 'INVALID_CREDENTIALS', title: 'Authentication failed.' }, 401),

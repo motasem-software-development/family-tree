@@ -82,7 +82,9 @@
       "confirm": "Export",
       "cancel": "Cancel",
       "busy": "Exporting…",
-      "failed": "Export failed"
+      "failed": "Export failed",
+      "failedTooLargeSheet": "This tree is too large for a single sheet. Try exporting it as A4 pages instead.",
+      "failedTooLarge": "This tree is too large to export."
     }
   },
   "panel": {

@@ -3,12 +3,23 @@ import { tokenStorage } from './tokenStorage'
 export class ApiError extends Error {
   readonly code: string
   readonly status: number
+  /**
+   * The Problem Details `reason` extension, when the backend sent one.
+   *
+   * `code` says what rule was violated; `reason` says which cause within that rule, and exists
+   * precisely because only some causes have a remedy the caller can offer. `EXPORT_TREE_TOO_LARGE`
+   * with `sheet-overflow` can be retried as A4; the same code with `member-cap` or `a4-page-cap`
+   * cannot be retried at all, and offering a remedy that does not exist is worse than offering
+   * none.
+   */
+  readonly reason?: string
 
-  constructor(code: string, status: number) {
+  constructor(code: string, status: number, reason?: string) {
     super(code)
     this.name = 'ApiError'
     this.code = code
     this.status = status
+    this.reason = reason
   }
 }
 
@@ -24,8 +35,8 @@ const withAuth = (init: RequestInit, accessToken?: string, json = true): Request
 
 const errorFrom = async (response: Response): Promise<ApiError> => {
   try {
-    const body = (await response.json()) as { code?: string }
-    return new ApiError(body.code ?? 'UNKNOWN', response.status)
+    const body = (await response.json()) as { code?: string; reason?: string }
+    return new ApiError(body.code ?? 'UNKNOWN', response.status, body.reason)
   } catch {
     return new ApiError('UNKNOWN', response.status)
   }

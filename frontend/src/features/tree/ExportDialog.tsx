@@ -1,6 +1,27 @@
 import { useEffect, useState, type CSSProperties } from 'react'
 import { useTranslation } from 'react-i18next'
+import { ApiError } from '../../services/apiClient'
 import { downloadTreePdf, type ExportPage, type ExportStyle } from './exportApi'
+
+/**
+ * Which message a failed export shows.
+ *
+ * The backend's `reason` extension exists for exactly this decision (spec §5.3): `sheet-overflow`
+ * has a remedy the user can act on — export as A4 pages — and `member-cap` and `a4-page-cap` do
+ * not. Offering the A4 option for a cause A4 cannot fix sends the user round a loop that fails
+ * the same way, so the two are deliberately told apart rather than collapsed into one "too large".
+ * Anything else stays the generic failure: a network drop or a 500 is not a size problem and must
+ * not be described as one.
+ */
+const messageKeyFor = (error: unknown): string => {
+  if (!(error instanceof ApiError) || error.code !== 'EXPORT_TREE_TOO_LARGE') {
+    return 'tree.export.failed'
+  }
+
+  return error.reason === 'sheet-overflow'
+    ? 'tree.export.failedTooLargeSheet'
+    : 'tree.export.failedTooLarge'
+}
 
 interface ExportDialogProps {
   /** The currently selected root, if any — narrows the export the same way the tree view is narrowed. */
@@ -26,7 +47,7 @@ export const ExportDialog = ({ rootId, fileName, onClose }: ExportDialogProps) =
   const [style, setStyle] = useState<ExportStyle>('xmind')
   const [page, setPage] = useState<ExportPage>('sheet')
   const [isExporting, setIsExporting] = useState(false)
-  const [failed, setFailed] = useState(false)
+  const [failureKey, setFailureKey] = useState<string | null>(null)
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -38,12 +59,12 @@ export const ExportDialog = ({ rootId, fileName, onClose }: ExportDialogProps) =
 
   const confirm = async () => {
     setIsExporting(true)
-    setFailed(false)
+    setFailureKey(null)
     try {
       await downloadTreePdf({ rootId, style, page, language: i18n.language }, fileName)
       onClose()
-    } catch {
-      setFailed(true)
+    } catch (error) {
+      setFailureKey(messageKeyFor(error))
     } finally {
       setIsExporting(false)
     }
@@ -133,9 +154,9 @@ export const ExportDialog = ({ rootId, fileName, onClose }: ExportDialogProps) =
             </div>
           </div>
 
-          {failed && (
+          {failureKey && (
             <div role="alert" style={{ marginTop: 16, fontSize: 13, color: 'var(--error)' }}>
-              {t('tree.export.failed')}
+              {t(failureKey)}
             </div>
           )}
         </div>
