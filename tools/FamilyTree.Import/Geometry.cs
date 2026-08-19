@@ -258,7 +258,8 @@ public static class Geometry
         points.Any(p => Math.Abs(p.X - cx) <= tolerance && Math.Abs(p.Y - cy) <= tolerance);
 
     /// <summary>See the "tick" bullet on <see cref="Classify"/>: flat and wide enough to be a
-    /// tick or a box-spanning spine -- <see cref="SpansARoundedBox"/> tells the two apart.</summary>
+    /// tick, a box-spanning spine, or a bridge -- <see cref="TryInflateTick"/> tells them
+    /// apart.</summary>
     private static bool IsFlatCandidate(PdfPath p)
     {
         // Curved paths are excluded even when their bounding box happens to be flat: some of
