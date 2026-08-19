@@ -23,15 +23,23 @@ public static class EmbeddedFonts
     public static SKTypeface Latin => LatinFont.Value;
 
     /// <summary>Arabic covers the names; Latin appears only in Latin captions.</summary>
-    public static SKTypeface For(string text) =>
-        text.Any(IsArabic) ? Arabic : Latin;
+    public static SKTypeface For(string text)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+        return text.Any(IsArabic) ? Arabic : Latin;
+    }
 
-    // U+0600–U+06FF Arabic, U+0750–U+077F Supplement, U+FB50–U+FDFF and U+FE70–U+FEFF forms.
+    // U+0600–U+06FF Arabic, U+0750–U+077F Supplement, U+0870–U+089F Extended-B,
+    // U+08A0–U+08FF Extended-A, U+FB50–U+FDFF Presentation Forms-A, and U+FE70–U+FEFC
+    // Presentation Forms-B (stopping short of U+FEFD/U+FEFF, which are not Arabic letters —
+    // U+FEFF in particular is the byte-order mark / zero-width no-break space).
     private static bool IsArabic(char c) =>
         c is >= '؀' and <= 'ۿ'
             or >= 'ݐ' and <= 'ݿ'
+            or >= 'ࡰ' and <= '࢟'
+            or >= 'ࢠ' and <= 'ࣿ'
             or >= 'ﭐ' and <= '﷿'
-            or >= 'ﹰ' and <= '﻿';
+            or >= 'ﹰ' and <= 'ﻼ';
 
     private static SKTypeface Load(string fileName)
     {
