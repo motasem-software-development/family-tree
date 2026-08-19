@@ -72,4 +72,23 @@ public sealed class CleanLayoutStrategyTests
         var scene = new CleanLayoutStrategy().Build([], LayoutOptions.Default, Stub);
         scene.Nodes.Should().BeEmpty();
     }
+
+    // A forest is the only path through the cursorY accumulator, and the only way two branches
+    // can collide on one hue. Both are exercised here.
+    [Fact]
+    public void Separate_roots_neither_overlap_vertically_nor_repeat_a_branch_hue()
+    {
+        var scene = Build(
+            Node("first", Node("a"), Node("b")),
+            Node("second", Node("c"), Node("d")));
+
+        SceneNode Find(string name) => scene.Nodes.Single(n => n.Label == name);
+
+        Find("second").Y.Should().BeGreaterThan(
+            Find("first").Y, "the second root is stacked below the first");
+        scene.Nodes.Max(n => n.Y).Should().Be(Find("d").Y, "no root may overlap the next");
+
+        new[] { Find("a").Color, Find("b").Color, Find("c").Color, Find("d").Color }
+            .Should().OnlyHaveUniqueItems("hue identifies the branch across the whole sheet");
+    }
 }

@@ -24,6 +24,12 @@ public sealed class CleanLayoutStrategy : ILayoutStrategy
         var connectors = new List<SceneConnector>();
         var cursorY = 0.0;
 
+        // VerticalPacking restarts BranchIndex at 0 for every root, so in a forest each root's
+        // first branch would otherwise repeat the previous root's first hue. Xmind avoids this
+        // by wrapping a forest in a synthetic centre; clean has no centre, so it carries the
+        // offset itself and hue keeps identifying the branch across the whole sheet.
+        var hueOffset = 0;
+
         foreach (var root in packed)
         {
             root.Shift(cursorY - root.Top);
@@ -35,7 +41,7 @@ public sealed class CleanLayoutStrategy : ILayoutStrategy
                 // Depth 0 is the root itself; everything below it wears its branch's hue.
                 var color = node.Depth == 0
                     ? options.Palette.CentreColor
-                    : options.Palette.ColorAt(node.BranchIndex);
+                    : options.Palette.ColorAt(node.BranchIndex + hueOffset);
 
                 var fontSize = metrics.FontSizeForDepth(node.Depth);
 
@@ -53,9 +59,11 @@ public sealed class CleanLayoutStrategy : ILayoutStrategy
                         new ScenePoint(node.X + node.Width, node.Y),
                         new ScenePoint(child.X, child.Y),
                         junctionX: node.X + node.Width + metrics.ColumnGap / 2,
-                        options.Palette.ColorAt(child.BranchIndex),
+                        options.Palette.ColorAt(child.BranchIndex + hueOffset),
                         metrics.ConnectorStroke));
             }
+
+            hueOffset += root.Children.Count;
         }
 
         return SceneNormaliser.Normalise(nodes, connectors, metrics);
