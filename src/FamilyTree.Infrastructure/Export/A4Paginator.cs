@@ -9,7 +9,7 @@ namespace FamilyTree.Infrastructure.Export;
 /// </summary>
 public static class A4Paginator
 {
-    private const float PageWidth = 595f;
+    internal const float PageWidth = 595f;
     private const float PageHeight = 842f;
     private const float Bleed = 18f;
 

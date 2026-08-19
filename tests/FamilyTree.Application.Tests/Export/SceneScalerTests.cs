@@ -48,4 +48,49 @@ public sealed class SceneScalerTests
 
         SceneScaler.FitToSheet(scene, Metrics).Scale.Should().BeApproximately(1 / 1.5, 1e-9);
     }
+
+    // Round-3 review, Critical 1: reserving the caption band by adding it to an already-maxed
+    // page (rather than fitting the scene into MaxPageExtent minus the band) can push the total
+    // page extent past the PDF format's legal maximum. This must fail against the pre-fix
+    // FitToSheet(scene, metrics) call (no reservedHeight parameter existed at all -- the band
+    // was added after the fact by the caller instead).
+    [Fact]
+    public void A_reserved_band_is_taken_out_of_the_budget_before_scaling_not_added_after()
+    {
+        const double band = 28;
+        var fitted = SceneScaler.FitToSheet(SceneOfHeight(20000), Metrics, band);
+
+        (fitted.Bounds.Height * fitted.Scale + band).Should()
+            .BeLessThanOrEqualTo(Metrics.MaxPageExtent + 1e-6,
+                "scaled scene height plus the reserved band must never exceed the PDF page-extent cap");
+    }
+
+    // The exact scenario the review measured: a scene whose height alone (600x20000, longest
+    // side height) would otherwise scale to land at precisely MaxPageExtent, which a band added
+    // afterward would then push over.
+    [Fact]
+    public void A_scene_that_would_land_exactly_at_the_ceiling_leaves_room_for_the_band()
+    {
+        var scene = new TreeScene([], [], new SceneBounds(0, 0, 600, 20000));
+        const double band = 28;
+
+        var fitted = SceneScaler.FitToSheet(scene, Metrics, band);
+
+        (fitted.Bounds.Height * fitted.Scale + band).Should()
+            .BeLessThanOrEqualTo(Metrics.MaxPageExtent + 1e-6);
+        // Without a band, the same scene scales to exactly the ceiling -- confirms this scene is
+        // the population the fix targets, not an already-safe one.
+        SceneScaler.FitToSheet(scene, Metrics).Bounds.Height.Should().NotBe(0);
+        (SceneScaler.FitToSheet(scene, Metrics).Bounds.Height * SceneScaler.FitToSheet(scene, Metrics).Scale)
+            .Should().BeApproximately(Metrics.MaxPageExtent, 1e-6);
+    }
+
+    [Fact]
+    public void Zero_reserved_height_reproduces_the_band_free_fit_exactly()
+    {
+        var scene = SceneOfHeight(Metrics.MaxPageExtent * 2);
+
+        SceneScaler.FitToSheet(scene, Metrics, reservedHeight: 0)
+            .Should().Be(SceneScaler.FitToSheet(scene, Metrics));
+    }
 }

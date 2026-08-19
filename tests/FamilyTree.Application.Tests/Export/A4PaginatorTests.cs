@@ -131,11 +131,27 @@ public sealed class A4PaginatorTests
     [Fact]
     public void Every_part_of_the_scene_is_covered_by_some_page_with_a_caption_band_reserved()
     {
-        var pages = A4Paginator.Pages(Scene(1400, 2000), Band).ToList();
+        // Round-3 review, finding 5: height 2000 does not discriminate here -- mutating the row
+        // loop-exit back to the band-free `y + PageHeight >= height` (842 instead of the 814
+        // content window) still leaves this scene fully covered, so the test stayed green
+        // against exactly the bug finding 6 (round 2) named. Height 2422 is sensitive to it: the
+        // correct (814-window) tiling reaches y=2388 (covering to 3202), while the mutant stops
+        // at y=1592 (covering only to 2434... short of a scene that needs it) -- concretely, the
+        // mutant's last row starts at 1592 and the 842-tall mutant window reaches 2434, so bump
+        // to a height the mutant provably cannot reach: verified below against the ACTUAL
+        // (814-window) row count, not just an inequality a coincidentally-generous mutant could
+        // still satisfy.
+        var pages = A4Paginator.Pages(Scene(1400, 2422), Band).ToList();
         var contentHeight = 842f - Band;
 
         pages.Max(p => p.OffsetX + p.Width).Should().BeGreaterThanOrEqualTo(1400);
-        pages.Max(p => p.OffsetY + contentHeight).Should().BeGreaterThanOrEqualTo(2000);
+        pages.Max(p => p.OffsetY + contentHeight).Should().BeGreaterThanOrEqualTo(2422);
+
+        // Directly pins the row count the 814-window tiling produces for this scene, so a mutant
+        // that silently reverts to stepping by the 842-tall physical page (fewer, wider-spaced
+        // rows) changes the row count and fails here even if the max-coverage inequality above
+        // happened not to catch it.
+        pages.Select(p => p.OffsetY).Distinct().Should().HaveCount(4);
     }
 
     // The band only shrinks the vertical content window; column (X) tiling is untouched.
