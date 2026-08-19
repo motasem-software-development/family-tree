@@ -18,6 +18,9 @@ jobs:
       - run: dotnet restore
       - run: dotnet build --no-restore --configuration Release
 
+      - name: Install poppler for PDF text extraction
+        run: sudo apt-get update && sudo apt-get install -y poppler-utils
+
       # Integration tests start their own PostgreSQL via Testcontainers, which needs
       # the Docker daemon the ubuntu-latest runner already provides.
       - run: dotnet test --no-build --configuration Release --verbosity normal
