@@ -45,8 +45,16 @@ public sealed class CleanLayoutStrategyTests
         var scene = Build(Node("r", Node("aaaa", Node("x")), Node("b", Node("yyyy"))));
         var byLabel = scene.Nodes.ToDictionary(n => n.Label);
 
-        byLabel["aaaa"].X.Should().Be(byLabel["b"].X);
-        byLabel["x"].X.Should().Be(byLabel["yyyy"].X);
+        // The names are Arabic, so a column reads as one line only when its TRAILING edges
+        // coincide -- which is also where every connector leaves from. Deliberately not X:
+        // labels differ in width, so equal left edges are exactly the ragged look this fixes.
+        double Trailing(string label) => byLabel[label].X + byLabel[label].Width;
+
+        Trailing("aaaa").Should().BeApproximately(Trailing("b"), 1e-9);
+        Trailing("x").Should().BeApproximately(Trailing("yyyy"), 1e-9);
+
+        byLabel["aaaa"].X.Should().NotBe(
+            byLabel["b"].X, "a narrower label is inset, not stretched to the column");
     }
 
     [Fact]

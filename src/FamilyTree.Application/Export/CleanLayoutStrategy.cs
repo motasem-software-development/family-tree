@@ -33,7 +33,8 @@ public sealed class CleanLayoutStrategy : ILayoutStrategy
         foreach (var root in packed)
         {
             root.Shift(cursorY - root.Top);
-            ColumnAssignment.Assign(root, startX: 0, direction: 1, metrics);
+            ColumnAssignment.Assign(
+                root, startX: 0, direction: 1, metrics, ColumnAlignment.Trailing);
             cursorY = root.Bottom + metrics.SiblingGroupGap;
 
             foreach (var node in root.Descend())
