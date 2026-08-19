@@ -12,7 +12,8 @@ public sealed class TreeRendererAdapter : ITreeRendererAdapter
         IReadOnlyList<FamilyTreeNodeResponse> roots,
         ExportStyle style,
         string pageFormat,
-        PdfCaption? caption = null)
+        PdfCaption? caption = null,
+        CancellationToken ct = default)
     {
         var options = LayoutOptions.Default;
 
@@ -37,6 +38,6 @@ public sealed class TreeRendererAdapter : ITreeRendererAdapter
             ? SceneScaler.FitToSheet(scene, options.Metrics, reservedHeight)
             : scene;
 
-        return new SkiaTreeRenderer().Render(fitted, format, caption);
+        return new SkiaTreeRenderer().Render(fitted, format, caption, ct);
     }
 }

@@ -28,7 +28,8 @@ public sealed class FamilyTreeExportServiceTests
             IReadOnlyList<FamilyTreeNodeResponse> roots,
             ExportStyle style,
             string pageFormat,
-            PdfCaption? caption = null)
+            PdfCaption? caption = null,
+            CancellationToken ct = default)
         {
             LastCaption = caption;
             return [1, 2, 3];

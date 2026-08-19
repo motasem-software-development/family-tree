@@ -79,7 +79,7 @@ message text is not part of the contract.
 | `INVALID_REFRESH_TOKEN` | 401 | Refresh token unknown, rotated, or revoked |
 | `ACCOUNT_INACTIVE` | 401 | The authenticated account has been deactivated |
 | `TENANT_INACTIVE` | 401 | The authenticated account's tenant subscription is inactive |
-| `EXPORT_TREE_TOO_LARGE` | 413 | Tree exceeds the export member cap, or cannot fit one sheet legibly. The `reason` extension is `member-cap` or `sheet-overflow`. |
+| `EXPORT_TREE_TOO_LARGE` | 413 | Tree exceeds the export member cap, cannot fit one sheet legibly, or needs more A4 pages than the export limit. The `reason` extension is `member-cap`, `sheet-overflow`, or `a4-page-cap`. Only `sheet-overflow` has a remedy the caller can act on (`page=a4`); the other two do not. |
 
 ## User and role management
 
@@ -128,7 +128,13 @@ Arabic is shaped with HarfBuzz against embedded Noto fonts, and the output keeps
 map, so names in the PDF stay selectable and searchable.
 
 A single sheet is capped at 14,400 pt by the PDF format. Past that the diagram is scaled down;
-below a 6 pt font it is refused with `EXPORT_TREE_TOO_LARGE` rather than emitted illegibly.
+below a 6 pt font it is refused with `EXPORT_TREE_TOO_LARGE` (`reason: sheet-overflow`) rather than
+emitted illegibly, and the caller is directed to `page=a4`.
+
+`page=a4` tiles the same diagram across overlapping A4 sheets, drawing only the nodes and
+connectors that fall on each tile. It is bounded in turn: an export needing more than 600 A4 pages
+is refused with `EXPORT_TREE_TOO_LARGE` (`reason: a4-page-cap`), so no single request can emit an
+unbounded number of pages.
 
 The API image installs `libfontconfig1` and `libfreetype6` for SkiaSharp, and the project
 references both `SkiaSharp.NativeAssets.Linux` and `HarfBuzzSharp.NativeAssets.Linux`. All four

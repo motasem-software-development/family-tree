@@ -1,3 +1,4 @@
+using FamilyTree.Domain.Common;
 using System.Globalization;
 using System.Text;
 using FamilyTree.Application.Export;
@@ -10,7 +11,17 @@ public enum ExportPageFormat { Sheet, A4 }
 
 public interface ITreeRenderer
 {
-    byte[] Render(TreeScene scene, ExportPageFormat format, PdfCaption? caption = null);
+    /// <param name="ct">
+    /// Observed once per page. A large A4 export is minutes of CPU inside one of only two
+    /// process-wide render slots, so a client that has already disconnected must be able to stop
+    /// it (final review, Critical 2) -- a plain BCL type, so this adds no dependency to any
+    /// caller.
+    /// </param>
+    byte[] Render(
+        TreeScene scene,
+        ExportPageFormat format,
+        PdfCaption? caption = null,
+        CancellationToken ct = default);
 }
 
 /// <summary>
@@ -56,7 +67,11 @@ public sealed class SkiaTreeRenderer : ITreeRenderer
     /// grows to fit the caption instead of clipping it (Important 2 fix) -- the tree stays
     /// centred in the wider page.
     /// </param>
-    public byte[] Render(TreeScene scene, ExportPageFormat format, PdfCaption? caption = null)
+    public byte[] Render(
+        TreeScene scene,
+        ExportPageFormat format,
+        PdfCaption? caption = null,
+        CancellationToken ct = default)
     {
         using var stream = new MemoryStream();
 
@@ -82,8 +97,22 @@ public sealed class SkiaTreeRenderer : ITreeRenderer
 
             var pages = Paginate(scene, format, captionBandHeight, sheetMinWidth).ToList();
 
+            GuardPageCount(format, pages.Count);
+
+            // Computed ONCE for the whole document, not once per page: bounds depend only on the
+            // scene, and recomputing them per page would put an O(pages x items) cost back in
+            // exactly the place this culling exists to take one out of.
+            var nodes = scene.Nodes.Select(node => (Item: node, Bounds: SceneCulling.BoundsOf(node))).ToList();
+            var connectors = scene.Connectors
+                .Select(connector => (Item: connector, Bounds: SceneCulling.BoundsOf(connector)))
+                .ToList();
+
             foreach (var page in pages)
             {
+                // Per page, not per item: a page is the unit of work worth abandoning, and a
+                // single page is bounded by construction.
+                ct.ThrowIfCancellationRequested();
+
                 var canvas = document.BeginPage(page.Width, page.Height);
                 canvas.Clear(SKColors.White);
 
@@ -94,8 +123,14 @@ public sealed class SkiaTreeRenderer : ITreeRenderer
                 canvas.Translate(-page.OffsetX + page.ContentOffsetX, -page.OffsetY);
                 canvas.Scale((float)scene.Scale);
 
-                foreach (var connector in scene.Connectors) DrawConnector(canvas, connector);
-                foreach (var node in scene.Nodes) DrawNode(canvas, node);
+                // Skia's own clip would discard these anyway -- but only AFTER DrawShapedRun has
+                // already shaped the label through HarfBuzz, under a process-wide lock. Skipping
+                // them here is what makes A4 cost the scene's size rather than pages x scene.
+                foreach (var (connector, bounds) in connectors)
+                    if (SceneCulling.IsVisible(bounds, scene.Scale, page)) DrawConnector(canvas, connector);
+
+                foreach (var (node, bounds) in nodes)
+                    if (SceneCulling.IsVisible(bounds, scene.Scale, page)) DrawNode(canvas, node);
 
                 canvas.Restore();
 
@@ -356,6 +391,37 @@ public sealed class SkiaTreeRenderer : ITreeRenderer
             : layout.TotalWidth + 2 * CaptionPageMargin;
 
         return LayoutCaptionRuns(layout, pageWidth).ToList();
+    }
+
+    /// <summary>
+    /// A hard ceiling on how many A4 tiles one export may emit.
+    ///
+    /// <para>
+    /// Per-page culling is the real cost fix and brings A4 back to roughly sheet cost; this is
+    /// the backstop that keeps the FORMAT from being an unbounded lever even if culling ever
+    /// regresses, because the sheet path's own 413 message actively directs callers here.
+    /// Post-culling measurements through the real adapter (single-threaded Release, three
+    /// generations below the root): 911 members / 18 pages 0.89 s, 1,911 / 36 pages 2.01 s,
+    /// 9,911 / 188 pages 11.25 s -- against 243.17 s for the same last case before culling.
+    /// A tree at the 10,000-member cap therefore lands near 190 pages; 600 is chosen a little
+    /// over 3x above that, high enough that no tree a tenant can actually build trips it, low
+    /// enough that a pathological aspect ratio still cannot turn one request into unbounded page
+    /// emission. That last case is the one the member cap genuinely cannot see: pagination is
+    /// driven by the scene's BOUNDS, and a scene can tile into thousands of nearly-empty pages
+    /// with very few members in it. A refusal names the cap, so the number is not a mystery to
+    /// the caller.
+    /// </para>
+    /// </summary>
+    internal const int MaxA4Pages = 600;
+
+    private static void GuardPageCount(ExportPageFormat format, int pageCount)
+    {
+        if (format != ExportPageFormat.A4 || pageCount <= MaxA4Pages) return;
+
+        throw new TooLargeException(
+            "EXPORT_TREE_TOO_LARGE",
+            $"This tree needs {pageCount} A4 pages, above the {MaxA4Pages} page export limit.",
+            "a4-page-cap");
     }
 
     private static IEnumerable<PageWindow> Paginate(

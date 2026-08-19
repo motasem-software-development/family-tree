@@ -53,7 +53,7 @@ public sealed class FamilyTreeExportService(
         try
         {
             return new ExportResult(
-                renderer.Render(view.RootMembers, style, pageFormat, caption), view.Name);
+                renderer.Render(view.RootMembers, style, pageFormat, caption, ct), view.Name);
         }
         finally
         {
