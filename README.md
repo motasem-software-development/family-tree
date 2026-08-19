@@ -80,6 +80,8 @@ message text is not part of the contract.
 | `ACCOUNT_INACTIVE` | 401 | The authenticated account has been deactivated |
 | `TENANT_INACTIVE` | 401 | The authenticated account's tenant subscription is inactive |
 | `EXPORT_TREE_TOO_LARGE` | 413 | Tree exceeds the export member cap, cannot fit one sheet legibly, or needs more A4 pages than the export limit. The `reason` extension is `member-cap`, `sheet-overflow`, or `a4-page-cap`. Only `sheet-overflow` has a remedy the caller can act on (`page=a4`); the other two do not. |
+| `EXPORT_INVALID_STYLE` | 400 | The `style` query parameter is not `xmind` or `clean`. Omitting it means `xmind`. |
+| `EXPORT_INVALID_PAGE` | 400 | The `page` query parameter is not `sheet` or `a4`. Omitting it means `sheet`. |
 
 ## User and role management
 

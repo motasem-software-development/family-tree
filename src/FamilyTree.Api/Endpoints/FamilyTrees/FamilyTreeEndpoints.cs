@@ -1,4 +1,5 @@
 using FamilyTree.Api.Authorization;
+using FamilyTree.Api.Errors;
 using FamilyTree.Application.Export;
 using FamilyTree.Application.FamilyTrees;
 using FamilyTree.Contracts.FamilyTrees;
@@ -29,7 +30,7 @@ public static class FamilyTreeEndpoints
         // Guarded by FamilyTree.View, not a new permission: the export reveals exactly the data
         // /view already returns, so a separate code would add a lockout surface the
         // last-administrator guard has to reason about, without adding protection (design §5.1).
-        group.MapGet("/export.pdf", async (
+        group.MapGet("/export.pdf", async Task<IResult> (
             Guid? rootId,
             int? maxDepth,
             string? style,
@@ -38,13 +39,21 @@ public static class FamilyTreeEndpoints
             IFamilyTreeExporter exporter,
             CancellationToken ct) =>
         {
-            var chosenStyle = string.Equals(style, "clean", StringComparison.OrdinalIgnoreCase)
-                ? ExportStyle.Clean
-                : ExportStyle.Xmind;
+            // Spec §5.1 specifies defaults for ABSENT parameters, not for invalid ones. Silently
+            // treating style=clea as the default produced a 200 carrying a different document
+            // than the caller asked for, with nothing to tell them so. Both selectors are
+            // case-insensitive, and both still default when omitted.
+            if (!TryParseStyle(style, out var chosenStyle))
+                return ProblemResults.Coded(
+                    StatusCodes.Status400BadRequest,
+                    "EXPORT_INVALID_STYLE",
+                    "Unknown export style. Use 'xmind' or 'clean'.");
 
-            var format = string.Equals(page, "a4", StringComparison.OrdinalIgnoreCase)
-                ? "a4"
-                : "sheet";
+            if (!TryParsePageFormat(page, out var format))
+                return ProblemResults.Coded(
+                    StatusCodes.Status400BadRequest,
+                    "EXPORT_INVALID_PAGE",
+                    "Unknown export page format. Use 'sheet' or 'a4'.");
 
             var language = CaptionLanguageResolver.Resolve(request);
 
@@ -60,5 +69,41 @@ public static class FamilyTreeEndpoints
             .RequirePermission(Permissions.FamilyTree.View);
 
         return app;
+    }
+
+    /// <summary>Absent means the default (design §5.1); anything unrecognised is a 400.</summary>
+    private static bool TryParseStyle(string? style, out ExportStyle parsed)
+    {
+        parsed = ExportStyle.Xmind;
+        if (style is null) return true;
+
+        if (string.Equals(style, "xmind", StringComparison.OrdinalIgnoreCase)) return true;
+        if (string.Equals(style, "clean", StringComparison.OrdinalIgnoreCase))
+        {
+            parsed = ExportStyle.Clean;
+            return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// The format still crosses the Application boundary as a string, not as
+    /// <c>ExportPageFormat</c> -- that conversion is deliberately parked. Validating it here
+    /// means the only strings that ever reach the adapter are the two it understands.
+    /// </summary>
+    private static bool TryParsePageFormat(string? page, out string parsed)
+    {
+        parsed = "sheet";
+        if (page is null) return true;
+
+        if (string.Equals(page, "sheet", StringComparison.OrdinalIgnoreCase)) return true;
+        if (string.Equals(page, "a4", StringComparison.OrdinalIgnoreCase))
+        {
+            parsed = "a4";
+            return true;
+        }
+
+        return false;
     }
 }

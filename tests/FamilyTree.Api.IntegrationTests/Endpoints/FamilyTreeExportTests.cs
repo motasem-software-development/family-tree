@@ -139,6 +139,90 @@ public sealed class FamilyTreeExportTests(PostgresFixture fixture) : IAsyncLifet
         problem!["code"].ToString().Should().Be("MEMBER_NOT_FOUND");
     }
 
+    /// <summary>
+    /// No committed test exercised style or page over HTTP before this one -- every existing case
+    /// hit the defaults, so an endpoint that ignored both selectors entirely, or a service that
+    /// hardcoded "sheet", passed the whole suite (final review, Minor 6). Byte-distinctness is a
+    /// meaningful assertion here precisely because rendering is byte-deterministic for a fixed
+    /// input: The_same_style_renders_the_same_bytes_twice pins that there is no clock or GUID
+    /// noise in the output, so four different byte strings can only come from four different
+    /// documents.
+    /// </summary>
+    [Fact]
+    public async Task All_four_style_and_page_combinations_produce_distinct_documents()
+    {
+        await AuthenticateAsync();
+
+        var combinations = new[]
+        {
+            "style=xmind&page=sheet",
+            "style=xmind&page=a4",
+            "style=clean&page=sheet",
+            "style=clean&page=a4"
+        };
+
+        var documents = new List<byte[]>();
+        foreach (var query in combinations)
+        {
+            var response = await _client.GetAsync($"{ExportPath}?{query}");
+            response.StatusCode.Should().Be(HttpStatusCode.OK, "{0} must be accepted", query);
+            documents.Add(await response.Content.ReadAsByteArrayAsync());
+        }
+
+        documents.Select(Convert.ToBase64String).Distinct().Should().HaveCount(
+            4, "each style x page combination must render its own document");
+    }
+
+    /// <summary>Case-insensitivity is contract, and must survive the new validation.</summary>
+    [Fact]
+    public async Task The_selectors_are_case_insensitive()
+    {
+        await AuthenticateAsync();
+
+        var mixedCase = await _client.GetAsync($"{ExportPath}?style=CLEAN&page=A4");
+        var lowerCase = await _client.GetAsync($"{ExportPath}?style=clean&page=a4");
+
+        mixedCase.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await mixedCase.Content.ReadAsByteArrayAsync())
+            .Should().Equal(await lowerCase.Content.ReadAsByteArrayAsync());
+    }
+
+    /// <summary>
+    /// Spec §5.1 specifies defaults for ABSENT parameters, not invalid ones: style=clea used to
+    /// return 200 with the xmind/sheet default, silently giving the caller a different document
+    /// than they asked for (final review, Minor 5).
+    /// </summary>
+    [Theory]
+    [InlineData("style=BOGUS", "EXPORT_INVALID_STYLE")]
+    [InlineData("style=clea", "EXPORT_INVALID_STYLE")]
+    [InlineData("page=BOGUS", "EXPORT_INVALID_PAGE")]
+    [InlineData("style=BOGUS&page=BOGUS", "EXPORT_INVALID_STYLE")]
+    public async Task An_unrecognised_selector_value_is_rejected(string query, string expectedCode)
+    {
+        await AuthenticateAsync();
+
+        var response = await _client.GetAsync($"{ExportPath}?{query}");
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        response.Content.Headers.ContentType!.MediaType.Should().Be("application/problem+json");
+
+        var problem = await response.Content.ReadFromJsonAsync<Dictionary<string, object>>();
+        problem!["code"].ToString().Should().Be(expectedCode);
+    }
+
+    /// <summary>An omitted selector still means its default, unchanged.</summary>
+    [Fact]
+    public async Task An_omitted_selector_still_means_its_default()
+    {
+        await AuthenticateAsync();
+
+        var omitted = await (await _client.GetAsync(ExportPath)).Content.ReadAsByteArrayAsync();
+        var explicitDefaults = await (await _client.GetAsync($"{ExportPath}?style=xmind&page=sheet"))
+            .Content.ReadAsByteArrayAsync();
+
+        omitted.Should().Equal(explicitDefaults);
+    }
+
     [Fact]
     public async Task A_subtree_export_is_smaller_than_the_whole_tree()
     {

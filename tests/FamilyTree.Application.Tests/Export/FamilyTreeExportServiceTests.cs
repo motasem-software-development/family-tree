@@ -20,9 +20,17 @@ public sealed class FamilyTreeExportServiceTests
             Guid? rootId, int? maxDepth, CancellationToken ct = default) => Task.FromResult(view);
     }
 
+    /// <summary>
+    /// Records the STYLE and PAGE FORMAT as well as the caption. Recording only the caption meant
+    /// a service that hardcoded "sheet", or ignored the style argument entirely, passed every
+    /// Application test (final review, Minor 6) -- the selectors' whole job is to reach the
+    /// renderer, and nothing asserted that they did.
+    /// </summary>
     private sealed class CapturingRenderer : ITreeRendererAdapter
     {
         public PdfCaption? LastCaption { get; private set; }
+        public ExportStyle? LastStyle { get; private set; }
+        public string? LastPageFormat { get; private set; }
 
         public byte[] Render(
             IReadOnlyList<FamilyTreeNodeResponse> roots,
@@ -32,6 +40,8 @@ public sealed class FamilyTreeExportServiceTests
             CancellationToken ct = default)
         {
             LastCaption = caption;
+            LastStyle = style;
+            LastPageFormat = pageFormat;
             return [1, 2, 3];
         }
     }
@@ -65,6 +75,30 @@ public sealed class FamilyTreeExportServiceTests
         renderer.LastCaption.GenerationCount.Should().Be(3); // generations 1..3
         renderer.LastCaption.ExportDate.Should().Be(new DateOnly(2026, 8, 18));
         renderer.LastCaption.Language.Should().Be(CaptionLanguage.En);
+    }
+
+    /// <summary>
+    /// Both selectors must arrive at the renderer exactly as chosen. Asserted for a non-default
+    /// value of each, so a service that ignored its arguments and passed its own constants could
+    /// not pass by coincidence.
+    /// </summary>
+    [Theory]
+    [InlineData(ExportStyle.Clean, "a4")]
+    [InlineData(ExportStyle.Xmind, "a4")]
+    [InlineData(ExportStyle.Clean, "sheet")]
+    public async Task The_chosen_style_and_page_format_reach_the_renderer(
+        ExportStyle style, string pageFormat)
+    {
+        var view = new FamilyTreeViewResponse(Guid.NewGuid(), "آل سالم", [Leaf("root", 1)]);
+
+        var renderer = new CapturingRenderer();
+        var service = new FamilyTreeExportService(
+            new FakeTreeService(view), renderer, new FixedTimeProvider(DateTimeOffset.UtcNow));
+
+        await service.ExportAsync(null, null, style, pageFormat, CaptionLanguage.Ar, CancellationToken.None);
+
+        renderer.LastStyle.Should().Be(style);
+        renderer.LastPageFormat.Should().Be(pageFormat);
     }
 
     [Fact]
