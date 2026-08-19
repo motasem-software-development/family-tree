@@ -3,9 +3,14 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text;
 using FamilyTree.Api.IntegrationTests.Fixtures;
+using FamilyTree.Application.FamilyMembers;
 using FamilyTree.Contracts.Auth;
 using FamilyTree.Contracts.FamilyMembers;
+using FamilyTree.Domain.FamilyTrees;
+using FamilyTree.Domain.Tenants;
+using FamilyTree.Infrastructure.Persistence;
 using FluentAssertions;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace FamilyTree.Api.IntegrationTests.Endpoints;
 
@@ -79,6 +84,55 @@ public sealed class FamilyTreeExportTests(PostgresFixture fixture) : IAsyncLifet
 
         var response = await _client.GetAsync($"{ExportPath}?rootId={Guid.NewGuid()}");
 
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+
+        var problem = await response.Content.ReadFromJsonAsync<Dictionary<string, object>>();
+        problem!["code"].ToString().Should().Be("MEMBER_NOT_FOUND");
+    }
+
+    /// <summary>
+    /// Creates a second tenant, with its own tree and one member, entirely separate from the
+    /// seeded tenant the HTTP client authenticates as. Mirrors
+    /// TenantIsolationTests.SeedTwoTenantsAsync and FamilyMemberSearchTests.SeedTenantWithTreeAsync:
+    /// an unfiltered scope (tenant Guid.Empty, matching HttpTenantContext with no HttpContext)
+    /// creates the tenant and tree, then a tenant-scoped IFamilyMemberService creates the member
+    /// as that tenant would over its own authenticated request.
+    /// </summary>
+    private async Task<Guid> SeedAnotherTenantsMemberAsync()
+    {
+        Guid otherTenantId;
+        await using (var unfiltered = _factory.Services.CreateAsyncScope())
+        {
+            var context = unfiltered.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var tenant = Tenant.Create("Al-Hassan Family", "export-iso-al-hassan", DateTimeOffset.UtcNow);
+            context.Tenants.Add(tenant);
+            await context.SaveChangesAsync();
+
+            context.FamilyTrees.Add(
+                FamilyTreeAggregate.Create(tenant.Id, "عائلة الحسن", DateTimeOffset.UtcNow));
+            await context.SaveChangesAsync();
+
+            otherTenantId = tenant.Id;
+        }
+
+        await using var scope = _factory.CreateTenantScope(otherTenantId);
+        var members = scope.ServiceProvider.GetRequiredService<IFamilyMemberService>();
+        var member = await members.CreateAsync(new CreateFamilyMemberRequest("غريب", null));
+
+        return member.Id;
+    }
+
+    [Fact]
+    public async Task Another_tenants_member_id_is_not_found_and_indistinguishable_from_unknown()
+    {
+        await AuthenticateAsync();
+
+        var foreignMemberId = await SeedAnotherTenantsMemberAsync();
+
+        var response = await _client.GetAsync($"{ExportPath}?rootId={foreignMemberId}");
+
+        // Same 404 and same code as a genuinely unknown id (An_unknown_root_id_is_not_found):
+        // the caller cannot tell "not yours" from "does not exist anywhere".
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
 
         var problem = await response.Content.ReadFromJsonAsync<Dictionary<string, object>>();

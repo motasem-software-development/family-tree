@@ -80,6 +80,18 @@ public sealed class AuthorizationTests(PostgresFixture fixture) : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Export_returns_403_for_a_caller_lacking_family_tree_view()
+    {
+        // Authenticated, but the export endpoint is guarded by FamilyTree.View like /view is.
+        _client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", TokenWith(Permissions.Member.View));
+
+        var response = await _client.GetAsync("/api/v1/family-tree/export.pdf");
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
     public async Task Me_is_authentication_only_and_never_answers_403()
     {
         // The counterpart of the three above: a token with no permission at all still reads
@@ -100,18 +112,6 @@ public sealed class AuthorizationTests(PostgresFixture fixture) : IAsyncLifetime
             new AuthenticationHeaderValue("Bearer", TokenWith(Permissions.Member.View));
 
         var response = await _client.DeleteAsync($"/api/v1/family-members/{Guid.CreateVersion7()}");
-
-        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
-    }
-
-    [Fact]
-    public async Task Export_returns_403_for_a_caller_lacking_family_tree_view()
-    {
-        // Authenticated, but the export endpoint is guarded by FamilyTree.View like /view is.
-        _client.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", TokenWith(Permissions.Member.View));
-
-        var response = await _client.GetAsync("/api/v1/family-tree/export.pdf");
 
         response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
