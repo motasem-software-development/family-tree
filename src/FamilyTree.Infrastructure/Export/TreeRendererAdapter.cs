@@ -6,14 +6,19 @@ namespace FamilyTree.Infrastructure.Export;
 public sealed class TreeRendererAdapter : ITreeRendererAdapter
 {
     private static readonly ILayoutStrategy Xmind = new XmindLayoutStrategy();
+    private static readonly ILayoutStrategy Clean = new CleanLayoutStrategy();
 
     public byte[] Render(
         IReadOnlyList<FamilyTreeNodeResponse> roots, ExportStyle style, string pageFormat)
     {
         var options = LayoutOptions.Default;
 
-        // Task 14 adds the clean strategy; until then both styles share this geometry.
-        var strategy = Xmind;
+        var strategy = style switch
+        {
+            ExportStyle.Xmind => Xmind,
+            ExportStyle.Clean => Clean,
+            _ => throw new ArgumentOutOfRangeException(nameof(style))
+        };
 
         var scene = strategy.Build(roots, options, SkiaTextMeasurer.Delegate);
         var format = pageFormat == "a4" ? ExportPageFormat.A4 : ExportPageFormat.Sheet;
