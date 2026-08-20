@@ -1,4 +1,4 @@
-using FamilyTree.Domain.Common;
+﻿using FamilyTree.Domain.Common;
 using System.Globalization;
 using System.Text;
 using FamilyTree.Application.Export;
@@ -508,9 +508,24 @@ public sealed class SkiaTreeRenderer : ITreeRenderer
         canvas.DrawRoundRect(rect, CornerRadius, CornerRadius, stroke);
     }
 
+    /// <summary>
+    /// Vertical offset from a tick's line to its label baseline, as a fraction of the font size.
+    /// Negative lifts the glyphs above the line: the name sits ON the tick rather than being
+    /// bisected by it, which is the mind-map convention the design asks for. Arabic descenders
+    /// still graze the line, which is what "resting on it" should look like.
+    /// </summary>
+    private const double TickLabelLift = -0.15;
+
+    /// <summary>
+    /// Offset for a label centred inside a rounded box: half the cap height, so the glyphs sit
+    /// optically centred on the box's vertical centre.
+    /// </summary>
+    private const double BoxLabelCentring = 0.35;
+
     private static void DrawLabel(SKCanvas canvas, SceneNode node)
     {
-        var baseline = (float)(node.Y + node.FontSize * 0.35);
+        var offset = node.Shape == NodeShape.Tick ? TickLabelLift : BoxLabelCentring;
+        var baseline = (float)(node.Y + node.FontSize * offset);
         DrawShapedText(
             canvas, node.Label, (float)node.X, baseline, (float)node.FontSize, SKColors.Black);
     }
