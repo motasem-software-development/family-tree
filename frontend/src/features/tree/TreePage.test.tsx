@@ -286,18 +286,40 @@ describe('TreePage', () => {
     expect(treeitem).toHaveAttribute('aria-selected', 'true')
   })
 
+  // f1 (فارس) sits under the collapsed s1 (سليمان) branch — flattenTree contributes no row for
+  // it until that branch is expanded. This is the case the feature exists for: report rows link
+  // to arbitrary members, not just roots.
+  it('reveals a non-root member: expands its ancestors, selects it, and opens its panel', async () => {
+    renderPageAt('/?memberId=f1')
+
+    const treeitem = await screen.findByRole('treeitem', { name: /فارس/ })
+    expect(treeitem).toHaveAttribute('aria-selected', 'true')
+    const panel = await screen.findByRole('complementary', { name: 'فارس' })
+    expect(within(panel).getByText(i18n.t('panel.descendants'))).toBeInTheDocument()
+  })
+
   it('ignores a memberId matching no member rather than failing', async () => {
     renderPageAt('/?memberId=00000000-0000-0000-0000-000000000000')
 
     // The tree still renders; nothing is selected.
     expect(await screen.findByText('عمر')).toBeInTheDocument()
-    expect(screen.queryByText(i18n.t('panel.descendants'))).not.toBeInTheDocument()
+    await waitFor(() => {
+      const selected = screen.queryAllByRole('treeitem').filter(
+        (item) => item.getAttribute('aria-selected') === 'true',
+      )
+      expect(selected).toHaveLength(0)
+    })
   })
 
   it('selects nothing when the parameter is absent, as before', async () => {
     renderPageAt('/')
 
     expect(await screen.findByText('عمر')).toBeInTheDocument()
-    expect(screen.queryByText(i18n.t('panel.descendants'))).not.toBeInTheDocument()
+    await waitFor(() => {
+      const selected = screen.queryAllByRole('treeitem').filter(
+        (item) => item.getAttribute('aria-selected') === 'true',
+      )
+      expect(selected).toHaveLength(0)
+    })
   })
 })

@@ -52,11 +52,17 @@ export const TreePage = () => {
   const [expanded, setExpanded] = useState<ExpandedMap>({})
   const [rootOpen, setRootOpen] = useState(true)
   const [searchParams] = useSearchParams()
-  // Seeded from the URL so a report row can link straight to a member (design §8). A lazy
-  // initialiser, not an effect: the parameter is the starting selection, not a binding — a
-  // later click must be free to select something else without the URL fighting it back.
-  const [selectedId, setSelectedId] = useState<string | null>(() => searchParams.get('memberId'))
-  const [panelOpen, setPanelOpen] = useState(false)
+  // The id a report row linked to, captured once at mount. A ref, not state: it is consulted
+  // exactly once (by the reveal effect below, once the tree has loaded) and then cleared, so it
+  // can never re-apply itself over a selection the user makes afterward.
+  const initialMemberId = useRef(searchParams.get('memberId'))
+  // Seeded from the URL so a report row can land on a highlighted, open panel immediately,
+  // before the tree data (and therefore the member's ancestor chain) has even loaded. Lazy
+  // initialisers, not effects: this is the starting selection, not a binding — a later click
+  // must be free to select something else without the URL fighting it back. If the id turns out
+  // to match nothing, the reveal effect below clears both once the data confirms it.
+  const [selectedId, setSelectedId] = useState<string | null>(() => initialMemberId.current)
+  const [panelOpen, setPanelOpen] = useState<boolean>(() => initialMemberId.current !== null)
   const [query, setQuery] = useState('')
   const [zoom, setZoom] = useState(1)
   const [revealId, setRevealId] = useState<string | null>(null)
@@ -153,21 +159,51 @@ export const TreePage = () => {
 
   const clearReveal = useCallback(() => setRevealId(null), [])
 
-  /** Reveal a search hit: open every branch above it, scroll to it, then select it. */
+  /** Open every branch above a member, scroll to it, select it, and open its panel. Shared by a
+   *  clicked search hit and by the initial `?memberId=` reveal effect below — both need the same
+   *  three things done together, just triggered differently. */
+  const revealMember = useCallback(
+    (id: string) => {
+      setExpanded((current) => {
+        const opened = { ...current }
+        ancestorIds(roots, id).forEach((ancestor) => {
+          opened[ancestor] = true
+        })
+        return opened
+      })
+      setRootOpen(true)
+      setSelectedId(id)
+      setPanelOpen(true)
+      // Expanding ancestors used to be enough — the row was always in the DOM. Windowed, it may
+      // not be, so the canvas is asked to scroll to it once this render settles.
+      setRevealId(id)
+    },
+    [roots],
+  )
+
+  /** Reveal a search hit: same as revealMember, plus clearing the search query. */
   const revealResult = (id: string) => {
-    const opened: Record<string, boolean> = { ...expanded }
-    ancestorIds(roots, id).forEach((ancestor) => {
-      opened[ancestor] = true
-    })
-    setRootOpen(true)
-    setExpanded(opened)
-    setSelectedId(id)
-    setPanelOpen(true)
-    // Expanding ancestors used to be enough — the row was always in the DOM. Windowed, it may
-    // not be, so the canvas is asked to scroll to it once this render settles.
-    setRevealId(id)
+    revealMember(id)
     setQuery('')
   }
+
+  // Completes the `?memberId=` preselection once the tree has actually loaded: the lazy
+  // initialisers above already highlighted the row and opened the panel optimistically, but
+  // expanding the member's ancestor chain needs the tree data, which isn't in yet at mount. Runs
+  // at most once — `initialMemberId` is cleared right after, so this never re-fires and never
+  // undoes a selection the user made in the meantime. An id matching no member degrades to the
+  // plain tree: the optimistic selection/panel are rolled back instead of pointing at nothing.
+  useEffect(() => {
+    const id = initialMemberId.current
+    if (id === null || view === undefined) return
+    initialMemberId.current = null
+    if (findNode(roots, id) === undefined) {
+      setSelectedId(null)
+      setPanelOpen(false)
+      return
+    }
+    revealMember(id)
+  }, [view, roots, revealMember])
 
   const openModal = (kind: ModalKind, initialName = '', initialLife = EMPTY_LIFE_DETAILS) => {
     setModal(kind)
