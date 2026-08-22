@@ -68,6 +68,31 @@ describe('MembersPage', () => {
     expect(await screen.findByText('سليمان')).toBeInTheDocument()
   })
 
+  it('renders a name in four parts, own name through great-grandfather', async () => {
+    vi.mocked(membersApi.list).mockResolvedValue([
+      member({ id: '1', name: 'داوود', parentId: null }),
+      member({ id: '2', name: 'محمود', parentId: '1' }),
+      member({ id: '3', name: 'حسن', parentId: '2' }),
+      member({ id: '4', name: 'سالم', parentId: '3' }),
+      member({ id: '5', name: 'عمر', parentId: '4' }),
+    ])
+
+    renderPage()
+
+    // The lineage sits in its own muted span, so the assertion goes through textContent:
+    // the default matcher only sees an element's direct text nodes.
+    const named = (composed: string) =>
+      screen.findAllByText(
+        (_content, element) => element?.tagName === 'SPAN' && element.textContent === composed,
+      )
+
+    expect(await named('سالم حسن محمود داوود')).not.toHaveLength(0)
+    // Deeper than four generations: the great-great-grandfather is left off.
+    expect(await named('عمر سالم حسن محمود')).not.toHaveLength(0)
+    // A first-generation member has no lineage to append.
+    expect(await named('داوود')).not.toHaveLength(0)
+  })
+
   it('shows an empty state when the family has no members', async () => {
     vi.mocked(membersApi.list).mockResolvedValue([])
     renderPage()

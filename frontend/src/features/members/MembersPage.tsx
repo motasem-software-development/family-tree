@@ -4,6 +4,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { AppShell } from '../../app/AppShell'
 import { useAuth } from '../auth/AuthContext'
 import { ApiError } from '../../services/apiClient'
+import { fullName, indexById, lineageName } from './fullName'
 import { lifeDetailsOf, lifeYears, type LifeDetails } from './lifeDetails'
 import { LifeStatusDot } from './LifeStatusDot'
 import { MemberForm } from './MemberForm'
@@ -106,7 +107,8 @@ export function MembersPage() {
   }
 
   const all = members ?? []
-  const nameById = new Map(all.map((current) => [current.id, current.name]))
+  // Indexed once per render: every row needs to walk its own parent chain to compose the name.
+  const byId = indexById(all)
   const familyName = user?.familyTreeName ?? ''
 
   return (
@@ -220,7 +222,18 @@ export function MembersPage() {
                       <td style={{ ...cellStyle, fontWeight: 500 }}>
                         <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                           <LifeStatusDot deceased={lifeDetailsOf(current).isDeceased} />
-                          <span>{current.name}</span>
+                          {/* Own name, then father, grandfather and great-grandfather. The
+                              lineage is muted so the row still scans by given name — it is
+                              context, not four names of equal weight. */}
+                          <span>
+                            {current.name}
+                            {lineageName(current, byId) !== '' && (
+                              <span style={{ fontWeight: 400, color: 'var(--text-3)' }}>
+                                {' '}
+                                {lineageName(current, byId)}
+                              </span>
+                            )}
+                          </span>
                           {/* Same treatment as the tree outline, so a member reads the same way
                               whichever screen they are looked at on. */}
                           {yearsOf(current) !== null && (
@@ -240,7 +253,7 @@ export function MembersPage() {
                       <td style={{ ...cellStyle, color: 'var(--text-3)' }}>
                         {current.parentId === null
                           ? t('members.noParent')
-                          : (nameById.get(current.parentId) ?? '—')}
+                          : (byId.get(current.parentId)?.name ?? '—')}
                       </td>
                       <td style={{ ...cellStyle, whiteSpace: 'nowrap' }}>
                         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
@@ -291,7 +304,7 @@ export function MembersPage() {
           <div
             role="dialog"
             aria-modal="true"
-            aria-label={t('members.confirmDelete', { name: pendingDelete.name })}
+            aria-label={t('members.confirmDelete', { name: fullName(pendingDelete, byId) })}
             style={{
               width: '100%',
               maxWidth: 420,
@@ -303,7 +316,7 @@ export function MembersPage() {
             }}
           >
             <div style={{ fontSize: 17, fontWeight: 600, marginBottom: 8 }}>
-              {t('members.confirmDelete', { name: pendingDelete.name })}
+              {t('members.confirmDelete', { name: fullName(pendingDelete, byId) })}
             </div>
             <div style={{ fontSize: 14, color: 'var(--text-2)', marginBottom: 'var(--space-6)' }}>
               {t('modal.deleteBody')}
