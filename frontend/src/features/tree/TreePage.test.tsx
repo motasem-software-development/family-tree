@@ -51,18 +51,20 @@ const FLAT: FamilyMember[] = [
   { id: 's2', name: 'عمر', parentId: null, version: 1, ...stamp },
 ]
 
-const renderPage = () => {
+const renderPageAt = (path: string) => {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
     <I18nextProvider i18n={i18n}>
       <QueryClientProvider client={queryClient}>
-        <MemoryRouter>
+        <MemoryRouter initialEntries={[path]}>
           <TreePage />
         </MemoryRouter>
       </QueryClientProvider>
     </I18nextProvider>,
   )
 }
+
+const renderPage = () => renderPageAt('/')
 
 describe('TreePage', () => {
   beforeEach(() => {
@@ -274,5 +276,28 @@ describe('TreePage', () => {
     // Virtualized, the row may not be in the DOM at all — expanding its ancestors is no longer
     // enough to put it in front of the user.
     await waitFor(() => expect(scrollTo).toHaveBeenCalled())
+  })
+
+  // Report rows link here with ?memberId=, so the member must be selected on arrival.
+  it('preselects the member named by the memberId parameter', async () => {
+    renderPageAt('/?memberId=s1')
+
+    const treeitem = await screen.findByRole('treeitem', { name: /سليمان/ })
+    expect(treeitem).toHaveAttribute('aria-selected', 'true')
+  })
+
+  it('ignores a memberId matching no member rather than failing', async () => {
+    renderPageAt('/?memberId=00000000-0000-0000-0000-000000000000')
+
+    // The tree still renders; nothing is selected.
+    expect(await screen.findByText('عمر')).toBeInTheDocument()
+    expect(screen.queryByText(i18n.t('panel.descendants'))).not.toBeInTheDocument()
+  })
+
+  it('selects nothing when the parameter is absent, as before', async () => {
+    renderPageAt('/')
+
+    expect(await screen.findByText('عمر')).toBeInTheDocument()
+    expect(screen.queryByText(i18n.t('panel.descendants'))).not.toBeInTheDocument()
   })
 })

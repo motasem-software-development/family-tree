@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useSearchParams } from 'react-router-dom'
 import { AppShell, type SearchResult } from '../../app/AppShell'
 import { useDirection } from '../../i18n/useDirection'
 import { ApiError } from '../../services/apiClient'
@@ -50,7 +51,11 @@ export const TreePage = () => {
 
   const [expanded, setExpanded] = useState<ExpandedMap>({})
   const [rootOpen, setRootOpen] = useState(true)
-  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [searchParams] = useSearchParams()
+  // Seeded from the URL so a report row can link straight to a member (design §8). A lazy
+  // initialiser, not an effect: the parameter is the starting selection, not a binding — a
+  // later click must be free to select something else without the URL fighting it back.
+  const [selectedId, setSelectedId] = useState<string | null>(() => searchParams.get('memberId'))
   const [panelOpen, setPanelOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [zoom, setZoom] = useState(1)
