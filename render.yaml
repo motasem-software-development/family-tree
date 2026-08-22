@@ -1,0 +1,98 @@
+# Render Blueprint — free-tier deployment (Neon Postgres + Render free web service).
+#
+# The database is NOT declared here. Render's managed Postgres free instances expire 30 days
+# after creation, so this stack points at an externally hosted Neon project instead. That is
+# why there is no `databases:` section and no `fromDatabase` env var: the connection string is
+# entered once in the Render dashboard (see `sync: false` below).
+#
+# Deploys are gated on migrations. See `autoDeploy: false` on the api service.
+
+services:
+  - type: web
+    name: familytree-api
+    runtime: docker
+    plan: free
+    region: frankfurt
+    dockerfilePath: src/FamilyTree.Api/Dockerfile
+    # The Dockerfile copies Directory.Build.props and the whole src/ tree, so the build
+    # context is the repo root, not the Api project directory.
+    dockerContext: .
+    healthCheckPath: /health
+
+    # Load-bearing, not a preference. With autoDeploy on, Render starts building the moment
+    # main is pushed — in parallel with the CI job that applies migrations. The new image
+    # would then boot against an unmigrated schema and DatabaseSeeder would crash querying
+    # tables that do not exist. Deploys are triggered instead by the `migrate` job in
+    # .github/workflows/ci.yml, via a deploy hook, only after `efbundle` succeeds.
+    autoDeploy: false
+
+    envVars:
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+
+      # Npgsql key/value form, NOT the postgresql:// URI Neon shows by default — Npgsql does
+      # not parse URIs. Convert it before pasting, and keep SSL Mode=Require: Neon terminates
+      # TLS and refuses plaintext connections.
+      #   Host=<project>.<region>.aws.neon.tech;Database=familytree;Username=...;Password=...;SSL Mode=Require;Trust Server Certificate=true
+      - key: ConnectionStrings__DefaultConnection
+        sync: false
+
+      # JwtTokenService validates eagerly that this is at least 32 bytes (UTF-8) and the API
+      # refuses to start on a shorter key. generateValue produces a 256-bit random secret on
+      # first deploy and keeps it stable afterwards; it is never in the repo.
+      - key: Jwt__SigningKey
+        generateValue: true
+
+      # Must match the service's own public URL. Render has no way to interpolate it into a
+      # blueprint value, so set it in the dashboard after the first deploy assigns the URL:
+      #   https://familytree-api.onrender.com
+      - key: Jwt__Issuer
+        sync: false
+      - key: Jwt__Audience
+        value: familytree-api
+
+      - key: Seed__TenantName
+        value: Al-Saqqa Family
+      - key: Seed__TenantSlug
+        value: al-saqqa
+      - key: Seed__FamilyTreeName
+        value: عائلة السقا
+      # Credentials — dashboard only, never committed.
+      - key: Seed__AdminEmail
+        sync: false
+      - key: Seed__AdminPassword
+        sync: false
+
+  # Static site rather than the nginx image in frontend/Dockerfile. That Dockerfile proxies to
+  # http://api:8080, a docker-compose service name that does not resolve on Render; it stays
+  # for local compose only. Static sites also do not spin down on the free plan, so the SPA
+  # stays instant even while the API is cold.
+  - type: web
+    name: familytree-web
+    runtime: static
+    rootDir: frontend
+    buildCommand: npm ci && npm run build
+    # Relative to rootDir above, i.e. frontend/dist.
+    staticPublishPath: dist
+
+    envVars:
+      # Pin to match the CI frontend job. Without this the build runs on Render's default Node,
+      # so a version-sensitive failure would surface here and nowhere in CI.
+      - key: NODE_VERSION
+        value: "24"
+
+    routes:
+      # Server-side rewrite, so the browser only ever talks to one origin and the API needs no
+      # CORS policy (none is registered in Program.cs).
+      #
+      # PLACEHOLDER: route destinations must be literal URLs — no variables, no fromService.
+      # Replace this host with the api service's real URL after its first deploy.
+      - type: rewrite
+        source: /api/*
+        destination: https://familytree-api.onrender.com/api/*
+
+      # SPA history fallback. Must stay LAST: routes match in order, and a /* rule above the
+      # /api/* rule would swallow every API call into index.html.
+      - type: rewrite
+        source: /*
+        destination: /index.html
