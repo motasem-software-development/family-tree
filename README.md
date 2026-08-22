@@ -45,6 +45,22 @@ replicas booting at once could race on the same seeded tenant/admin.
 The members screen is at `/members` once signed in, and the tree outline is at `/`. Search runs
 server-side and returns each hit's ancestor path; the outline renders only the rows in view.
 
+The reports screen is at `/reports`. It answers questions the tree cannot: how deep and how
+balanced the family is, how the living and deceased divide, which records still need a date,
+whose birthday or death anniversary falls in the next 30 days, and what changed in the last 30.
+Everything is computed on request from the members already stored — there is no reporting
+table and no scheduled job.
+
+`GET /api/v1/reports` returns all five sections in one payload and takes no parameters: the
+windows (30 days) and list caps (50) are server-side constants. Every capped list carries its
+untruncated count alongside, so a client must render that count and never `members.length`.
+The endpoint is guarded by `FamilyTree.View`, the same permission as the tree and the PDF
+export — the reports aggregate data that permission already exposes.
+
+Recent activity is derived from record timestamps, not from an audit log, so it cannot show
+deletions or attribute a change to a user. `Audit.View` exists in the permission catalog but
+no `AuditLog` entity does; a real audit report is blocked on that.
+
 ## Deploying to Render
 
 `render.yaml` is a Render Blueprint describing two free-tier services: the API as a Docker web
