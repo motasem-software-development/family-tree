@@ -45,7 +45,7 @@ The three pieces every later calculator depends on: the tuning constants, the ge
   - `static IReadOnlyDictionary<Guid, int> GenerationIndex.Build(IReadOnlyList<FamilyMember> members)`
   - `static int Ages.YearsBetween(DateOnly from, DateOnly to)`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `tests/FamilyTree.Application.Tests/Reports/GenerationIndexTests.cs`:
 
@@ -178,12 +178,12 @@ public class AgesTests
 }
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `dotnet test tests/FamilyTree.Application.Tests --filter "FullyQualifiedName~Reports"`
 Expected: FAIL — the namespace `FamilyTree.Application.Reports` and its types do not exist yet (compile error).
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 Create `src/FamilyTree.Contracts/Reports/MemberRef.cs`:
 
@@ -302,12 +302,12 @@ public static class Ages
 }
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `dotnet test tests/FamilyTree.Application.Tests --filter "FullyQualifiedName~Reports"`
 Expected: PASS — 10 tests.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/FamilyTree.Contracts/Reports src/FamilyTree.Application/Reports tests/FamilyTree.Application.Tests/Reports
@@ -335,7 +335,7 @@ composed name so the lineage rule stays in one language (design 7)."
   - `record BranchSummary(Guid Id, string Name, int DescendantCount, int Depth)`
   - `static StructureReport StructureCalculator.Calculate(IReadOnlyList<FamilyMember> members, IReadOnlyDictionary<Guid, int> generations)`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `tests/FamilyTree.Application.Tests/Reports/StructureCalculatorTests.cs`:
 
@@ -451,12 +451,12 @@ public class StructureCalculatorTests
 }
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `dotnet test tests/FamilyTree.Application.Tests --filter "FullyQualifiedName~StructureCalculatorTests"`
 Expected: FAIL — `StructureCalculator` does not exist.
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 Create `src/FamilyTree.Contracts/Reports/StructureReport.cs`:
 
@@ -561,12 +561,12 @@ public static class StructureCalculator
 }
 ```
 
-- [ ] **Step 4: Run the test to verify it passes**
+- [x] **Step 4: Run the test to verify it passes**
 
 Run: `dotnet test tests/FamilyTree.Application.Tests --filter "FullyQualifiedName~StructureCalculatorTests"`
 Expected: PASS — 8 tests.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/FamilyTree.Contracts/Reports/StructureReport.cs src/FamilyTree.Application/Reports/StructureCalculator.cs tests/FamilyTree.Application.Tests/Reports/StructureCalculatorTests.cs
@@ -595,7 +595,7 @@ everyone, so the number describes something."
   - `record LongevityStats(int Count, int MinYears, int MaxYears, int MedianYears)`
   - `static LifeStatusReport LifeStatusCalculator.Calculate(IReadOnlyList<FamilyMember> members, IReadOnlyDictionary<Guid, int> generations, DateOnly today)`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `tests/FamilyTree.Application.Tests/Reports/LifeStatusCalculatorTests.cs`:
 
@@ -749,12 +749,12 @@ public class LifeStatusCalculatorTests
 }
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `dotnet test tests/FamilyTree.Application.Tests --filter "FullyQualifiedName~LifeStatusCalculatorTests"`
 Expected: FAIL — `LifeStatusCalculator` does not exist.
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 Create `src/FamilyTree.Contracts/Reports/LifeStatusReport.cs`:
 
@@ -859,12 +859,12 @@ public static class LifeStatusCalculator
 }
 ```
 
-- [ ] **Step 4: Run the test to verify it passes**
+- [x] **Step 4: Run the test to verify it passes**
 
 Run: `dotnet test tests/FamilyTree.Application.Tests --filter "FullyQualifiedName~LifeStatusCalculatorTests"`
 Expected: PASS — 11 tests.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/FamilyTree.Contracts/Reports/LifeStatusReport.cs src/FamilyTree.Application/Reports/LifeStatusCalculator.cs tests/FamilyTree.Application.Tests/Reports/LifeStatusCalculatorTests.cs
@@ -892,7 +892,7 @@ holding both. Longevity is null rather than zeroed when unmeasurable."
   - `static class CompletenessCodes { const string MissingBirthDate = "MISSING_BIRTH_DATE"; const string DeceasedWithoutDeathDate = "DECEASED_WITHOUT_DEATH_DATE"; }`
   - `static CompletenessReport CompletenessCalculator.Calculate(IReadOnlyList<FamilyMember> members)`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `tests/FamilyTree.Application.Tests/Reports/CompletenessCalculatorTests.cs`:
 
@@ -1015,12 +1015,12 @@ public class CompletenessCalculatorTests
 }
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `dotnet test tests/FamilyTree.Application.Tests --filter "FullyQualifiedName~CompletenessCalculatorTests"`
 Expected: FAIL — `CompletenessCalculator` does not exist.
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 Create `src/FamilyTree.Contracts/Reports/CompletenessReport.cs`:
 
@@ -1111,12 +1111,12 @@ public static class CompletenessCalculator
 }
 ```
 
-- [ ] **Step 4: Run the test to verify it passes**
+- [x] **Step 4: Run the test to verify it passes**
 
 Run: `dotnet test tests/FamilyTree.Application.Tests --filter "FullyQualifiedName~CompletenessCalculatorTests"`
 Expected: PASS — 9 tests.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/FamilyTree.Contracts/Reports/CompletenessReport.cs src/FamilyTree.Application/Reports/CompletenessCalculator.cs tests/FamilyTree.Application.Tests/Reports/CompletenessCalculatorTests.cs
@@ -1149,7 +1149,7 @@ The task with the most date arithmetic. The occurrence helper is separated from 
   - `static DateOnly AnniversaryOccurrence.Next(DateOnly anniversary, DateOnly today)`
   - `static UpcomingReport UpcomingCalculator.Calculate(IReadOnlyList<FamilyMember> members, DateOnly today)`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `tests/FamilyTree.Application.Tests/Reports/AnniversaryOccurrenceTests.cs`:
 
@@ -1353,12 +1353,12 @@ public class UpcomingCalculatorTests
 }
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `dotnet test tests/FamilyTree.Application.Tests --filter "FullyQualifiedName~Upcoming|FullyQualifiedName~AnniversaryOccurrence"`
 Expected: FAIL — `AnniversaryOccurrence` and `UpcomingCalculator` do not exist.
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 Create `src/FamilyTree.Contracts/Reports/UpcomingReport.cs`:
 
@@ -1492,12 +1492,12 @@ public static class UpcomingCalculator
 }
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `dotnet test tests/FamilyTree.Application.Tests --filter "FullyQualifiedName~Upcoming|FullyQualifiedName~AnniversaryOccurrence"`
 Expected: PASS — 18 tests.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/FamilyTree.Contracts/Reports/UpcomingReport.cs src/FamilyTree.Application/Reports/AnniversaryOccurrence.cs src/FamilyTree.Application/Reports/UpcomingCalculator.cs tests/FamilyTree.Application.Tests/Reports/AnniversaryOccurrenceTests.cs tests/FamilyTree.Application.Tests/Reports/UpcomingCalculatorTests.cs
@@ -1524,7 +1524,7 @@ ages are counted at the occurrence rather than today."
   - `record ActivityEntry(MemberRef Member, DateTimeOffset At)`
   - `static ActivityReport ActivityCalculator.Calculate(IReadOnlyList<FamilyMember> members, DateTimeOffset now)`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `tests/FamilyTree.Application.Tests/Reports/ActivityCalculatorTests.cs`:
 
@@ -1635,12 +1635,12 @@ public class ActivityCalculatorTests
 }
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `dotnet test tests/FamilyTree.Application.Tests --filter "FullyQualifiedName~ActivityCalculatorTests"`
 Expected: FAIL — `ActivityCalculator` does not exist.
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 Create `src/FamilyTree.Contracts/Reports/ActivityReport.cs`:
 
@@ -1705,12 +1705,12 @@ public static class ActivityCalculator
 }
 ```
 
-- [ ] **Step 4: Run the test to verify it passes**
+- [x] **Step 4: Run the test to verify it passes**
 
 Run: `dotnet test tests/FamilyTree.Application.Tests --filter "FullyQualifiedName~ActivityCalculatorTests"`
 Expected: PASS — 8 tests.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/FamilyTree.Contracts/Reports/ActivityReport.cs src/FamilyTree.Application/Reports/ActivityCalculator.cs tests/FamilyTree.Application.Tests/Reports/ActivityCalculatorTests.cs
@@ -1739,7 +1739,7 @@ listed once. A stand-in for audit history until AuditLog exists."
   - `interface IReportService { Task<ReportsResponse> GetAsync(CancellationToken ct = default); }`
   - `sealed class ReportService(ApplicationDbContext context, TimeProvider timeProvider) : IReportService`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `tests/FamilyTree.Api.IntegrationTests/Reports/ReportServiceTests.cs`:
 
@@ -1876,12 +1876,12 @@ public sealed class ReportServiceTests(PostgresFixture fixture) : DatabaseTestBa
 > `dotnet add tests/FamilyTree.Api.IntegrationTests package Microsoft.Extensions.TimeProvider.Testing`
 > and include the `.csproj` change in this task's commit.
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `dotnet test tests/FamilyTree.Api.IntegrationTests --filter "FullyQualifiedName~ReportServiceTests"`
 Expected: FAIL — `ReportService` does not exist. (Docker must be running.)
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 Create `src/FamilyTree.Contracts/Reports/ReportsResponse.cs`:
 
@@ -1984,12 +1984,12 @@ using FamilyTree.Infrastructure.Reports;
 > `TimeProvider` is already resolvable — `FamilyTreeService` takes it. If the build reports it
 > is unregistered, add `services.AddSingleton(TimeProvider.System);` rather than newing one up.
 
-- [ ] **Step 4: Run the test to verify it passes**
+- [x] **Step 4: Run the test to verify it passes**
 
 Run: `dotnet test tests/FamilyTree.Api.IntegrationTests --filter "FullyQualifiedName~ReportServiceTests"`
 Expected: PASS — 5 tests.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/FamilyTree.Contracts/Reports/ReportsResponse.cs src/FamilyTree.Application/Reports/IReportService.cs src/FamilyTree.Infrastructure/Reports tests/FamilyTree.Api.IntegrationTests/Reports src/FamilyTree.Infrastructure/DependencyInjection.cs
@@ -2013,7 +2013,7 @@ about the tree or the day they describe."
 - Consumes: `IReportService` (Task 7), `RequirePermission` (existing, `FamilyTree.Api.Authorization.EndpointExtensions`).
 - Produces: `GET /api/v1/reports` returning `ReportsResponse` as JSON; `IEndpointRouteBuilder.MapReportEndpoints()`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `tests/FamilyTree.Api.IntegrationTests/Endpoints/ReportEndpointsTests.cs`:
 
@@ -2122,12 +2122,12 @@ public sealed class ReportEndpointsTests(PostgresFixture fixture) : IAsyncLifeti
 }
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `dotnet test tests/FamilyTree.Api.IntegrationTests --filter "FullyQualifiedName~ReportEndpointsTests"`
 Expected: FAIL — 404 on `/api/v1/reports`, since the route is not mapped.
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 Create `src/FamilyTree.Api/Endpoints/Reports/ReportEndpoints.cs`:
 
@@ -2172,17 +2172,17 @@ app.MapRoleEndpoints();
 app.MapReportEndpoints();
 ```
 
-- [ ] **Step 4: Run the test to verify it passes**
+- [x] **Step 4: Run the test to verify it passes**
 
 Run: `dotnet test tests/FamilyTree.Api.IntegrationTests --filter "FullyQualifiedName~ReportEndpointsTests"`
 Expected: PASS — 5 tests.
 
-- [ ] **Step 5: Run the whole backend suite**
+- [x] **Step 5: Run the whole backend suite**
 
 Run: `dotnet test`
 Expected: PASS — every project, no regressions.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/FamilyTree.Api/Endpoints/Reports src/FamilyTree.Api/Program.cs tests/FamilyTree.Api.IntegrationTests/Endpoints/ReportEndpointsTests.cs
@@ -2209,7 +2209,7 @@ PDF export: the reports aggregate data that permission already exposes."
   - `reportsApi.get(): Promise<ReportsResponse>`
   - `reportKeys.all`, `useReportsQuery()`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `frontend/src/features/reports/reportsApi.test.ts`:
 
@@ -2242,12 +2242,12 @@ describe('reportsApi', () => {
 })
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `cd frontend && npx vitest run src/features/reports/reportsApi.test.ts`
 Expected: FAIL — cannot resolve `./reportsApi`.
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 Create `frontend/src/features/reports/types.ts`:
 
@@ -2409,12 +2409,12 @@ export const useReportsQuery = () =>
   useQuery<ReportsResponse>({ queryKey: reportKeys.all, queryFn: () => reportsApi.get() })
 ```
 
-- [ ] **Step 4: Run the test to verify it passes**
+- [x] **Step 4: Run the test to verify it passes**
 
 Run: `cd frontend && npx vitest run src/features/reports/reportsApi.test.ts`
 Expected: PASS — 2 tests.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add frontend/src/features/reports
@@ -2444,7 +2444,7 @@ Delivers a working `/reports` route with the two count-only sections. Task 11 ad
 - Consumes: `useReportsQuery` (Task 9).
 - Produces: `ReportsPage`, `StructureSection`, `LifeStatusSection`; the route `/reports`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `frontend/src/features/reports/ReportsPage.test.tsx`:
 
@@ -2606,12 +2606,12 @@ vi.mock('../features/reports/ReportsPage', () => ({ ReportsPage: () => <p>report
   })
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `cd frontend && npx vitest run src/features/reports src/routes/AppRoutes.test.tsx`
 Expected: FAIL — cannot resolve `./ReportsPage`.
 
-- [ ] **Step 3: Add the i18n keys**
+- [x] **Step 3: Add the i18n keys**
 
 Add to `frontend/src/i18n/locales/en.json`, at the top level beside the existing sections:
 
@@ -2681,7 +2681,7 @@ structure — `locales.test.ts` compares the two key sets and fails on any diver
 Also add the nav label beside the existing `nav.*` keys — `nav.reports`: `"Reports"` in
 English, `"التقارير"` in Arabic.
 
-- [ ] **Step 4: Write the components**
+- [x] **Step 4: Write the components**
 
 Create `frontend/src/features/reports/StructureSection.tsx`:
 
@@ -2886,7 +2886,7 @@ export const ReportsPage = () => {
 > exactly — if `MembersPage` does not wrap itself in `AppShell`, drop the wrapper here and let
 > the route provide it, and use whatever loading key already exists instead of `common.loading`.
 
-- [ ] **Step 5: Register the route and the nav entry**
+- [x] **Step 5: Register the route and the nav entry**
 
 In `frontend/src/routes/AppRoutes.tsx`, add the import beside the others and the route beside
 `/members`:
@@ -2926,12 +2926,12 @@ than adding a seventh item. If nothing else references `nav.dashboard` afterward
 key from both locale files — `locales.test.ts` checks parity between the two, not that every
 key is used, so an orphaned key would rot unnoticed.
 
-- [ ] **Step 6: Run the tests to verify they pass**
+- [x] **Step 6: Run the tests to verify they pass**
 
 Run: `cd frontend && npx vitest run src/features/reports src/routes src/i18n src/app`
 Expected: PASS — the new page tests, the route test, the locale parity test, and the shell tests.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add frontend/src/features/reports frontend/src/routes frontend/src/app/AppShell.tsx frontend/src/i18n/locales
@@ -2965,7 +2965,7 @@ histogram rather than folded into a bracket."
 the existing `fullName` helper against the member list — design §7. The page fetches that list
 once via `useMembersQuery` and passes the index down; sections never compose names themselves.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Extend `frontend/src/features/reports/ReportsPage.test.tsx`. Add the members mock beside the
 existing mocks:
@@ -3106,12 +3106,12 @@ Add these cases inside `describe('ReportsPage')`:
   })
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `cd frontend && npx vitest run src/features/reports/ReportsPage.test.tsx`
 Expected: FAIL — the new test ids are not rendered.
 
-- [ ] **Step 3: Add the i18n keys**
+- [x] **Step 3: Add the i18n keys**
 
 Add to the `reports` object in `frontend/src/i18n/locales/en.json`:
 
@@ -3173,7 +3173,7 @@ Add the Arabic counterpart with the identical key structure to `ar.json`:
     }
 ```
 
-- [ ] **Step 4: Write the components**
+- [x] **Step 4: Write the components**
 
 Create `frontend/src/features/reports/CompletenessSection.tsx`:
 
@@ -3417,12 +3417,12 @@ And inside the `data !== undefined` block, after `LifeStatusSection`:
             <ActivitySection report={data.activity} byId={byId} />
 ```
 
-- [ ] **Step 5: Run the tests to verify they pass**
+- [x] **Step 5: Run the tests to verify they pass**
 
 Run: `cd frontend && npx vitest run src/features/reports src/i18n`
 Expected: PASS — the page suite and the locale parity test.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add frontend/src/features/reports frontend/src/i18n/locales
@@ -3447,7 +3447,7 @@ Without this the links added in Task 11 land on the tree with nothing selected.
 - Consumes: `useSearchParams` from `react-router-dom`.
 - Produces: `/?memberId=<id>` preselects that member. Absent parameter behaves exactly as before.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Read `frontend/src/features/tree/TreePage.test.tsx` first and reuse its fixture ids, its render
 helper, and its existing assertions style. The suite renders inside `MemoryRouter`; add a
@@ -3497,12 +3497,12 @@ fixture for `<memberId>` and `<memberName>`:
 > by whatever role or label its tests already use. Do not add `data-testid` attributes to
 > `TreePage` for this task.
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `cd frontend && npx vitest run src/features/tree/TreePage.test.tsx`
 Expected: FAIL — the member is not selected on arrival.
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 In `frontend/src/features/tree/TreePage.tsx`, add the import:
 
@@ -3524,12 +3524,12 @@ An id matching no member needs no special handling: `findNode` on line 96 alread
 `undefined`, and every consumer guards on that — which is what makes a stale link degrade to
 the plain tree instead of an error.
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `cd frontend && npx vitest run src/features/tree`
 Expected: PASS — the new cases and the whole existing tree suite.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add frontend/src/features/tree
@@ -3547,7 +3547,7 @@ matching nothing degrades to the plain tree."
 **Files:**
 - Modify: `README.md` (one section after the screens paragraph)
 
-- [ ] **Step 1: Run every test**
+- [x] **Step 1: Run every test**
 
 Run: `dotnet test`
 Expected: PASS — all four test projects. (Docker must be running.)
@@ -3555,7 +3555,7 @@ Expected: PASS — all four test projects. (Docker must be running.)
 Run: `cd frontend && npm test`
 Expected: PASS — the whole component suite.
 
-- [ ] **Step 2: Run the linter and the type check**
+- [x] **Step 2: Run the linter and the type check**
 
 Run: `cd frontend && npm run lint && npx tsc --noEmit`
 Expected: no errors. Fix anything reported before continuing.
@@ -3563,7 +3563,7 @@ Expected: no errors. Fix anything reported before continuing.
 > If either script does not exist, check `frontend/package.json` for the actual names and run
 > those instead.
 
-- [ ] **Step 3: Document the screen**
+- [x] **Step 3: Document the screen**
 
 Add to `README.md`, after the paragraph describing the members screen and the tree outline:
 
@@ -3585,7 +3585,7 @@ deletions or attribute a change to a user. `Audit.View` exists in the permission
 no `AuditLog` entity does; a real audit report is blocked on that.
 ```
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add README.md
