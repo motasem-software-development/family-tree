@@ -89,6 +89,11 @@ jobs:
 
       - run: dotnet tool install --global dotnet-ef
 
+      # Required before the bundle build. `dotnet ef migrations bundle` does not restore on its
+      # own and fails with NETSDK1004 ("Assets file project.assets.json not found") on a fresh
+      # runner. This job checks out clean, so nothing else has restored for it.
+      - run: dotnet restore
+
       # A bundle rather than `dotnet ef database update`: it is a self-contained executable
       # carrying only the migrations, so the deploy step needs no SDK, no project restore, and
       # cannot accidentally pick up model changes that were never committed as a migration.

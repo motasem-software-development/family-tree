@@ -45,7 +45,7 @@ services:
 
       # Must match the service's own public URL. Render has no way to interpolate it into a
       # blueprint value, so set it in the dashboard after the first deploy assigns the URL:
-      #   https://familytree-api.onrender.com
+      #   https://familytree-api-551l.onrender.com
       - key: Jwt__Issuer
         sync: false
       - key: Jwt__Audience
@@ -85,11 +85,13 @@ services:
       # Server-side rewrite, so the browser only ever talks to one origin and the API needs no
       # CORS policy (none is registered in Program.cs).
       #
-      # PLACEHOLDER: route destinations must be literal URLs — no variables, no fromService.
-      # Replace this host with the api service's real URL after its first deploy.
+      # Route destinations must be literal URLs — no variables, no fromService — so this host is
+      # hardcoded. The `-551l` suffix is not decorative: Render appends a random suffix when the
+      # service name is already taken globally, so the URL is NOT derivable from the service name
+      # above. If the api service is ever recreated it gets a new suffix and this must be updated.
       - type: rewrite
         source: /api/*
-        destination: https://familytree-api.onrender.com/api/*
+        destination: https://familytree-api-551l.onrender.com/api/*
 
       # SPA history fallback. Must stay LAST: routes match in order, and a /* rule above the
       # /api/* rule would swallow every API call into index.html.
