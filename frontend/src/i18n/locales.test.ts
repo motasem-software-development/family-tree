@@ -40,6 +40,9 @@ const COUNTED = [
   'tree.membersCount',
   'tree.generationsCount',
   'modal.blockedBody',
+  'reports.upcoming.inDays',
+  'reports.upcoming.turningAge',
+  'reports.upcoming.yearsSince',
 ]
 
 describe('locale resources', () => {

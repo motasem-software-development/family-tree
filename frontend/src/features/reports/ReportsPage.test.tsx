@@ -270,6 +270,40 @@ describe('ReportsPage', () => {
     expect(await screen.findByTestId('birthday-row')).toHaveTextContent('36')
   })
 
+  it('shows the true birthday count even when the row list is capped', async () => {
+    vi.mocked(reportsApi.get).mockResolvedValue(
+      report({
+        upcoming: {
+          windowDays: 30,
+          birthdayCount: 60,
+          anniversaryCount: 0,
+          birthdays: [
+            {
+              member: { id: 'b', name: 'فارس', parentId: 'a' },
+              dateOfBirth: '1990-09-01',
+              occurrence: '2026-09-01',
+              daysAway: 10,
+              turningAge: 36,
+            },
+            {
+              member: { id: 'c', name: 'سارة', parentId: 'a' },
+              dateOfBirth: '1992-09-05',
+              occurrence: '2026-09-05',
+              daysAway: 14,
+              turningAge: 34,
+            },
+          ],
+          anniversaries: [],
+        },
+      }),
+    )
+
+    renderPage()
+
+    // 60 affected, 2 rows returned: the screen must show the 60, not the row count.
+    expect(await screen.findByTestId('birthday-count')).toHaveTextContent('60')
+  })
+
   it('says when nothing falls inside the upcoming window', async () => {
     renderPage()
 

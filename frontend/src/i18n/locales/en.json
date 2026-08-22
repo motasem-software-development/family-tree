@@ -268,10 +268,13 @@
       "title": "Next {{days}} days",
       "birthdays": "Birthdays",
       "anniversaries": "Anniversaries",
-      "turningAge": "turning {{age}}",
-      "yearsSince": "{{years}} years",
+      "turningAge_one": "turning {{count}}",
+      "turningAge_other": "turning {{count}}",
+      "yearsSince_one": "{{count}} year",
+      "yearsSince_other": "{{count}} years",
       "today": "Today",
-      "inDays": "In {{days}} days",
+      "inDays_one": "In {{count}} day",
+      "inDays_other": "In {{count}} days",
       "empty": "Nothing falls in the next {{days}} days."
     },
     "activity": {
