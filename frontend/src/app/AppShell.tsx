@@ -182,17 +182,15 @@ export const AppShell = ({
         </div>
 
         <nav style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          <PendingNavItem
-            label={t('nav.dashboard')}
-            icon={
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true">
-                <rect x="4" y="4" width="7" height="7" rx="1.5" />
-                <rect x="13" y="4" width="7" height="7" rx="1.5" />
-                <rect x="4" y="13" width="7" height="7" rx="1.5" />
-                <rect x="13" y="13" width="7" height="7" rx="1.5" />
-              </svg>
-            }
-          />
+          <Link to="/reports" style={navItemStyle(pathname === '/reports', true)}>
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true">
+              <rect x="4" y="4" width="7" height="7" rx="1.5" />
+              <rect x="13" y="4" width="7" height="7" rx="1.5" />
+              <rect x="4" y="13" width="7" height="7" rx="1.5" />
+              <rect x="13" y="13" width="7" height="7" rx="1.5" />
+            </svg>
+            {t('nav.reports')}
+          </Link>
           <Link to="/" style={navItemStyle(pathname === '/', true)}>
             <FamilyIcon />
             {t('nav.tree')}

@@ -10,6 +10,7 @@ import { AppRoutes } from './AppRoutes'
 vi.mock('../features/auth/LoginPage', () => ({ LoginPage: () => <p>login screen</p> }))
 vi.mock('../features/tree/TreePage', () => ({ TreePage: () => <p>tree screen</p> }))
 vi.mock('../features/members/MembersPage', () => ({ MembersPage: () => <p>members screen</p> }))
+vi.mock('../features/reports/ReportsPage', () => ({ ReportsPage: () => <p>reports screen</p> }))
 vi.mock('./ProtectedRoute', () => ({
   ProtectedRoute: ({ children }: { children: ReactNode }) => <>{children}</>,
 }))
@@ -46,5 +47,11 @@ describe('AppRoutes', () => {
     renderAt('/nowhere')
 
     expect(await screen.findByText('tree screen')).toBeInTheDocument()
+  })
+
+  it('serves the reports screen at /reports', async () => {
+    renderAt('/reports')
+
+    expect(await screen.findByText('reports screen')).toBeInTheDocument()
   })
 })

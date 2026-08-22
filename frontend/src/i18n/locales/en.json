@@ -27,7 +27,7 @@
   },
   "nav": {
     "tenantTag": "Family workspace",
-    "dashboard": "Dashboard",
+    "reports": "Reports",
     "tree": "Family tree",
     "members": "Members",
     "users": "Users",
@@ -228,6 +228,34 @@
     "Role": "Roles",
     "Audit": "Audit history",
     "PublicLink": "Public sharing"
+  },
+  "reports": {
+    "title": "Reports",
+    "generatedOn": "As of {{date}}",
+    "loading": "Loading the reports…",
+    "loadFailed": "The reports could not be loaded.",
+    "structure": {
+      "title": "Family structure",
+      "totalMembers": "Members",
+      "depth": "Generations deep",
+      "leafMembers": "Without children",
+      "membersWithChildren": "With children",
+      "averageChildren": "Children per parent",
+      "generation": "Generation {{number}}",
+      "branches": "Branches",
+      "descendants": "Descendants"
+    },
+    "lifeStatus": {
+      "title": "Living and deceased",
+      "living": "Living",
+      "deceased": "Deceased",
+      "ages": "Ages of living members",
+      "unknownAge": "Living, birth date unknown",
+      "longevity": "Lifespan of deceased members",
+      "longevityRange": "{{min}} to {{max}} years",
+      "longevityMedian": "Median {{years}} years",
+      "longevityUnavailable": "No deceased member has both a birth and a death date recorded."
+    }
   },
   "errors": {
     "INVALID_CREDENTIALS": "The email or password is incorrect.",

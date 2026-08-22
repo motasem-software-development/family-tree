@@ -27,7 +27,7 @@
   },
   "nav": {
     "tenantTag": "مساحة العائلة",
-    "dashboard": "لوحة المعلومات",
+    "reports": "التقارير",
     "tree": "شجرة العائلة",
     "members": "الأفراد",
     "users": "المستخدمون",
@@ -252,6 +252,34 @@
     "Role": "الأدوار",
     "Audit": "سجل التغييرات",
     "PublicLink": "المشاركة العامة"
+  },
+  "reports": {
+    "title": "التقارير",
+    "generatedOn": "حتى تاريخ {{date}}",
+    "loading": "جارٍ تحميل التقارير…",
+    "loadFailed": "تعذّر تحميل التقارير.",
+    "structure": {
+      "title": "بنية العائلة",
+      "totalMembers": "الأفراد",
+      "depth": "عدد الأجيال",
+      "leafMembers": "بلا أبناء",
+      "membersWithChildren": "لديهم أبناء",
+      "averageChildren": "معدل الأبناء لكل والد",
+      "generation": "الجيل {{number}}",
+      "branches": "الفروع",
+      "descendants": "الذرية"
+    },
+    "lifeStatus": {
+      "title": "الأحياء والمتوفون",
+      "living": "على قيد الحياة",
+      "deceased": "متوفّون",
+      "ages": "أعمار الأحياء",
+      "unknownAge": "أحياء بتاريخ ميلاد غير معروف",
+      "longevity": "أعمار المتوفين",
+      "longevityRange": "من {{min}} إلى {{max}} سنة",
+      "longevityMedian": "الوسيط {{years}} سنة",
+      "longevityUnavailable": "لا يوجد متوفٍّ مسجَّل له تاريخا ميلاد ووفاة معًا."
+    }
   },
   "errors": {
     "INVALID_CREDENTIALS": "البريد الإلكتروني أو كلمة المرور غير صحيحة.",

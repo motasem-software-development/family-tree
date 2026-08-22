@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import { ChangePasswordPage } from '../features/auth/ChangePasswordPage'
 import { LoginPage } from '../features/auth/LoginPage'
 import { MembersPage } from '../features/members/MembersPage'
+import { ReportsPage } from '../features/reports/ReportsPage'
 import { RolesPage } from '../features/roles/RolesPage'
 import { TreePage } from '../features/tree/TreePage'
 import { UsersPage } from '../features/users/UsersPage'
@@ -51,6 +52,14 @@ export const AppRoutes = () => (
       element={
         <ProtectedRoute>
           <RolesPage />
+        </ProtectedRoute>
+      }
+    />
+    <Route
+      path="/reports"
+      element={
+        <ProtectedRoute>
+          <ReportsPage />
         </ProtectedRoute>
       }
     />
