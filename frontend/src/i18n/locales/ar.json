@@ -279,6 +279,31 @@
       "longevityRange": "من {{min}} إلى {{max}} سنة",
       "longevityMedian": "الوسيط {{years}} سنة",
       "longevityUnavailable": "لا يوجد متوفٍّ مسجَّل له تاريخا ميلاد ووفاة معًا."
+    },
+    "completeness": {
+      "title": "سجلات تحتاج إلى استكمال",
+      "complete": "{{complete}} من {{total}} سجلًا مكتملة",
+      "showingSome": "عرض أول {{shown}}",
+      "MISSING_BIRTH_DATE": "لا يوجد تاريخ ميلاد",
+      "DECEASED_WITHOUT_DEATH_DATE": "مسجَّل متوفّى بلا تاريخ وفاة",
+      "nothingToFix": "جميع السجلات مكتملة."
+    },
+    "upcoming": {
+      "title": "الأيام الـ{{days}} القادمة",
+      "birthdays": "أعياد الميلاد",
+      "anniversaries": "ذكرى الوفاة",
+      "turningAge": "يُتمّ {{age}}",
+      "yearsSince": "{{years}} سنة",
+      "today": "اليوم",
+      "inDays": "بعد {{days}} يومًا",
+      "empty": "لا شيء خلال الأيام الـ{{days}} القادمة."
+    },
+    "activity": {
+      "title": "آخر {{days}} يومًا",
+      "added": "أُضيفوا",
+      "edited": "عُدِّلوا",
+      "empty": "لم يتغيّر شيء خلال آخر {{days}} يومًا.",
+      "note": "مستخرج من طوابع زمن السجلات، لذا لا تظهر عمليات الحذف."
     }
   },
   "errors": {

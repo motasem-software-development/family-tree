@@ -1,8 +1,13 @@
 import { useTranslation } from 'react-i18next'
 import { AppShell } from '../../app/AppShell'
 import { useAuth } from '../auth/AuthContext'
+import { indexById } from '../members/fullName'
+import { useMembersQuery } from '../members/useMembers'
+import { ActivitySection } from './ActivitySection'
+import { CompletenessSection } from './CompletenessSection'
 import { LifeStatusSection } from './LifeStatusSection'
 import { StructureSection } from './StructureSection'
+import { UpcomingSection } from './UpcomingSection'
 import { useReportsQuery } from './useReports'
 
 export const ReportsPage = () => {
@@ -10,6 +15,11 @@ export const ReportsPage = () => {
   const { user } = useAuth()
   const familyName = user?.familyTreeName ?? ''
   const { data, isPending, isError } = useReportsQuery()
+
+  // Report rows carry (id, name, parentId); the lineage is composed here with the helper the
+  // members screen already uses, so the naming rule lives in one place (design §7).
+  const { data: members } = useMembersQuery()
+  const byId = indexById(members ?? [])
 
   return (
     <AppShell
@@ -41,6 +51,9 @@ export const ReportsPage = () => {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
             <StructureSection report={data.structure} />
             <LifeStatusSection report={data.lifeStatus} />
+            <CompletenessSection report={data.completeness} byId={byId} />
+            <UpcomingSection report={data.upcoming} byId={byId} />
+            <ActivitySection report={data.activity} byId={byId} />
           </div>
         </>
       )}

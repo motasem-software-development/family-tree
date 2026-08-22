@@ -255,6 +255,31 @@
       "longevityRange": "{{min}} to {{max}} years",
       "longevityMedian": "Median {{years}} years",
       "longevityUnavailable": "No deceased member has both a birth and a death date recorded."
+    },
+    "completeness": {
+      "title": "Records needing attention",
+      "complete": "{{complete}} of {{total}} records are complete",
+      "showingSome": "Showing the first {{shown}}",
+      "MISSING_BIRTH_DATE": "No birth date recorded",
+      "DECEASED_WITHOUT_DEATH_DATE": "Recorded as deceased with no death date",
+      "nothingToFix": "Every record is complete."
+    },
+    "upcoming": {
+      "title": "Next {{days}} days",
+      "birthdays": "Birthdays",
+      "anniversaries": "Anniversaries",
+      "turningAge": "turning {{age}}",
+      "yearsSince": "{{years}} years",
+      "today": "Today",
+      "inDays": "In {{days}} days",
+      "empty": "Nothing falls in the next {{days}} days."
+    },
+    "activity": {
+      "title": "Last {{days}} days",
+      "added": "Added",
+      "edited": "Edited",
+      "empty": "Nothing has changed in the last {{days}} days.",
+      "note": "Taken from record timestamps, so deletions are not shown."
     }
   },
   "errors": {

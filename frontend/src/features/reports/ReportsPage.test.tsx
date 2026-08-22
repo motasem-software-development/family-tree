@@ -10,6 +10,15 @@ import type { ReportsResponse } from './types'
 
 vi.mock('./reportsApi')
 
+vi.mock('../members/useMembers', () => ({
+  useMembersQuery: () => ({
+    data: [
+      { id: 'a', name: 'سليمان', parentId: null },
+      { id: 'b', name: 'فارس', parentId: 'a' },
+    ],
+  }),
+}))
+
 vi.mock('../auth/AuthContext', () => ({
   useAuth: () => ({
     user: { email: 'admin@example.com', familyTreeName: 'عائلة السقا', permissions: [] },
@@ -162,5 +171,126 @@ describe('ReportsPage', () => {
     renderPage()
 
     expect(await screen.findByRole('alert')).toBeInTheDocument()
+  })
+
+  it('lists each completeness issue with the true count, not the row count', async () => {
+    vi.mocked(reportsApi.get).mockResolvedValue(
+      report({
+        completeness: {
+          totalMembers: 60,
+          completeRecords: 0,
+          issues: [
+            {
+              code: 'MISSING_BIRTH_DATE',
+              count: 60,
+              members: [{ id: 'b', name: 'فارس', parentId: 'a' }],
+            },
+          ],
+        },
+      }),
+    )
+
+    renderPage()
+
+    // 60 affected, 1 row returned: the screen must show the 60.
+    expect(await screen.findByTestId('issue-count-MISSING_BIRTH_DATE')).toHaveTextContent('60')
+  })
+
+  it('links a completeness row to the member in the tree', async () => {
+    vi.mocked(reportsApi.get).mockResolvedValue(
+      report({
+        completeness: {
+          totalMembers: 1,
+          completeRecords: 0,
+          issues: [
+            {
+              code: 'MISSING_BIRTH_DATE',
+              count: 1,
+              members: [{ id: 'b', name: 'فارس', parentId: 'a' }],
+            },
+          ],
+        },
+      }),
+    )
+
+    renderPage()
+
+    expect(await screen.findByRole('link', { name: /فارس/ })).toHaveAttribute(
+      'href',
+      '/?memberId=b',
+    )
+  })
+
+  // Design §7: a bare given name identifies nobody; the lineage comes from the parent chain.
+  it('shows a report row under its composed lineage name', async () => {
+    vi.mocked(reportsApi.get).mockResolvedValue(
+      report({
+        completeness: {
+          totalMembers: 1,
+          completeRecords: 0,
+          issues: [
+            {
+              code: 'MISSING_BIRTH_DATE',
+              count: 1,
+              members: [{ id: 'b', name: 'فارس', parentId: 'a' }],
+            },
+          ],
+        },
+      }),
+    )
+
+    renderPage()
+
+    expect(await screen.findByRole('link', { name: 'فارس سليمان' })).toBeInTheDocument()
+  })
+
+  it('lists an upcoming birthday with the age being reached', async () => {
+    vi.mocked(reportsApi.get).mockResolvedValue(
+      report({
+        upcoming: {
+          windowDays: 30,
+          birthdayCount: 1,
+          anniversaryCount: 0,
+          birthdays: [
+            {
+              member: { id: 'b', name: 'فارس', parentId: 'a' },
+              dateOfBirth: '1990-09-01',
+              occurrence: '2026-09-01',
+              daysAway: 10,
+              turningAge: 36,
+            },
+          ],
+          anniversaries: [],
+        },
+      }),
+    )
+
+    renderPage()
+
+    expect(await screen.findByTestId('birthday-row')).toHaveTextContent('36')
+  })
+
+  it('says when nothing falls inside the upcoming window', async () => {
+    renderPage()
+
+    expect(await screen.findByTestId('upcoming-empty')).toBeInTheDocument()
+  })
+
+  it('lists recently added members', async () => {
+    vi.mocked(reportsApi.get).mockResolvedValue(
+      report({
+        activity: {
+          windowDays: 30,
+          addedCount: 1,
+          editedCount: 0,
+          added: [{ member: { id: 'b', name: 'فارس', parentId: 'a' }, at: '2026-08-21T12:00:00Z' }],
+          edited: [],
+        },
+      }),
+    )
+
+    renderPage()
+
+    expect(await screen.findByTestId('activity-added-row')).toBeInTheDocument()
   })
 })
