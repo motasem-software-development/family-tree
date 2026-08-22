@@ -1,4 +1,3 @@
-import type { FamilyMember } from './types'
 
 /**
  * The editable life facts of a member, in the shape the form holds them: ISO `yyyy-MM-dd`
@@ -22,10 +21,24 @@ export const EMPTY_LIFE_DETAILS: LifeDetails = {
   isDeceased: false,
 }
 
-export const lifeDetailsOf = (member: Pick<FamilyMember, 'dateOfBirth' | 'dateOfDeath' | 'isDeceased'>): LifeDetails => ({
-  dateOfBirth: member.dateOfBirth,
-  dateOfDeath: member.dateOfDeath,
-  isDeceased: member.isDeceased,
+/**
+ * The single normalization point between an API response and the rest of the UI. The parameter
+ * is deliberately typed loose: `FamilyMember` promises `string | null`, but an API deployed a
+ * step behind the frontend omits these fields entirely and they arrive as `undefined`. That is
+ * not hypothetical — it took the tree down after login on the first production deploy, because
+ * `undefined === null` is false and an absent date reached `iso.slice(0, 4)`.
+ *
+ * Everything that reads life details goes through here, so the rest of the code can rely on
+ * the three fields being exactly null / null / boolean.
+ */
+export const lifeDetailsOf = (member: {
+  dateOfBirth?: string | null
+  dateOfDeath?: string | null
+  isDeceased?: boolean | null
+}): LifeDetails => ({
+  dateOfBirth: member.dateOfBirth ?? null,
+  dateOfDeath: member.dateOfDeath ?? null,
+  isDeceased: member.isDeceased === true,
 })
 
 /** `<input type="date">` yields '' for an empty field; the API wants null. */
@@ -63,11 +76,13 @@ const year = (iso: string, locale: string): string =>
  * common case in the imported tree and must render as nothing rather than as a bare dash.
  */
 export const lifeYears = (life: LifeDetails, locale: string): string | null => {
-  const born = life.dateOfBirth === null ? '' : year(life.dateOfBirth, locale)
-  const died = life.dateOfDeath === null ? '' : year(life.dateOfDeath, locale)
+  // Nullish, not `=== null`: normalization upstream should make undefined impossible, but this
+  // formats data that came off the wire and must not be the thing that takes a page down.
+  const born = life.dateOfBirth == null ? '' : year(life.dateOfBirth, locale)
+  const died = life.dateOfDeath == null ? '' : year(life.dateOfDeath, locale)
 
   if (born === '' && died === '') return null
   // An en dash, and no trailing one for a member who is simply still alive with no death date
   // recorded: "1920–" reads as "born 1920, still living", which is exactly right.
-  return life.isDeceased || died !== '' ? `${born}–${died}` : born
+  return life.isDeceased === true || died !== '' ? `${born}–${died}` : born
 }

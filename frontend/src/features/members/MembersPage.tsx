@@ -219,7 +219,7 @@ export function MembersPage() {
                     <tr key={current.id}>
                       <td style={{ ...cellStyle, fontWeight: 500 }}>
                         <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <LifeStatusDot deceased={current.isDeceased} />
+                          <LifeStatusDot deceased={lifeDetailsOf(current).isDeceased} />
                           <span>{current.name}</span>
                           {/* Same treatment as the tree outline, so a member reads the same way
                               whichever screen they are looked at on. */}
