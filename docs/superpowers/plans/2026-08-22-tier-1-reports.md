@@ -164,7 +164,7 @@ public class AgesTests
     }
 
     [Fact]
-    public void A_birth_date_in_a_later_month_of_the_same_year_counts_as_zero()
+    public void A_birth_earlier_in_the_same_year_counts_as_zero_years()
     {
         Ages.YearsBetween(new DateOnly(2026, 1, 5), new DateOnly(2026, 8, 22)).Should().Be(0);
     }
