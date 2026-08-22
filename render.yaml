@@ -5,7 +5,7 @@
 # why there is no `databases:` section and no `fromDatabase` env var: the connection string is
 # entered once in the Render dashboard (see `sync: false` below).
 #
-# Deploys are gated on migrations. See `autoDeploy: false` on the api service.
+# Render auto-deploys on push; CI races the schema in ahead of it. See `autoDeploy` below.
 
 services:
   - type: web
@@ -19,12 +19,13 @@ services:
     dockerContext: .
     healthCheckPath: /health
 
-    # Load-bearing, not a preference. With autoDeploy on, Render starts building the moment
-    # main is pushed — in parallel with the CI job that applies migrations. The new image
-    # would then boot against an unmigrated schema and DatabaseSeeder would crash querying
-    # tables that do not exist. Deploys are triggered instead by the `migrate` job in
-    # .github/workflows/ci.yml, via a deploy hook, only after `efbundle` succeeds.
-    autoDeploy: false
+    # Render builds as soon as main is pushed. The ordering against schema changes is held by
+    # the `migrate` job in .github/workflows/ci.yml, which has no `needs:` and so applies
+    # migrations roughly a minute after the push — well inside the 3-6 minutes a Render Docker
+    # build takes. That margin is the whole guarantee, so do not add a `needs:` to that job:
+    # gating it on the test matrix pushed its start to ~3.5 minutes and it began losing the
+    # race, booting new images against an unmigrated schema.
+    autoDeploy: true
 
     envVars:
       - key: ASPNETCORE_ENVIRONMENT

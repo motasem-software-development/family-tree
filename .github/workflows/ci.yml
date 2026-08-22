@@ -56,17 +56,26 @@ jobs:
       - run: docker build -f src/FamilyTree.Api/Dockerfile -t familytree-api .
       - run: docker build -f frontend/Dockerfile -t familytree-frontend ./frontend
 
-  # Applies schema migrations, then — and only then — triggers the Render deploy.
+  # Applies schema migrations to Neon. It does NOT deploy: Render's api service has
+  # auto-deploy enabled and starts building the moment main is pushed, so this job's only
+  # responsibility is getting the schema ahead of that build.
   #
-  # The api service sets `autoDeploy: false` in render.yaml precisely so this job owns the
-  # ordering. Migrations run first; if `efbundle` fails, the deploy hook is never called and
-  # the currently-running instance keeps serving the old, matching schema.
+  # Deliberately has NO `needs:`. Gating it on backend/frontend/docker delayed its start to
+  # ~3.5 minutes after the push (measured across three runs), while Render begins building
+  # immediately and finishes in roughly 3-6 minutes — so the migration regularly lost the race
+  # and the new image would boot against the old schema, 500ing every query that touches a new
+  # column until the migration landed. Starting at second 0 puts the schema change in place
+  # about a minute in, comfortably before any Render build can finish.
+  #
+  # The cost of dropping the gate is that a migration is applied even if tests later fail. That
+  # is an acceptable trade here: migrations in this repo are additive, an additive migration is
+  # harmless to the running image, and a migration that does not compile still fails this job's
+  # own bundle build.
   #
   # Push-to-main only: pull requests must never touch the production database.
-  migrate-and-deploy:
+  migrate:
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
-    needs: [backend, frontend, docker]
 
     # Placeholders, needed by BOTH the build and the apply step — verified by running the bundle
     # against a throwaway Postgres. EF boots the API's host to resolve the DbContext, not just
@@ -94,9 +103,9 @@ jobs:
       # runner. This job checks out clean, so nothing else has restored for it.
       - run: dotnet restore
 
-      # A bundle rather than `dotnet ef database update`: it is a self-contained executable
-      # carrying only the migrations, so the deploy step needs no SDK, no project restore, and
-      # cannot accidentally pick up model changes that were never committed as a migration.
+      # A bundle rather than `dotnet ef database update`: it carries only the migrations that
+      # are actually committed, so it cannot pick up model changes that were never generated as
+      # a migration — the failure mode where CI goes green and production silently drifts.
       - name: Build migration bundle
         run: |
           dotnet ef migrations bundle \
@@ -113,10 +122,3 @@ jobs:
         run: ./efbundle --connection "$NEON_CONNECTION_STRING"
         env:
           NEON_CONNECTION_STRING: ${{ secrets.NEON_CONNECTION_STRING }}
-
-      # --fail turns a non-2xx into a non-zero exit; without it curl reports success on a 404
-      # deploy hook and a failed deploy would look green.
-      - name: Trigger Render deploy
-        run: curl --fail --silent --show-error "$RENDER_DEPLOY_HOOK_URL"
-        env:
-          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
