@@ -10,6 +10,7 @@ import {
   lifeDetailsOf,
   type LifeDetails,
 } from '../members/lifeDetails'
+import { fullName, indexById, lineageName } from '../members/fullName'
 import type { FamilyTreeNode } from '../members/types'
 import {
   useCreateMember,
@@ -19,7 +20,14 @@ import {
   useUpdateMember,
 } from '../members/useMembers'
 import { ExportDialog } from './ExportDialog'
-import { ancestorIds, findNode, flattenTree, treeStats, type ExpandedMap } from './flattenTree'
+import {
+  allNodes,
+  ancestorIds,
+  findNode,
+  flattenTree,
+  treeStats,
+  type ExpandedMap,
+} from './flattenTree'
 import { ContextMenu, MemberModal, Toast, type MenuAnchor, type ModalKind } from './MemberActions'
 import { MemberPanel } from './MemberPanel'
 import { TreeCanvas } from './TreeCanvas'
@@ -105,6 +113,9 @@ export const TreePage = () => {
   )
   const stats = useMemo(() => treeStats(roots), [roots])
   const selected = selectedId === null ? undefined : findNode(roots, selectedId)
+  // Every ancestor of a selectable node is loaded by construction — a row can only be clicked
+  // once its branch is expanded — so the chain composes off the tree without a second fetch.
+  const byId = useMemo(() => indexById(allNodes(roots)), [roots])
 
   const detailById = useMemo(() => {
     const map = new Map<
@@ -340,6 +351,7 @@ export const TreePage = () => {
         <MemberPanel
           member={selected}
           parentName={parentNameOf(selected)}
+          lineage={lineageName(selected, byId)}
           createdAt={detail?.createdAt}
           updatedAt={detail?.updatedAt}
           life={detail?.life}
@@ -384,7 +396,7 @@ export const TreePage = () => {
       {modal !== null && (
         <MemberModal
           kind={modal}
-          subjectName={selected?.name ?? familyName}
+          subjectName={selected === undefined ? familyName : fullName(selected, byId)}
           parentName={modal === 'add' ? (selected?.name ?? familyName) : parentNameOf(selected)}
           childNames={selected?.children.map((child) => child.name) ?? []}
           nameValue={nameValue}

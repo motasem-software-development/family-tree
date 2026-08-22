@@ -15,6 +15,11 @@ interface MemberPanelProps {
   member: FamilyTreeNode
   parentName: string
   /**
+   * Father, grandfather, great-grandfather — composed by the page from the parent chain, since
+   * the panel only ever holds the one node. Empty for a first-generation member.
+   */
+  lineage: string
+  /**
    * ISO timestamps from the flat members list. The tree endpoint returns structure only, so
    * the page joins the two by id rather than widening the tree DTO for two display fields.
    */
@@ -71,6 +76,7 @@ const formatDate = (iso: string | null | undefined, locale: string): string => {
 export const MemberPanel = ({
   member,
   parentName,
+  lineage,
   createdAt,
   updatedAt,
   life = EMPTY_LIFE_DETAILS,
@@ -82,6 +88,10 @@ export const MemberPanel = ({
 }: MemberPanelProps) => {
   const { t, i18n } = useTranslation()
 
+  // The accessible name has to be the whole name the heading shows: a bare given name
+  // identifies nobody once two cousins share it.
+  const composed = lineage === '' ? member.name : `${member.name} ${lineage}`
+
   const missing: string[] = []
   if (!permissions.canCreate) missing.push('Member.Create')
   if (!permissions.canEdit) missing.push('Member.Edit')
@@ -89,7 +99,7 @@ export const MemberPanel = ({
 
   return (
     <aside
-      aria-label={member.name}
+      aria-label={composed}
       style={{
         width: 320,
         flex: '0 0 320px',
@@ -112,6 +122,11 @@ export const MemberPanel = ({
         <div style={{ minWidth: 0 }}>
           <div style={{ fontSize: 19, fontWeight: 600, lineHeight: 1.35, wordBreak: 'break-word' }}>
             {member.name}
+            {/* Muted, as on a members row: the lineage is context, not four names of equal
+                weight, and the given name still has to be what the eye lands on. */}
+            {lineage !== '' && (
+              <span style={{ fontWeight: 400, color: 'var(--text-3)' }}> {lineage}</span>
+            )}
           </div>
           <div
             style={{

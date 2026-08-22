@@ -110,6 +110,25 @@ describe('TreePage', () => {
     expect(within(panel).getByText(i18n.t('panel.descendants'))).toBeInTheDocument()
   })
 
+  it('titles the panel with the composed lineage name', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText('سليمان')
+    const treeitem = screen.getByRole('treeitem', { name: /سليمان/ })
+    await user.click(within(treeitem).getByRole('button', { name: i18n.t('tree.expand') }))
+    await user.click(await screen.findByText('فارس'))
+
+    // The heading carries the same split as a members row: given name, then a muted lineage.
+    // Its own text node is the given name alone, so the assertion goes through textContent.
+    const panel = await screen.findByRole('complementary', { name: 'فارس سليمان' })
+    expect(
+      within(panel).getByText(
+        (_content, element) =>
+          element?.tagName === 'DIV' && element.textContent === 'فارس سليمان',
+      ),
+    ).toBeInTheDocument()
+  })
+
   it('renders Move disabled, because its backend command is a later phase', async () => {
     const user = userEvent.setup()
     renderPage()
@@ -127,7 +146,7 @@ describe('TreePage', () => {
     await user.click(within(treeitem).getByRole('button', { name: i18n.t('tree.expand') }))
     await user.click(await screen.findByText('فارس'))
 
-    const panel = await screen.findByRole('complementary', { name: 'فارس' })
+    const panel = await screen.findByRole('complementary', { name: 'فارس سليمان' })
     await user.click(within(panel).getByRole('button', { name: i18n.t('tree.edit') }))
     const field = await screen.findByLabelText(i18n.t('modal.nameLabel'))
     await user.clear(field)
@@ -167,6 +186,23 @@ describe('TreePage', () => {
     await user.click(await screen.findByRole('button', { name: i18n.t('modal.confirmDelete') }))
 
     await waitFor(() => expect(membersApi.remove).toHaveBeenCalledWith('s2'))
+  })
+
+  it('names the delete confirmation by the composed name, not the given name alone', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText('سليمان')
+    const treeitem = screen.getByRole('treeitem', { name: /سليمان/ })
+    await user.click(within(treeitem).getByRole('button', { name: i18n.t('tree.expand') }))
+    await user.click(await screen.findByText('فارس'))
+
+    const panel = await screen.findByRole('complementary', { name: 'فارس سليمان' })
+    await user.click(within(panel).getByRole('button', { name: i18n.t('tree.delete') }))
+
+    // Deleting is irreversible, so the dialog has to say which فارس is about to go.
+    expect(
+      await screen.findByText(`${i18n.t('modal.deleteTitle')} — فارس سليمان`),
+    ).toBeInTheDocument()
   })
 
   it('translates a server error code rather than showing it raw', async () => {
@@ -294,7 +330,7 @@ describe('TreePage', () => {
 
     const treeitem = await screen.findByRole('treeitem', { name: /فارس/ })
     expect(treeitem).toHaveAttribute('aria-selected', 'true')
-    const panel = await screen.findByRole('complementary', { name: 'فارس' })
+    const panel = await screen.findByRole('complementary', { name: 'فارس سليمان' })
     expect(within(panel).getByText(i18n.t('panel.descendants'))).toBeInTheDocument()
   })
 
