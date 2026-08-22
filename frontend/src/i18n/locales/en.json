@@ -93,7 +93,9 @@
     "descendants": "Total descendants",
     "created": "Created",
     "updated": "Updated",
-    "close": "Close"
+    "close": "Close",
+    "dateOfBirth": "Date of birth",
+    "dateOfDeath": "Date of death"
   },
   "modal": {
     "addTitle": "Add child",
@@ -134,7 +136,13 @@
     "delete": "Delete",
     "deleting": "Deleting…",
     "confirmDelete": "Delete {{name}}?",
-    "loading": "Loading members…"
+    "loading": "Loading members…",
+    "dateOfBirth": "Date of birth",
+    "dateOfDeath": "Date of death",
+    "markDeceased": "Deceased",
+    "markDeceasedHint": "Tick this when the death is certain even if the date is unknown.",
+    "living": "Living",
+    "deceased": "Deceased"
   },
   "users": {
     "title": "Users",
@@ -252,6 +260,8 @@
     "ROLE_NAME_TOO_LONG": "That role name is too long (100 characters maximum).",
     "ROLE_NAME_TAKEN": "A role with that name already exists.",
     "ROLE_IN_USE": "This role cannot be deleted because it is assigned to users.",
-    "PERMISSION_NOT_FOUND": "Unknown permission. Reload and try again."
+    "PERMISSION_NOT_FOUND": "Unknown permission. Reload and try again.",
+    "MEMBER_DEATH_BEFORE_BIRTH": "A death date cannot be earlier than the birth date.",
+    "MEMBER_DATE_IN_FUTURE": "A birth or death date cannot be in the future."
   }
 }

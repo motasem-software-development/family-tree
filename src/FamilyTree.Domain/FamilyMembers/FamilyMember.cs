@@ -18,6 +18,19 @@ public sealed class FamilyMember : Entity, ITenantOwned
     public Guid? ParentId { get; private set; }
     public string Name { get; private set; } = null!;
 
+    /// <summary>Calendar date, Gregorian. Null when unknown — which is the norm for imported records.</summary>
+    public DateOnly? DateOfBirth { get; private set; }
+
+    /// <summary>Calendar date, Gregorian. Null when unknown, including for a member known to have died.</summary>
+    public DateOnly? DateOfDeath { get; private set; }
+
+    /// <summary>
+    /// Deliberately an explicit flag rather than <c>DateOfDeath is not null</c>. Genealogy
+    /// records routinely establish that someone has died while the date itself is lost, and
+    /// deriving the status would silently record every such ancestor as still living.
+    /// </summary>
+    public bool IsDeceased { get; private set; }
+
     /// <summary>
     /// Application-managed optimistic concurrency token (design spec §3.1). Mapped as an EF
     /// concurrency token, so a stale update fails loudly instead of silently overwriting a
@@ -26,7 +39,8 @@ public sealed class FamilyMember : Entity, ITenantOwned
     public int Version { get; private set; }
 
     public static FamilyMember Create(
-        Guid tenantId, Guid familyTreeId, Guid? parentId, string name, DateTimeOffset now)
+        Guid tenantId, Guid familyTreeId, Guid? parentId, string name, DateTimeOffset now,
+        DateOnly? dateOfBirth = null, DateOnly? dateOfDeath = null, bool isDeceased = false)
     {
         if (tenantId == Guid.Empty)
             throw new DomainException("MEMBER_TENANT_REQUIRED", "A family member must belong to a tenant.");
@@ -43,18 +57,71 @@ public sealed class FamilyMember : Entity, ITenantOwned
             Version = 1
         };
         member.Name = ValidateName(name);
+        member.ApplyLifeDetails(dateOfBirth, dateOfDeath, isDeceased, now);
         member.InitializeTimestamps(now);
         return member;
     }
 
-    public void Rename(string name, DateTimeOffset now)
+    /// <summary>
+    /// The single edit command behind the update endpoint. Name and life details move together
+    /// because one form submission is one edit: bumping <see cref="Version"/> twice for a
+    /// single save would leave the version returned to the client already stale against its
+    /// own write.
+    /// </summary>
+    public void Update(
+        string name, DateOnly? dateOfBirth, DateOnly? dateOfDeath, bool isDeceased, DateTimeOffset now)
     {
-        // Validate before mutating: a rejected rename must leave the entity exactly as it was.
-        var validated = ValidateName(name);
+        // Validate everything before mutating anything: a rejected update must leave the
+        // entity exactly as it was, version included.
+        var validatedName = ValidateName(name);
+        var life = ValidateLifeDetails(dateOfBirth, dateOfDeath, isDeceased, now);
 
-        Name = validated;
+        Name = validatedName;
+        DateOfBirth = life.DateOfBirth;
+        DateOfDeath = life.DateOfDeath;
+        IsDeceased = life.IsDeceased;
         Version++;
         Touch(now);
+    }
+
+    /// <summary>
+    /// Changes only the name, leaving the life details as they are. A delegate to
+    /// <see cref="Update"/> rather than its own validate-then-mutate block, so there is exactly
+    /// one path through the member's write rules and no way for the two to drift apart.
+    /// </summary>
+    public void Rename(string name, DateTimeOffset now) =>
+        Update(name, DateOfBirth, DateOfDeath, IsDeceased, now);
+
+    private void ApplyLifeDetails(
+        DateOnly? dateOfBirth, DateOnly? dateOfDeath, bool isDeceased, DateTimeOffset now)
+    {
+        var life = ValidateLifeDetails(dateOfBirth, dateOfDeath, isDeceased, now);
+        DateOfBirth = life.DateOfBirth;
+        DateOfDeath = life.DateOfDeath;
+        IsDeceased = life.IsDeceased;
+    }
+
+    /// <summary>
+    /// Validates the life details and returns the normalized triple. A death date implies the
+    /// deceased flag: a caller supplying one has stated the fact, and storing the date next to
+    /// "still living" would make the row contradict itself.
+    /// </summary>
+    private static (DateOnly? DateOfBirth, DateOnly? DateOfDeath, bool IsDeceased) ValidateLifeDetails(
+        DateOnly? dateOfBirth, DateOnly? dateOfDeath, bool isDeceased, DateTimeOffset now)
+    {
+        // "Today" in UTC. Members are recorded from many time zones and a calendar date has no
+        // zone of its own, so a single server-side reference day is the only stable bound —
+        // and it is inclusive, because a newborn recorded on the day of birth must be accepted.
+        var today = DateOnly.FromDateTime(now.UtcDateTime);
+
+        if (dateOfBirth > today || dateOfDeath > today)
+            throw new DomainException("MEMBER_DATE_IN_FUTURE", "A birth or death date cannot be in the future.");
+
+        if (dateOfBirth is { } born && dateOfDeath is { } died && died < born)
+            throw new DomainException(
+                "MEMBER_DEATH_BEFORE_BIRTH", "A death date cannot be earlier than the birth date.");
+
+        return (dateOfBirth, dateOfDeath, isDeceased || dateOfDeath is not null);
     }
 
     private static string ValidateName(string name)

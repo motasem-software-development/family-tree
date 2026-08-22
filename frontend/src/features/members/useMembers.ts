@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import type { LifeDetails } from './lifeDetails'
 import { membersApi } from './membersApi'
 import type { FamilyMember, FamilyTreeView, TreeQueryParams } from './types'
 
@@ -34,8 +35,15 @@ const useInvalidateMembers = () => {
 export const useCreateMember = () => {
   const invalidate = useInvalidateMembers()
   return useMutation({
-    mutationFn: ({ name, parentId }: { name: string; parentId: string | null }) =>
-      membersApi.create(name, parentId),
+    mutationFn: ({
+      name,
+      parentId,
+      life,
+    }: {
+      name: string
+      parentId: string | null
+      life: LifeDetails
+    }) => membersApi.create(name, parentId, life),
     onSuccess: invalidate,
   })
 }
@@ -43,8 +51,17 @@ export const useCreateMember = () => {
 export const useUpdateMember = () => {
   const invalidate = useInvalidateMembers()
   return useMutation({
-    mutationFn: ({ id, name, version }: { id: string; name: string; version: number }) =>
-      membersApi.update(id, name, version),
+    mutationFn: ({
+      id,
+      name,
+      version,
+      life,
+    }: {
+      id: string
+      name: string
+      version: number
+      life: LifeDetails
+    }) => membersApi.update(id, name, version, life),
     onSuccess: invalidate,
   })
 }

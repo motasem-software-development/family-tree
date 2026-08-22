@@ -10,9 +10,31 @@ public sealed class FamilyMemberConfiguration : IEntityTypeConfiguration<FamilyM
 {
     public void Configure(EntityTypeBuilder<FamilyMember> builder)
     {
-        builder.ToTable("family_members");
+        // The two life-detail invariants are enforced by the database as well as by the domain,
+        // the same belt-and-braces the cross-tenant parent link gets in §3.3 below: Phase 2.5's
+        // bulk import writes members in volume, and a check constraint cannot be bypassed by a
+        // code path that forgets to call the aggregate. The "not in the future" rule is
+        // deliberately NOT here — it depends on the current date, so it would have to be
+        // re-evaluated on every read to stay true, and CHECK is only evaluated on write.
+        builder.ToTable("family_members", table =>
+        {
+            table.HasCheckConstraint(
+                "ck_member_death_after_birth",
+                "date_of_death IS NULL OR date_of_birth IS NULL OR date_of_death >= date_of_birth");
+
+            table.HasCheckConstraint(
+                "ck_member_death_date_implies_deceased",
+                "date_of_death IS NULL OR is_deceased");
+        });
         builder.HasKey(x => x.Id);
         builder.Property(x => x.Name).IsRequired().HasMaxLength(FamilyMember.MaxNameLength);
+
+        // DateOnly maps to PostgreSQL `date` — a calendar date with no time and no zone, which
+        // is exactly what a birth or death date is. Storing them as timestamps would invent a
+        // midnight that shifts the day under a time-zone conversion.
+        builder.Property(x => x.DateOfBirth).HasColumnType("date");
+        builder.Property(x => x.DateOfDeath).HasColumnType("date");
+        builder.Property(x => x.IsDeceased).IsRequired().HasDefaultValue(false);
 
         // Optimistic concurrency (design spec §3.1, technical specification §43). EF puts this
         // column in the UPDATE's WHERE clause; a stale value matches no row and raises

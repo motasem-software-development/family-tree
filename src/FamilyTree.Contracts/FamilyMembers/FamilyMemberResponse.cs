@@ -10,4 +10,7 @@ public sealed record FamilyMemberResponse(
     Guid? ParentId,
     int Version,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    DateOnly? DateOfBirth,
+    DateOnly? DateOfDeath,
+    bool IsDeceased);

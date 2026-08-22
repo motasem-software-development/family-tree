@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { membersApi } from './membersApi'
+import { EMPTY_LIFE_DETAILS } from './lifeDetails'
 import { tokenStorage } from '../../services/tokenStorage'
 import { ApiError } from '../../services/apiClient'
 
@@ -34,11 +35,17 @@ describe('membersApi', () => {
     )
     vi.stubGlobal('fetch', fetchMock)
 
-    await membersApi.create('سليمان', null)
+    await membersApi.create('سليمان', null, EMPTY_LIFE_DETAILS)
 
     const [, init] = fetchMock.mock.calls[0]
     expect(init.method).toBe('POST')
-    expect(JSON.parse(init.body as string)).toEqual({ name: 'سليمان', parentId: null })
+    expect(JSON.parse(init.body as string)).toEqual({
+      name: 'سليمان',
+      parentId: null,
+      dateOfBirth: null,
+      dateOfDeath: null,
+      isDeceased: false,
+    })
   })
 
   it('sends the version when updating so the server can detect a stale write', async () => {
@@ -47,19 +54,25 @@ describe('membersApi', () => {
     )
     vi.stubGlobal('fetch', fetchMock)
 
-    await membersApi.update('a', 'فارس أحمد', 1)
+    await membersApi.update('a', 'فارس أحمد', 1, EMPTY_LIFE_DETAILS)
 
     const [url, init] = fetchMock.mock.calls[0]
     expect(url).toBe('/api/v1/family-members/a')
     expect(init.method).toBe('PUT')
-    expect(JSON.parse(init.body as string)).toEqual({ name: 'فارس أحمد', version: 1 })
+    expect(JSON.parse(init.body as string)).toEqual({
+      name: 'فارس أحمد',
+      version: 1,
+      dateOfBirth: null,
+      dateOfDeath: null,
+      isDeceased: false,
+    })
   })
 
   it('never sends parentId on update, because the server rejects it', async () => {
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ id: 'a', version: 2 }))
     vi.stubGlobal('fetch', fetchMock)
 
-    await membersApi.update('a', 'فارس', 1)
+    await membersApi.update('a', 'فارس', 1, EMPTY_LIFE_DETAILS)
 
     const body = JSON.parse(fetchMock.mock.calls[0][1].body as string)
     expect(body).not.toHaveProperty('parentId')

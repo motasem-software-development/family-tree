@@ -1,3 +1,4 @@
+import { EMPTY_LIFE_DETAILS, type LifeDetails } from '../members/lifeDetails'
 import type { FamilyTreeNode } from '../members/types'
 
 /** One rendered line of the outline. Depth is 0-based; generation is the server's 1-based value. */
@@ -16,7 +17,15 @@ export interface TreeRow {
   matched: boolean
   /** Search is active and this row is not a match, so it renders faded rather than hidden. */
   dimmed: boolean
+  /**
+   * Joined in from the flat members list, not the tree endpoint — the tree DTO carries
+   * structure only, and the page already holds both (see the detailById map in TreePage).
+   */
+  life: LifeDetails
 }
+
+/** Life details by member id, as joined from the flat list. Missing ids fall back to living. */
+export type LifeDetailsMap = ReadonlyMap<string, LifeDetails>
 
 export type ExpandedMap = Readonly<Record<string, boolean>>
 
@@ -33,6 +42,7 @@ export const flattenTree = (
   rootMembers: readonly FamilyTreeNode[],
   expanded: ExpandedMap,
   query = '',
+  lifeById: LifeDetailsMap = new Map(),
 ): TreeRow[] => {
   const term = normalize(query)
   const rows: TreeRow[] = []
@@ -55,6 +65,9 @@ export const flattenTree = (
         isOpen,
         matched,
         dimmed: term.length > 0 && !matched,
+        // The flat list can lag the tree by one fetch after a create. Defaulting to "living,
+        // dates unknown" shows the new member plainly rather than blanking their row.
+        life: lifeById.get(node.id) ?? EMPTY_LIFE_DETAILS,
       })
 
       if (isOpen && childCount > 0) walk(node.children, depth + 1)

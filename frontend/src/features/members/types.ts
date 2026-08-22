@@ -6,6 +6,12 @@ export interface FamilyMember {
   version: number
   createdAt: string
   updatedAt: string
+  /** ISO `yyyy-MM-dd`, Gregorian. Null when unknown — the norm for the imported tree. */
+  dateOfBirth: string | null
+  /** ISO `yyyy-MM-dd`, Gregorian. Null when unknown, including for a member known to have died. */
+  dateOfDeath: string | null
+  /** Explicit, not derived from `dateOfDeath`: "died, date unknown" is a real record. */
+  isDeceased: boolean
 }
 
 export interface FamilyTreeNode {

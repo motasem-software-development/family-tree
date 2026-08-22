@@ -1,5 +1,7 @@
 import type { CSSProperties } from 'react'
 import { useTranslation } from 'react-i18next'
+import { LifeStatusDot } from '../members/LifeStatusDot'
+import { EMPTY_LIFE_DETAILS, type LifeDetails } from '../members/lifeDetails'
 import type { FamilyTreeNode } from '../members/types'
 import { descendantCount } from './flattenTree'
 
@@ -18,6 +20,8 @@ interface MemberPanelProps {
    */
   createdAt: string | undefined
   updatedAt: string | undefined
+  /** From the same join. Absent while the flat list is still loading — treated as living. */
+  life: LifeDetails | undefined
   permissions: MemberPermissions
   onClose: () => void
   onAdd: () => void
@@ -57,8 +61,8 @@ const actionStyle = (enabled: boolean, danger = false): CSSProperties => ({
  * Dates arrive as ISO strings. Rendered with the active locale so Arabic gets Arabic-Indic
  * numerals, per the design system's numeral rule.
  */
-const formatDate = (iso: string | undefined, locale: string): string => {
-  if (iso === undefined) return '—'
+const formatDate = (iso: string | null | undefined, locale: string): string => {
+  if (iso === undefined || iso === null) return '—'
   const parsed = new Date(iso)
   if (Number.isNaN(parsed.getTime())) return iso
   return parsed.toLocaleDateString(locale, { day: 'numeric', month: 'short', year: 'numeric' })
@@ -69,6 +73,7 @@ export const MemberPanel = ({
   parentName,
   createdAt,
   updatedAt,
+  life = EMPTY_LIFE_DETAILS,
   permissions,
   onClose,
   onAdd,
@@ -108,8 +113,24 @@ export const MemberPanel = ({
           <div style={{ fontSize: 19, fontWeight: 600, lineHeight: 1.35, wordBreak: 'break-word' }}>
             {member.name}
           </div>
-          <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 4 }}>
-            {t('tree.gen')} {member.generation}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 7,
+              fontSize: 12,
+              color: 'var(--text-3)',
+              marginTop: 6,
+            }}
+          >
+            <LifeStatusDot deceased={life.isDeceased} />
+            {/* Spelled out, not left to the dot's colour: the status has to survive a
+                greyscale print and a screen reader alike. */}
+            <span>{t(life.isDeceased ? 'members.deceased' : 'members.living')}</span>
+            <span aria-hidden="true">·</span>
+            <span>
+              {t('tree.gen')} {member.generation}
+            </span>
           </div>
         </div>
         <button
@@ -141,6 +162,8 @@ export const MemberPanel = ({
         }}
       >
         <Row label={t('panel.parent')} value={parentName} />
+        <Row label={t('panel.dateOfBirth')} value={formatDate(life.dateOfBirth, i18n.language)} />
+        <Row label={t('panel.dateOfDeath')} value={formatDate(life.dateOfDeath, i18n.language)} />
         <Row label={t('panel.children')} value={String(member.children.length)} />
         <Row label={t('panel.descendants')} value={String(descendantCount(member))} />
         <Row label={t('panel.created')} value={formatDate(createdAt, i18n.language)} />

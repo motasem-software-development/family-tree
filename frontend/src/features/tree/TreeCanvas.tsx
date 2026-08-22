@@ -1,5 +1,7 @@
 import { useEffect, useRef, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
+import { LifeStatusDot } from '../members/LifeStatusDot'
+import { lifeYears } from '../members/lifeDetails'
 import type { Direction } from '../../i18n/useDirection'
 import type { TreeRow } from './flattenTree'
 import { useVisibleRange } from './useVisibleRange'
@@ -357,8 +359,9 @@ const TreeRowView = ({
   onSelect,
   onMenu,
 }: TreeRowViewProps) => {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const hasChildren = row.childCount > 0 || row.hasMoreChildren
+  const years = lifeYears(row.life, i18n.language)
 
   // Node appearance is a small state machine: selected beats matched beats default.
   let background = 'var(--surface)'
@@ -461,7 +464,7 @@ const TreeRowView = ({
         style={{
           height: 36,
           minWidth: 140,
-          maxWidth: 240,
+          maxWidth: 300,
           background,
           border,
           borderRadius: 'var(--r-md)',
@@ -481,10 +484,35 @@ const TreeRowView = ({
         }}
       >
         <span
-          style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-          title={row.name}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 7,
+            minWidth: 0,
+            overflow: 'hidden',
+          }}
         >
-          {row.name}
+          <LifeStatusDot deceased={row.life.isDeceased} />
+          <span
+            style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+            title={row.name}
+          >
+            {row.name}
+          </span>
+          {/* The genealogy convention, and far more informative than the dot alone — but only
+              when a date is actually known, which for the imported tree it usually is not. */}
+          {years !== null && (
+            <span
+              style={{
+                fontFamily: 'var(--mono)',
+                fontSize: 11,
+                color: 'var(--text-3)',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {years}
+            </span>
+          )}
         </span>
         {row.childCount > 0 && (
           <span

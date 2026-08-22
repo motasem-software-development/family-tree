@@ -4,6 +4,11 @@ import { AppShell, type SearchResult } from '../../app/AppShell'
 import { useDirection } from '../../i18n/useDirection'
 import { ApiError } from '../../services/apiClient'
 import { useAuth } from '../auth/AuthContext'
+import {
+  EMPTY_LIFE_DETAILS,
+  lifeDetailsOf,
+  type LifeDetails,
+} from '../members/lifeDetails'
 import type { FamilyTreeNode } from '../members/types'
 import {
   useCreateMember,
@@ -53,6 +58,7 @@ export const TreePage = () => {
   const [menu, setMenu] = useState<MenuAnchor | null>(null)
   const [modal, setModal] = useState<ModalKind | null>(null)
   const [nameValue, setNameValue] = useState('')
+  const [lifeValue, setLifeValue] = useState<LifeDetails>(EMPTY_LIFE_DETAILS)
   const [errorCode, setErrorCode] = useState<string | null>(null)
   const [toast, setToast] = useState('')
   const [exportOpen, setExportOpen] = useState(false)
@@ -76,17 +82,31 @@ export const TreePage = () => {
   }, [])
 
   const roots = useMemo(() => view?.rootMembers ?? [], [view])
+  // Life details for the outline, keyed by id. Separate from detailById below only because the
+  // rows are built before it — same join, same source, no second fetch.
+  const lifeById = useMemo(
+    () => new Map((members ?? []).map((m) => [m.id, lifeDetailsOf(m)])),
+    [members],
+  )
   const rows = useMemo(
-    () => (rootOpen ? flattenTree(roots, expanded, query) : []),
-    [roots, expanded, query, rootOpen],
+    () => (rootOpen ? flattenTree(roots, expanded, query, lifeById) : []),
+    [roots, expanded, query, rootOpen, lifeById],
   )
   const stats = useMemo(() => treeStats(roots), [roots])
   const selected = selectedId === null ? undefined : findNode(roots, selectedId)
 
   const detailById = useMemo(() => {
-    const map = new Map<string, { version: number; createdAt: string; updatedAt: string }>()
+    const map = new Map<
+      string,
+      { version: number; createdAt: string; updatedAt: string; life: LifeDetails }
+    >()
     ;(members ?? []).forEach((m) =>
-      map.set(m.id, { version: m.version, createdAt: m.createdAt, updatedAt: m.updatedAt }),
+      map.set(m.id, {
+        version: m.version,
+        createdAt: m.createdAt,
+        updatedAt: m.updatedAt,
+        life: lifeDetailsOf(m),
+      }),
     )
     return map
   }, [members])
@@ -144,9 +164,10 @@ export const TreePage = () => {
     setQuery('')
   }
 
-  const openModal = (kind: ModalKind, initialName = '') => {
+  const openModal = (kind: ModalKind, initialName = '', initialLife = EMPTY_LIFE_DETAILS) => {
     setModal(kind)
     setNameValue(initialName)
+    setLifeValue(initialLife)
     setErrorCode(null)
     setMenu(null)
   }
@@ -167,7 +188,7 @@ export const TreePage = () => {
       setErrorCode(null)
       const parentId = selectedId
       createMember.mutate(
-        { name: nameValue, parentId },
+        { name: nameValue, parentId, life: lifeValue },
         {
           onSuccess: (created) => {
             if (parentId !== null) setExpanded((current) => ({ ...current, [parentId]: true }))
@@ -190,7 +211,7 @@ export const TreePage = () => {
       }
       setErrorCode(null)
       updateMember.mutate(
-        { id: selected.id, name: nameValue, version: detail.version },
+        { id: selected.id, name: nameValue, version: detail.version, life: lifeValue },
         {
           onSuccess: () => {
             closeModal()
@@ -280,6 +301,7 @@ export const TreePage = () => {
           parentName={parentNameOf(selected)}
           createdAt={detail?.createdAt}
           updatedAt={detail?.updatedAt}
+          life={detail?.life}
           permissions={permissions}
           onClose={() => {
             setPanelOpen(false)
@@ -301,7 +323,17 @@ export const TreePage = () => {
             setMenu(null)
           }}
           onAdd={() => openModal('add')}
-          onEdit={() => openModal('edit', selected?.name ?? '')}
+          onEdit={() =>
+            openModal(
+              'edit',
+              selected?.name ?? '',
+              // Seeded from the flat list, the same join the panel reads: opening the editor
+              // must show the dates already on file, not blank fields that would clear them.
+              selectedId === null
+                ? EMPTY_LIFE_DETAILS
+                : (detailById.get(selectedId)?.life ?? EMPTY_LIFE_DETAILS),
+            )
+          }
           onDelete={() => {
             if (selected !== undefined) openDelete(selected)
           }}
@@ -315,9 +347,11 @@ export const TreePage = () => {
           parentName={modal === 'add' ? (selected?.name ?? familyName) : parentNameOf(selected)}
           childNames={selected?.children.map((child) => child.name) ?? []}
           nameValue={nameValue}
+          lifeValue={lifeValue}
           errorCode={errorCode}
           isSaving={createMember.isPending || updateMember.isPending || deleteMember.isPending}
           onNameChange={setNameValue}
+          onLifeChange={setLifeValue}
           onCancel={closeModal}
           onConfirm={confirm}
         />

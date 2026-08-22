@@ -328,4 +328,135 @@ public sealed class FamilyMemberEndpointsTests(PostgresFixture fixture) : IAsync
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         (await response.Content.ReadFromJsonAsync<FamilyMemberSearchResponse>())!.Total.Should().Be(0);
     }
+
+    // ---- Life details ----
+
+    [Fact]
+    public async Task Post_round_trips_the_life_details()
+    {
+        await AuthenticateAsync();
+
+        var response = await _client.PostAsJsonAsync("/api/v1/family-members",
+            new CreateFamilyMemberRequest(
+                "سليمان", null, new DateOnly(1920, 3, 14), new DateOnly(1995, 11, 2), IsDeceased: true));
+
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
+        var created = (await response.Content.ReadFromJsonAsync<FamilyMemberResponse>())!;
+        created.DateOfBirth.Should().Be(new DateOnly(1920, 3, 14));
+        created.DateOfDeath.Should().Be(new DateOnly(1995, 11, 2));
+        created.IsDeceased.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Post_defaults_a_member_to_living_with_no_dates()
+    {
+        await AuthenticateAsync();
+
+        var created = await CreateAsync("فارس");
+
+        created.DateOfBirth.Should().BeNull();
+        created.DateOfDeath.Should().BeNull();
+        created.IsDeceased.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Post_rejects_a_death_date_before_the_birth_date()
+    {
+        await AuthenticateAsync();
+
+        var response = await _client.PostAsJsonAsync("/api/v1/family-members",
+            new CreateFamilyMemberRequest(
+                "سليمان", null, new DateOnly(1995, 11, 2), new DateOnly(1920, 3, 14), IsDeceased: true));
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await CodeOf(response)).Should().Be("MEMBER_DEATH_BEFORE_BIRTH");
+    }
+
+    [Fact]
+    public async Task Post_rejects_a_birth_date_in_the_future()
+    {
+        await AuthenticateAsync();
+        var tomorrow = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(1);
+
+        var response = await _client.PostAsJsonAsync("/api/v1/family-members",
+            new CreateFamilyMemberRequest("سليمان", null, tomorrow));
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await CodeOf(response)).Should().Be("MEMBER_DATE_IN_FUTURE");
+    }
+
+    [Fact]
+    public async Task Put_updates_the_life_details_alongside_the_name_in_one_version_bump()
+    {
+        await AuthenticateAsync();
+        var created = await CreateAsync("فارس");
+
+        var response = await _client.PutAsJsonAsync($"/api/v1/family-members/{created.Id}",
+            new UpdateFamilyMemberRequest(
+                "فارس أحمد",
+                created.Version,
+                DateOfBirth: new DateOnly(1940, 1, 5),
+                DateOfDeath: new DateOnly(2010, 6, 30),
+                IsDeceased: true));
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var updated = (await response.Content.ReadFromJsonAsync<FamilyMemberResponse>())!;
+        updated.Name.Should().Be("فارس أحمد");
+        updated.DateOfBirth.Should().Be(new DateOnly(1940, 1, 5));
+        updated.DateOfDeath.Should().Be(new DateOnly(2010, 6, 30));
+        updated.IsDeceased.Should().BeTrue();
+        // One save is one edit — the client's returned version must not already be stale.
+        updated.Version.Should().Be(created.Version + 1);
+    }
+
+    [Fact]
+    public async Task Put_marks_a_member_deceased_when_only_a_death_date_is_sent()
+    {
+        await AuthenticateAsync();
+        var created = await CreateAsync("سليمان");
+
+        var response = await _client.PutAsJsonAsync($"/api/v1/family-members/{created.Id}",
+            new UpdateFamilyMemberRequest(
+                "سليمان", created.Version, DateOfDeath: new DateOnly(1995, 11, 2)));
+
+        var updated = (await response.Content.ReadFromJsonAsync<FamilyMemberResponse>())!;
+        updated.IsDeceased.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Put_can_clear_the_life_details_again()
+    {
+        // A mistaken death record has to be correctable, or a misclick is permanent.
+        await AuthenticateAsync();
+        var create = await _client.PostAsJsonAsync("/api/v1/family-members",
+            new CreateFamilyMemberRequest(
+                "سليمان", null, new DateOnly(1920, 3, 14), new DateOnly(1995, 11, 2), IsDeceased: true));
+        var created = (await create.Content.ReadFromJsonAsync<FamilyMemberResponse>())!;
+
+        var response = await _client.PutAsJsonAsync($"/api/v1/family-members/{created.Id}",
+            new UpdateFamilyMemberRequest("سليمان", created.Version));
+
+        var updated = (await response.Content.ReadFromJsonAsync<FamilyMemberResponse>())!;
+        updated.DateOfBirth.Should().BeNull();
+        updated.DateOfDeath.Should().BeNull();
+        updated.IsDeceased.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Put_rejects_a_death_date_before_the_birth_date()
+    {
+        await AuthenticateAsync();
+        var created = await CreateAsync("سليمان");
+
+        var response = await _client.PutAsJsonAsync($"/api/v1/family-members/{created.Id}",
+            new UpdateFamilyMemberRequest(
+                "سليمان",
+                created.Version,
+                DateOfBirth: new DateOnly(1995, 11, 2),
+                DateOfDeath: new DateOnly(1920, 3, 14),
+                IsDeceased: true));
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await CodeOf(response)).Should().Be("MEMBER_DEATH_BEFORE_BIRTH");
+    }
 }

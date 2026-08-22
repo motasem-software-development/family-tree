@@ -4,6 +4,8 @@ import { useQueryClient } from '@tanstack/react-query'
 import { AppShell } from '../../app/AppShell'
 import { useAuth } from '../auth/AuthContext'
 import { ApiError } from '../../services/apiClient'
+import { lifeDetailsOf, lifeYears, type LifeDetails } from './lifeDetails'
+import { LifeStatusDot } from './LifeStatusDot'
 import { MemberForm } from './MemberForm'
 import {
   memberKeys,
@@ -47,7 +49,9 @@ const rowButtonStyle = (danger: boolean): CSSProperties => ({
 })
 
 export function MembersPage() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+  /** Life years for one row, in the active language — see lifeYears for the convention. */
+  const yearsOf = (m: FamilyMember): string | null => lifeYears(lifeDetailsOf(m), i18n.language)
   const { user, hasPermission } = useAuth()
   const queryClient = useQueryClient()
   const { data: members, isLoading } = useMembersQuery()
@@ -61,18 +65,18 @@ export function MembersPage() {
 
   const close = () => setEditing({ mode: 'none' })
 
-  const handleCreate = (name: string, parentId: string | null) => {
+  const handleCreate = (name: string, parentId: string | null, life: LifeDetails) => {
     setErrorCode(null)
     createMember.mutate(
-      { name, parentId },
+      { name, parentId, life },
       { onSuccess: close, onError: (error) => setErrorCode(codeOf(error)) },
     )
   }
 
-  const handleUpdate = (target: FamilyMember, name: string) => {
+  const handleUpdate = (target: FamilyMember, name: string, life: LifeDetails) => {
     setErrorCode(null)
     updateMember.mutate(
-      { id: target.id, name, version: target.version },
+      { id: target.id, name, version: target.version, life },
       {
         onSuccess: close,
         onError: (error) => {
@@ -173,7 +177,7 @@ export function MembersPage() {
               member={editing.member}
               parents={all.filter((candidate) => candidate.id !== editing.member.id)}
               isSaving={updateMember.isPending}
-              onSubmit={(name) => handleUpdate(editing.member, name)}
+              onSubmit={(name, _parentId, life) => handleUpdate(editing.member, name, life)}
               onCancel={close}
             />
           )}
@@ -213,7 +217,26 @@ export function MembersPage() {
                 <tbody>
                   {all.map((current) => (
                     <tr key={current.id}>
-                      <td style={{ ...cellStyle, fontWeight: 500 }}>{current.name}</td>
+                      <td style={{ ...cellStyle, fontWeight: 500 }}>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <LifeStatusDot deceased={current.isDeceased} />
+                          <span>{current.name}</span>
+                          {/* Same treatment as the tree outline, so a member reads the same way
+                              whichever screen they are looked at on. */}
+                          {yearsOf(current) !== null && (
+                            <span
+                              style={{
+                                fontFamily: 'var(--mono)',
+                                fontSize: 11,
+                                fontWeight: 400,
+                                color: 'var(--text-3)',
+                              }}
+                            >
+                              {yearsOf(current)}
+                            </span>
+                          )}
+                        </span>
+                      </td>
                       <td style={{ ...cellStyle, color: 'var(--text-3)' }}>
                         {current.parentId === null
                           ? t('members.noParent')

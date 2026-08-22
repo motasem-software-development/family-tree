@@ -39,7 +39,8 @@ public sealed class FamilyMemberService(
         }
 
         var member = FamilyMember.Create(
-            tenant.TenantId, tree.Id, request.ParentId, request.Name, timeProvider.GetUtcNow());
+            tenant.TenantId, tree.Id, request.ParentId, request.Name, timeProvider.GetUtcNow(),
+            request.DateOfBirth, request.DateOfDeath, request.IsDeceased);
 
         context.FamilyMembers.Add(member);
 
@@ -105,7 +106,12 @@ public sealed class FamilyMemberService(
         if (member.TenantId != tenant.TenantId)
             throw new NotFoundException("MEMBER_NOT_FOUND", "Member not found.");
 
-        member.Rename(request.Name, timeProvider.GetUtcNow());
+        member.Update(
+            request.Name,
+            request.DateOfBirth,
+            request.DateOfDeath,
+            request.IsDeceased,
+            timeProvider.GetUtcNow());
 
         // Load-bearing. EF builds `UPDATE ... WHERE id = @id AND version = @original`, and
         // `@original` defaults to the value it just READ — which always matches, making the
@@ -159,5 +165,6 @@ public sealed class FamilyMemberService(
     }
 
     internal static FamilyMemberResponse Map(FamilyMember member) => new(
-        member.Id, member.Name, member.ParentId, member.Version, member.CreatedAt, member.UpdatedAt);
+        member.Id, member.Name, member.ParentId, member.Version, member.CreatedAt, member.UpdatedAt,
+        member.DateOfBirth, member.DateOfDeath, member.IsDeceased);
 }

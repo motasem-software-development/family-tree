@@ -139,3 +139,23 @@ describe('findNode', () => {
     expect(findNode(tree(), 'nope')).toBeUndefined()
   })
 })
+
+describe('flattenTree life details', () => {
+  it('joins the life details in by id', () => {
+    const rows = flattenTree(tree(), ALL_OPEN, '', new Map([
+      ['f1', { dateOfBirth: '1940-01-05', dateOfDeath: '2010-06-30', isDeceased: true }],
+    ]))
+
+    expect(rows.find((r) => r.id === 'f1')?.life.isDeceased).toBe(true)
+    expect(rows.find((r) => r.id === 'f1')?.life.dateOfBirth).toBe('1940-01-05')
+  })
+
+  it('falls back to living with no dates for a member the flat list has not caught up with', () => {
+    // The tree and the flat list are two queries. Straight after a create the tree can hold a
+    // member the list does not, and a blank row would be worse than an honest default.
+    const rows = flattenTree(tree(), ALL_OPEN)
+
+    expect(rows.every((r) => !r.life.isDeceased)).toBe(true)
+    expect(rows.every((r) => r.life.dateOfBirth === null)).toBe(true)
+  })
+})

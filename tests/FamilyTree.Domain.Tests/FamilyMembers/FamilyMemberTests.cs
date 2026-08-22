@@ -142,4 +142,176 @@ public class FamilyMemberTests
         member.Version.Should().Be(1);
         member.Name.Should().Be("فارس");
     }
+
+    // ---- Life details: dates of birth and death, and the living/deceased flag ----
+
+    private static readonly DateOnly Born = new(1920, 3, 14);
+    private static readonly DateOnly Died = new(1995, 11, 2);
+
+    [Fact]
+    public void Create_defaults_to_a_living_member_with_no_dates()
+    {
+        // The imported tree carries names and nothing else, so "alive, dates unknown" is the
+        // only honest default for a member created without life details.
+        var member = FamilyMember.Create(TenantId, TreeId, null, "سليمان", Now);
+
+        member.DateOfBirth.Should().BeNull();
+        member.DateOfDeath.Should().BeNull();
+        member.IsDeceased.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Create_records_the_life_details_it_is_given()
+    {
+        var member = FamilyMember.Create(
+            TenantId, TreeId, null, "سليمان", Now, Born, Died, isDeceased: true);
+
+        member.DateOfBirth.Should().Be(Born);
+        member.DateOfDeath.Should().Be(Died);
+        member.IsDeceased.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Create_marks_a_member_deceased_when_a_death_date_is_given_without_the_flag()
+    {
+        // A caller supplying a death date has stated the fact; silently keeping the member
+        // "alive" would contradict the very data being saved.
+        var member = FamilyMember.Create(
+            TenantId, TreeId, null, "سليمان", Now, Born, Died, isDeceased: false);
+
+        member.IsDeceased.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Create_allows_a_deceased_member_with_no_known_death_date()
+    {
+        // The case the explicit flag exists for: genealogy records routinely say "died" while
+        // the date is lost.
+        var member = FamilyMember.Create(
+            TenantId, TreeId, null, "سليمان", Now, Born, null, isDeceased: true);
+
+        member.IsDeceased.Should().BeTrue();
+        member.DateOfDeath.Should().BeNull();
+    }
+
+    [Fact]
+    public void Create_rejects_a_death_date_before_the_birth_date()
+    {
+        var act = () => FamilyMember.Create(
+            TenantId, TreeId, null, "سليمان", Now, Died, Born, isDeceased: true);
+
+        act.Should().Throw<DomainException>().Which.Code.Should().Be("MEMBER_DEATH_BEFORE_BIRTH");
+    }
+
+    [Fact]
+    public void Create_accepts_a_death_date_equal_to_the_birth_date()
+    {
+        // An infant who died the day they were born is a real and unfortunately common record.
+        var member = FamilyMember.Create(
+            TenantId, TreeId, null, "سليمان", Now, Born, Born, isDeceased: true);
+
+        member.DateOfDeath.Should().Be(Born);
+    }
+
+    [Fact]
+    public void Create_rejects_a_birth_date_in_the_future()
+    {
+        var tomorrow = DateOnly.FromDateTime(Now.UtcDateTime).AddDays(1);
+
+        var act = () => FamilyMember.Create(TenantId, TreeId, null, "سليمان", Now, tomorrow);
+
+        act.Should().Throw<DomainException>().Which.Code.Should().Be("MEMBER_DATE_IN_FUTURE");
+    }
+
+    [Fact]
+    public void Create_rejects_a_death_date_in_the_future()
+    {
+        var tomorrow = DateOnly.FromDateTime(Now.UtcDateTime).AddDays(1);
+
+        var act = () => FamilyMember.Create(
+            TenantId, TreeId, null, "سليمان", Now, Born, tomorrow, isDeceased: true);
+
+        act.Should().Throw<DomainException>().Which.Code.Should().Be("MEMBER_DATE_IN_FUTURE");
+    }
+
+    [Fact]
+    public void Create_accepts_a_date_of_today()
+    {
+        // "Today" is the boundary: a newborn recorded the day they are born must be accepted.
+        var today = DateOnly.FromDateTime(Now.UtcDateTime);
+
+        var member = FamilyMember.Create(TenantId, TreeId, null, "سليمان", Now, today);
+
+        member.DateOfBirth.Should().Be(today);
+    }
+
+    [Fact]
+    public void Update_changes_the_name_and_the_life_details_in_one_version_bump()
+    {
+        // One save is one edit: bumping the version twice for a single form submission would
+        // make the client's freshly returned version stale against its own write.
+        var member = FamilyMember.Create(TenantId, TreeId, null, "فارس", Now);
+        var later = Now.AddDays(1);
+
+        member.Update("فارس أحمد", Born, Died, isDeceased: true, now: later);
+
+        member.Name.Should().Be("فارس أحمد");
+        member.DateOfBirth.Should().Be(Born);
+        member.DateOfDeath.Should().Be(Died);
+        member.IsDeceased.Should().BeTrue();
+        member.Version.Should().Be(2);
+        member.UpdatedAt.Should().Be(later);
+    }
+
+    [Fact]
+    public void Update_can_clear_the_life_details_again()
+    {
+        // Correcting a mistaken death record has to be possible, or a misclick is permanent.
+        var member = FamilyMember.Create(
+            TenantId, TreeId, null, "فارس", Now, Born, Died, isDeceased: true);
+
+        member.Update("فارس", null, null, isDeceased: false, now: Now.AddDays(1));
+
+        member.DateOfBirth.Should().BeNull();
+        member.DateOfDeath.Should().BeNull();
+        member.IsDeceased.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Update_applies_the_same_date_rules_as_create()
+    {
+        var member = FamilyMember.Create(TenantId, TreeId, null, "فارس", Now);
+
+        var act = () => member.Update("فارس", Died, Born, isDeceased: true, now: Now);
+
+        act.Should().Throw<DomainException>().Which.Code.Should().Be("MEMBER_DEATH_BEFORE_BIRTH");
+    }
+
+    [Fact]
+    public void Update_leaves_the_member_untouched_when_a_date_is_rejected()
+    {
+        // Same guarantee Rename already makes: a rejected write must not advance the version,
+        // or a client retrying after a validation error hits a spurious concurrency conflict.
+        var member = FamilyMember.Create(TenantId, TreeId, null, "فارس", Now);
+
+        var act = () => member.Update("فارس أحمد", Died, Born, isDeceased: true, now: Now);
+
+        act.Should().Throw<DomainException>();
+        member.Name.Should().Be("فارس");
+        member.Version.Should().Be(1);
+        member.IsDeceased.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Rename_preserves_the_life_details()
+    {
+        var member = FamilyMember.Create(
+            TenantId, TreeId, null, "فارس", Now, Born, Died, isDeceased: true);
+
+        member.Rename("فارس أحمد", Now.AddDays(1));
+
+        member.DateOfBirth.Should().Be(Born);
+        member.DateOfDeath.Should().Be(Died);
+        member.IsDeceased.Should().BeTrue();
+    }
 }

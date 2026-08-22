@@ -1,4 +1,5 @@
 import { apiFetch } from '../../services/apiClient'
+import type { LifeDetails } from './lifeDetails'
 import type {
   FamilyMember,
   FamilyTreeSummary,
@@ -21,20 +22,24 @@ const treePath = (params?: TreeQueryParams): string => {
 export const membersApi = {
   list: (): Promise<FamilyMember[]> => apiFetch<FamilyMember[]>(MEMBERS),
 
-  create: (name: string, parentId: string | null): Promise<FamilyMember> =>
+  create: (name: string, parentId: string | null, life: LifeDetails): Promise<FamilyMember> =>
     apiFetch<FamilyMember>(MEMBERS, {
       method: 'POST',
-      body: JSON.stringify({ name, parentId }),
+      body: JSON.stringify({ name, parentId, ...life }),
     }),
 
   /**
-   * Sends only name and version. parentId is deliberately absent: the server rejects it
-   * outright (design spec §4.6), and re-parenting is the Phase 5 move command.
+   * Sends name, version, and the life details. parentId is deliberately absent: the server
+   * rejects it outright (design spec §4.6), and re-parenting is the Phase 5 move command.
+   *
+   * The life details are replace-semantics on the server, so they are always sent in full —
+   * omitting a cleared date would leave the old value in place and make an unmarked death
+   * record impossible to correct.
    */
-  update: (id: string, name: string, version: number): Promise<FamilyMember> =>
+  update: (id: string, name: string, version: number, life: LifeDetails): Promise<FamilyMember> =>
     apiFetch<FamilyMember>(`${MEMBERS}/${id}`, {
       method: 'PUT',
-      body: JSON.stringify({ name, version }),
+      body: JSON.stringify({ name, version, ...life }),
     }),
 
   remove: (id: string): Promise<void> => apiFetch<void>(`${MEMBERS}/${id}`, { method: 'DELETE' }),

@@ -1,5 +1,7 @@
 import { useState, type CSSProperties, type FormEvent } from 'react'
 import { useTranslation } from 'react-i18next'
+import { LifeDetailsFields } from './LifeDetailsFields'
+import { EMPTY_LIFE_DETAILS, lifeDetailsOf, type LifeDetails } from './lifeDetails'
 import type { FamilyMember } from './types'
 
 interface MemberFormProps {
@@ -8,7 +10,7 @@ interface MemberFormProps {
   /** Candidate parents — excludes the member being edited. */
   parents: FamilyMember[]
   isSaving: boolean
-  onSubmit: (name: string, parentId: string | null) => void
+  onSubmit: (name: string, parentId: string | null, life: LifeDetails) => void
   onCancel: () => void
 }
 
@@ -50,10 +52,13 @@ export function MemberForm({ member, parents, isSaving, onSubmit, onCancel }: Me
   const { t } = useTranslation()
   const [name, setName] = useState(member?.name ?? '')
   const [parentId, setParentId] = useState(member?.parentId ?? '')
+  const [life, setLife] = useState<LifeDetails>(
+    member === undefined ? EMPTY_LIFE_DETAILS : lifeDetailsOf(member),
+  )
 
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault()
-    onSubmit(name, parentId === '' ? null : parentId)
+    onSubmit(name, parentId === '' ? null : parentId, life)
   }
 
   return (
@@ -105,6 +110,14 @@ export function MemberForm({ member, parents, isSaving, onSubmit, onCancel }: Me
           </select>
         </div>
       )}
+
+      <LifeDetailsFields
+        idPrefix="member"
+        value={life}
+        onChange={setLife}
+        labelStyle={labelStyle}
+        controlStyle={controlStyle}
+      />
 
       <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
         <button type="button" onClick={onCancel} style={buttonStyle(false, false)}>

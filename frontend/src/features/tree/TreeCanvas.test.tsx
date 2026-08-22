@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react'
 import { I18nextProvider } from 'react-i18next'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import i18n from '../../i18n'
+import { EMPTY_LIFE_DETAILS } from '../members/lifeDetails'
 import type { TreeRow } from './flattenTree'
 import { TreeCanvas } from './TreeCanvas'
 import { ROW_HEIGHT } from './windowRange'
@@ -22,6 +23,7 @@ const buildRows = (count: number): TreeRow[] =>
     isOpen: false,
     matched: false,
     dimmed: false,
+    life: EMPTY_LIFE_DETAILS,
   }))
 
 const noop = (): void => {}
@@ -101,5 +103,43 @@ describe('TreeCanvas windowing', () => {
     // firstVisible = floor(3000/44) = 68, startIndex = 68 - 6 = 62. The first rendered row's
     // position must reflect its real index in the outline, not its offset within the window.
     expect(rendered[0]).toHaveAttribute('aria-posinset', '63')
+  })
+})
+
+describe('life status', () => {
+  const row = (over: Partial<TreeRow> = {}): TreeRow => ({
+    ...buildRows(1)[0],
+    ...over,
+  })
+
+  it('labels a living member so the status does not rest on colour alone', async () => {
+    renderCanvas([row({ name: 'سليمان' })])
+
+    expect(await screen.findByLabelText(i18n.t('members.living'))).toBeInTheDocument()
+  })
+
+  it('labels a deceased member', async () => {
+    renderCanvas([row({ name: 'سليمان', life: { ...EMPTY_LIFE_DETAILS, isDeceased: true } })])
+
+    expect(await screen.findByLabelText(i18n.t('members.deceased'))).toBeInTheDocument()
+  })
+
+  it('shows the life years next to the name when a date is known', async () => {
+    renderCanvas([
+      row({
+        name: 'سليمان',
+        life: { dateOfBirth: '1920-03-14', dateOfDeath: '1995-11-02', isDeceased: true },
+      }),
+    ])
+
+    expect(await screen.findByText('1920–1995')).toBeInTheDocument()
+  })
+
+  it('shows no year range when no date is known', async () => {
+    // The imported tree carries names and nothing else; a bare dash would be noise on 350 rows.
+    renderCanvas([row({ name: 'سليمان' })])
+
+    await screen.findByText('سليمان')
+    expect(screen.queryByText('–')).not.toBeInTheDocument()
   })
 })

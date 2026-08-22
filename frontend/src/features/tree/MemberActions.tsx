@@ -1,5 +1,7 @@
 import { useEffect, useRef, type CSSProperties, type FormEvent, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
+import { LifeDetailsFields } from '../members/LifeDetailsFields'
+import type { LifeDetails } from '../members/lifeDetails'
 import type { MemberPermissions } from './MemberPanel'
 
 export type ModalKind = 'add' | 'edit' | 'delete' | 'blocked'
@@ -119,6 +121,28 @@ export const ContextMenu = ({
 
 /* ------------------------------------------------------------------------ modal */
 
+/** The modal's own control metrics, passed down so the shared fields match its name input. */
+const MODAL_LABEL_STYLE: CSSProperties = {
+  display: 'block',
+  fontSize: 13,
+  fontWeight: 500,
+  marginBottom: 6,
+  color: 'var(--text-1)',
+}
+
+const MODAL_CONTROL_STYLE: CSSProperties = {
+  width: '100%',
+  height: 40,
+  border: '1px solid var(--border-strong)',
+  borderRadius: 'var(--r-md)',
+  padding: '0 12px',
+  fontFamily: 'inherit',
+  fontSize: 14,
+  outline: 'none',
+  background: 'var(--surface)',
+  color: 'var(--text-1)',
+}
+
 interface MemberModalProps {
   kind: ModalKind
   /** The member being edited or deleted; when adding, the prospective parent. */
@@ -126,9 +150,11 @@ interface MemberModalProps {
   parentName: string
   childNames: readonly string[]
   nameValue: string
+  lifeValue: LifeDetails
   errorCode: string | null
   isSaving: boolean
   onNameChange: (value: string) => void
+  onLifeChange: (value: LifeDetails) => void
   onCancel: () => void
   onConfirm: () => void
 }
@@ -158,9 +184,11 @@ export const MemberModal = ({
   parentName,
   childNames,
   nameValue,
+  lifeValue,
   errorCode,
   isSaving,
   onNameChange,
+  onLifeChange,
   onCancel,
   onConfirm,
 }: MemberModalProps) => {
@@ -309,6 +337,18 @@ export const MemberModal = ({
               >
                 {errorCode !== null ? t(`errors.${errorCode}`, t('errors.UNKNOWN')) : ''}
               </div>
+              <div style={{ marginTop: 14 }}>
+                <LifeDetailsFields
+                  // Distinct from the members-page form's prefix so the two never collide on
+                  // element ids if both are ever mounted at once.
+                  idPrefix="modal-member"
+                  value={lifeValue}
+                  onChange={onLifeChange}
+                  labelStyle={MODAL_LABEL_STYLE}
+                  controlStyle={MODAL_CONTROL_STYLE}
+                />
+              </div>
+
               <div style={{ marginTop: 14 }}>
                 <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 6 }}>
                   {t('modal.parentLabel')}
