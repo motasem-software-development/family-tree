@@ -1,9 +1,10 @@
 namespace FamilyTree.Contracts.Reports;
 
 /// <summary>
-/// Shape only, no member lists: the tree screen already browses these. Because a parent link
-/// is guaranteed to resolve, <paramref name="TotalMembers"/> always equals what the tree
-/// screen renders and generation 1 is exactly <paramref name="Branches"/> (design §5).
+/// Shape only, no member lists: the tree screen already browses these. Provided the caller
+/// computed this from the complete member list of one tree, every parent link is guaranteed to
+/// resolve, so <paramref name="TotalMembers"/> equals what the tree screen renders and
+/// generation 1 is exactly <paramref name="Branches"/> (design §5).
 /// </summary>
 public sealed record StructureReport(
     int TotalMembers,
