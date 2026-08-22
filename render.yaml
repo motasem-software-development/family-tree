@@ -43,11 +43,15 @@ services:
       - key: Jwt__SigningKey
         generateValue: true
 
-      # Must match the service's own public URL. Render has no way to interpolate it into a
-      # blueprint value, so set it in the dashboard after the first deploy assigns the URL:
-      #   https://familytree-api-551l.onrender.com
+      # Must match this service's own public URL — it is compared literally against the `iss`
+      # claim, so no trailing slash. Hardcoded rather than `sync: false`: a blank sync:false var
+      # is not created at all, which is how it went missing on the first deploy and every login
+      # 500'd (JwtTokenService's constructor throws on an empty Issuer, so DI failed before any
+      # auth code ran, while /health kept working because it resolves no ITokenService).
+      # It is a public URL, not a secret. Update it if the api service is ever recreated with a
+      # new random suffix.
       - key: Jwt__Issuer
-        sync: false
+        value: https://familytree-api-551l.onrender.com
       - key: Jwt__Audience
         value: familytree-api
 
