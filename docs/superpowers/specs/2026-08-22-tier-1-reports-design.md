@@ -139,10 +139,10 @@ question is how many children a parent has, and including the childless makes th
 describe nothing.
 
 `Branches` is one entry per member with `ParentId is null`, matching exactly what the tree
-screen roots. Orphans are therefore counted in generation 1 of `Generations` but are **not**
-branches, so `Generations[0].Count` can exceed `Branches.Count`. That gap is intentional and
-is what `ORPHANED_PARENT` explains; the alternative — inventing a phantom branch per orphan —
-would put a root on the report that the tree screen cannot show.
+screen roots. Because a member's parent link is guaranteed to resolve (§6), generation 1 is
+precisely the set of branch roots, so `Generations[0].Count == Branches.Count` and
+`Structure.TotalMembers` always equals what the tree screen displays. Both are worth asserting
+in tests: they are the invariants that catch a broken generation walk.
 
 ### Life status
 
@@ -185,7 +185,6 @@ Issue codes, stable and translated client-side like every other code in this API
 |---|---|
 | `MISSING_BIRTH_DATE` | `DateOfBirth is null` |
 | `DECEASED_WITHOUT_DEATH_DATE` | `IsDeceased && DateOfDeath is null` |
-| `ORPHANED_PARENT` | `ParentId` names a member not present in the tree |
 
 A member can appear under more than one code; the codes are independent worklists, not a
 partition. `CompleteRecords` counts members flagged by no code at all.
@@ -195,6 +194,8 @@ partition. `CompleteRecords` counts members flagged by no code at all.
 ```csharp
 UpcomingReport(
     int WindowDays,
+    int BirthdayCount,
+    int AnniversaryCount,
     IReadOnlyList<UpcomingBirthday> Birthdays,
     IReadOnlyList<UpcomingAnniversary> Anniversaries);
 
@@ -243,11 +244,14 @@ upcoming lists, and both activity lists. Completeness and activity truncate afte
 documented ordering; upcoming truncates by nearest date, the only cut that keeps that list
 useful.
 
-Every capped list carries its untruncated count alongside — `Count` on a completeness issue,
-`AddedCount`/`EditedCount` on activity — mirroring how search returns `total` independent of
-page size. A client must never report `Members.Count` as the number of affected members. The
-upcoming lists are the one exception: within a 30-day window they are not expected to truncate,
-and no separate total is returned, so a client renders exactly what it receives.
+Every capped list carries its untruncated count alongside, with no exceptions — `Count` on a
+completeness issue, `AddedCount`/`EditedCount` on activity, `BirthdayCount`/`AnniversaryCount`
+on upcoming — mirroring how search returns `total` independent of page size. A client must
+never report `Members.Count` as the number of affected members.
+
+A truncation that no field discloses is a lie the contract tells quietly, and a large tree can
+reach 50 in a 30-day window: at 500 members with birth dates, roughly 41 birthdays fall in any
+given month, so the cap is close enough to be crossed rather than hypothetical.
 
 ## 6. Computation rules
 
@@ -264,17 +268,31 @@ member count exactly as `FamilyTreeAssembler.GenerationOf` bounds it, so a malfo
 cannot loop. A first-generation member is generation 1, per BR-003: the root family is the
 `family_trees` row, not a member.
 
-**Orphans.** `FamilyTreeAssembler` roots only members with `ParentId is null`, so a member
-whose `ParentId` names a missing row is silently absent from the tree view. Reports count all
-members, so `Structure.TotalMembers` can legitimately exceed what the tree screen displays.
-Rather than hide the discrepancy, an orphan is treated as generation 1 for counting and is
-reported under `ORPHANED_PARENT`. This is a data-integrity finding the tree screen currently
-swallows, and the report is the right place to surface it.
+**Unresolvable parent links cannot occur, and are still handled.** The composite self
+foreign key `(parent_id, family_tree_id) → (id, family_tree_id)`, added as raw DDL in
+`AddFamilyMembers`, makes a `ParentId` naming a non-existent member physically
+unrepresentable. There is therefore no orphan condition to report, and no completeness code
+for one — an issue that can never fire is also an issue that can never be tested.
+
+The calculators still tolerate an unresolved link rather than throwing, treating such a member
+as generation 1. This is robustness, not a finding: the calculators are pure functions over
+whatever list they are handed, and if reports ever move to a windowed query, a parent outside
+the window is an artifact of the query, not corruption in the data. Nothing in the response
+draws attention to it.
 
 **Added versus edited.** `Entity.InitializeTimestamps` sets `CreatedAt == UpdatedAt`, so a
-newly created member matches any naive "updated recently" filter. `Added` is `CreatedAt`
-within the window; `Edited` is `UpdatedAt` within the window **and** `UpdatedAt != CreatedAt`.
-Without the second clause every addition would appear in both lists.
+newly created member matches any naive "updated recently" filter. The two lists are therefore
+defined to be disjoint:
+
+- `Added` — `CreatedAt` within the window.
+- `Edited` — `UpdatedAt` within the window **and** `CreatedAt` outside it.
+
+Testing `UpdatedAt != CreatedAt` instead is not enough: a member created on Monday and
+corrected on Tuesday satisfies both clauses and would be listed twice in the same week's
+report. Anchoring `Edited` on `CreatedAt` outside the window makes it mean "a change to a
+member that already existed", which is the question the list actually answers. A member both
+added and edited inside the window appears once, under `Added` — its arrival is the more
+informative fact, and its `Added` entry already carries the newer `UpdatedAt` state.
 
 **29 February.** A birthday or anniversary on 29 February is observed on 1 March in a
 non-leap year. Chosen over "skip it" so the person never silently disappears from a 30-day
@@ -349,12 +367,20 @@ TDD per the project workflow: test first, watch it fail, implement, refactor.
 **Calculator unit tests** carry the edge cases named in §6 explicitly:
 
 - empty tree; single member; single generation
-- a member whose `ParentId` names a missing row
+- the structure invariants of §5: `Generations[0].Count == Branches.Count`, and
+  `TotalMembers` equal to the member count the tree view would render
+- a member whose `ParentId` names a missing row, asserted to be counted and *not* reported
+  as an issue
 - a cyclic `parentId` chain terminating within the member-count bound
 - every date null; birth date only; death date without `IsDeceased`; `IsDeceased` without a date
 - a birthday on 29 February evaluated in a leap year and in a non-leap year
 - a birthday exactly on the reference day, and exactly at the window edge
+- a window crossing a year boundary: a reference day in mid-December with occurrences in
+  January, asserting the next occurrence is dated in the following year and `DaysAway` and
+  `TurningAge` are computed against it — the case where "this year's occurrence" arithmetic
+  most often goes wrong
 - a member created and edited inside the same window, asserted to appear once, in `Added` only
+- a member created before the window and edited inside it, asserted to appear in `Edited` only
 - a list of exactly 50 and of 51, asserting truncation with the true count preserved
 - even and odd longevity populations, asserting the median rule
 
