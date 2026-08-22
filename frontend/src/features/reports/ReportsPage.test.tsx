@@ -91,6 +91,32 @@ describe('ReportsPage', () => {
     expect(await screen.findByTestId('structure-total')).toHaveTextContent('5')
   })
 
+  // Regression: `generatedOn` is a YYYY-MM-DD string, parsed as UTC midnight. Formatting it
+  // in the viewer's local zone (rather than pinned to UTC) makes anyone west of UTC see the
+  // day before the server measured. Forcing TZ west of UTC here reproduces that bug even when
+  // the test machine itself sits at or east of UTC.
+  it("shows the server's day, not the viewer's local day", async () => {
+    vi.stubEnv('TZ', 'America/Los_Angeles')
+    try {
+      renderPage()
+
+      // Computed the same way the component pins it: formatted in UTC, so the asserted day
+      // is the day the server measured rather than a hardcoded localized string.
+      const expectedDay = new Intl.DateTimeFormat(i18n.language, { timeZone: 'UTC' }).format(
+        new Date('2026-08-22'),
+      )
+
+      expect(
+        await screen.findByText(
+          (_, element) =>
+            element?.tagName === 'P' && (element?.textContent?.includes(expectedDay) ?? false),
+        ),
+      ).toBeInTheDocument()
+    } finally {
+      vi.unstubAllEnvs()
+    }
+  })
+
   it('lists a row per generation', async () => {
     renderPage()
 

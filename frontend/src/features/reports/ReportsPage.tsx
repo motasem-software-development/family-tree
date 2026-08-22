@@ -25,10 +25,16 @@ export const ReportsPage = () => {
       {data !== undefined && (
         <>
           {/* The server's reference day, shown rather than re-derived: a client in another
-              time zone must not disagree with the figures it is labelling (design §5). */}
+              time zone must not disagree with the figures it is labelling (design §5).
+              Pinned to UTC: `generatedOn` is a YYYY-MM-DD string, which `Date` parses as UTC
+              midnight, so the formatter must stay in UTC too — otherwise a viewer west of
+              UTC sees the day before the one the server measured. Do not "fix" this back to
+              the viewer's local zone. */}
           <p style={{ fontSize: 11, color: 'var(--text-3)' }}>
             {t('reports.generatedOn', {
-              date: new Intl.DateTimeFormat(i18n.language).format(new Date(data.generatedOn)),
+              date: new Intl.DateTimeFormat(i18n.language, { timeZone: 'UTC' }).format(
+                new Date(data.generatedOn),
+              ),
             })}
           </p>
 
