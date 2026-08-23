@@ -92,6 +92,29 @@ public sealed class FamilyMember : Entity, ITenantOwned
     public void Rename(string name, DateTimeOffset now) =>
         Update(name, DateOfBirth, DateOfDeath, IsDeceased, now);
 
+    /// <summary>
+    /// Re-parents the member. A null <paramref name="newParentId"/> promotes them to first
+    /// generation, attached to the family tree rather than to a member (BR-003).
+    ///
+    /// Only the self-loop is caught here. A deeper cycle needs the ancestor chain, which this
+    /// entity cannot see — Infrastructure's recursive CTE owns those (design §3.1). Validation
+    /// precedes mutation, so a refused move leaves the member exactly as it was.
+    /// </summary>
+    public void MoveTo(Guid? newParentId, DateTimeOffset now)
+    {
+        // Same normalization as Create: Guid.Empty is never a real member id, and letting it
+        // through would fail a foreign key at write time instead of recording "no parent".
+        var parentId = newParentId == Guid.Empty ? null : newParentId;
+
+        if (parentId == Id)
+            throw new DomainException(
+                "MOVE_CREATES_CYCLE", "A member cannot be their own parent.");
+
+        ParentId = parentId;
+        Version++;
+        Touch(now);
+    }
+
     private void ApplyLifeDetails(
         DateOnly? dateOfBirth, DateOnly? dateOfDeath, bool isDeceased, DateTimeOffset now)
     {

@@ -60,7 +60,6 @@
     "delete": "Delete",
     "gen": "Generation",
     "needPerm": "Requires",
-    "movePhase": "Move isn't available yet.",
     "treeLabel": "Family tree",
     "resultCount_one": "{{count}} result",
     "resultCount_other": "{{count}} results",
@@ -117,10 +116,21 @@
     "blockedBody_one": "Can't delete {{name}} because they have {{count}} child. Move or delete that child first.",
     "blockedBody_other": "Can't delete {{name}} because they have {{count}} children. Move or delete those children first."
   },
+  "move": {
+    "title": "Move member",
+    "body": "Choose the member {{name}} should be attached to.",
+    "searchPlaceholder": "Search for the new parent…",
+    "rootOption": "{{family}} — first generation",
+    "self": "A member cannot be their own parent.",
+    "descendant": "This member is already beneath the one being moved.",
+    "confirm": "Move",
+    "noResults": "No matching members."
+  },
   "toast": {
     "added": "{{name}} was added.",
     "saved": "Name saved.",
-    "deleted": "{{name}} was deleted."
+    "deleted": "{{name}} was deleted.",
+    "moved": "{{name}} was moved."
   },
   "members": {
     "title": "Family members",
@@ -298,6 +308,7 @@
     "MEMBER_HAS_CHILDREN": "This member cannot be deleted because they have children.",
     "MEMBER_FIELD_NOT_UPDATABLE": "Only the name can be changed here.",
     "MEMBER_NOT_FOUND": "That member no longer exists. Reload and try again.",
+    "MOVE_CREATES_CYCLE": "This member cannot be moved under their own descendant.",
     "CONCURRENCY_CONFLICT": "Someone else changed this member. Reload and try again.",
     "FAMILY_TREE_NOT_FOUND": "This family tree could not be found.",
     "FAMILY_TREE_NAME_REQUIRED": "A family tree name is required.",

@@ -314,4 +314,73 @@ public class FamilyMemberTests
         member.DateOfDeath.Should().Be(Died);
         member.IsDeceased.Should().BeTrue();
     }
+
+    [Fact]
+    public void MoveTo_reattaches_the_member_to_a_new_parent()
+    {
+        var member = FamilyMember.Create(TenantId, TreeId, Guid.CreateVersion7(), "فارس", Now);
+        var newParent = Guid.CreateVersion7();
+
+        member.MoveTo(newParent, Now);
+
+        member.ParentId.Should().Be(newParent);
+    }
+
+    [Fact]
+    public void MoveTo_null_promotes_the_member_to_first_generation()
+    {
+        var member = FamilyMember.Create(TenantId, TreeId, Guid.CreateVersion7(), "فارس", Now);
+
+        member.MoveTo(null, Now);
+
+        member.ParentId.Should().BeNull();
+    }
+
+    [Fact]
+    public void MoveTo_treats_an_empty_guid_as_no_parent()
+    {
+        // Create already normalizes Guid.Empty; a move that did not would send it to the
+        // database and fail a foreign key instead of recording a first-generation member.
+        var member = FamilyMember.Create(TenantId, TreeId, Guid.CreateVersion7(), "فارس", Now);
+
+        member.MoveTo(Guid.Empty, Now);
+
+        member.ParentId.Should().BeNull();
+    }
+
+    [Fact]
+    public void MoveTo_bumps_the_version_and_the_timestamp()
+    {
+        var member = FamilyMember.Create(TenantId, TreeId, null, "فارس", Now);
+        var later = Now.AddHours(1);
+
+        member.MoveTo(Guid.CreateVersion7(), later);
+
+        member.Version.Should().Be(2);
+        member.UpdatedAt.Should().Be(later);
+    }
+
+    [Fact]
+    public void MoveTo_refuses_to_make_a_member_their_own_parent()
+    {
+        var member = FamilyMember.Create(TenantId, TreeId, null, "فارس", Now);
+
+        var act = () => member.MoveTo(member.Id, Now);
+
+        act.Should().Throw<DomainException>().Which.Code.Should().Be("MOVE_CREATES_CYCLE");
+    }
+
+    [Fact]
+    public void MoveTo_leaves_the_member_untouched_when_it_refuses()
+    {
+        var original = Guid.CreateVersion7();
+        var member = FamilyMember.Create(TenantId, TreeId, original, "فارس", Now);
+
+        var act = () => member.MoveTo(member.Id, Now.AddHours(1));
+
+        act.Should().Throw<DomainException>();
+        member.ParentId.Should().Be(original);
+        member.Version.Should().Be(1);
+        member.UpdatedAt.Should().Be(Now);
+    }
 }

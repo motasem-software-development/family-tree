@@ -45,6 +45,21 @@ replicas booting at once could race on the same seeded tenant/admin.
 The members screen is at `/members` once signed in, and the tree outline is at `/`. Search runs
 server-side and returns each hit's ancestor path; the outline renders only the rows in view.
 
+A member can be re-parented with `POST /api/v1/family-members/{id}/move`, which takes
+`{ parentId, version }` and is guarded by `Member.Move`. A null `parentId` promotes the member
+to the first generation, attached to the tree itself rather than to a member. The command
+refuses any target that is the member or one of their descendants with `MOVE_CREATES_CYCLE`,
+detected by a recursive query inside the move transaction rather than in memory, and serialized
+per tenant so that two concurrent moves cannot each pass their own check and jointly close a
+loop.
+
+Move is deliberately not a field on `PUT`, which still rejects `parentId` outright. Generations
+are not stored, so a moved subtree renumbers itself on the next read — there is no backfill and
+no migration.
+
+Unlike design spec §4.6, the move transaction does not yet write an audit row: there is no
+`audit_logs` table. The transaction exists so that insert can be added without restructuring.
+
 The reports screen is at `/reports`. It answers questions the tree cannot: how deep and how
 balanced the family is, how the living and deceased divide, which records still need a date,
 whose birthday or death anniversary falls in the next 30 days, and what changed in the last 30.

@@ -9,6 +9,7 @@ export interface MemberPermissions {
   canCreate: boolean
   canEdit: boolean
   canDelete: boolean
+  canMove: boolean
 }
 
 interface MemberPanelProps {
@@ -31,6 +32,7 @@ interface MemberPanelProps {
   onClose: () => void
   onAdd: () => void
   onEdit: () => void
+  onMove: () => void
   onDelete: () => void
 }
 
@@ -84,6 +86,7 @@ export const MemberPanel = ({
   onClose,
   onAdd,
   onEdit,
+  onMove,
   onDelete,
 }: MemberPanelProps) => {
   const { t, i18n } = useTranslation()
@@ -95,6 +98,7 @@ export const MemberPanel = ({
   const missing: string[] = []
   if (!permissions.canCreate) missing.push('Member.Create')
   if (!permissions.canEdit) missing.push('Member.Edit')
+  if (!permissions.canMove) missing.push('Member.Move')
   if (!permissions.canDelete) missing.push('Member.Delete')
 
   return (
@@ -214,8 +218,12 @@ export const MemberPanel = ({
         >
           {t('tree.edit')}
         </button>
-        {/* Move needs the Phase 5 command with cycle detection; disabled rather than dead. */}
-        <button type="button" disabled title={t('tree.movePhase')} style={actionStyle(false)}>
+        <button
+          type="button"
+          onClick={onMove}
+          disabled={!permissions.canMove}
+          style={actionStyle(permissions.canMove)}
+        >
           {t('tree.move')}
         </button>
         <button
@@ -228,9 +236,13 @@ export const MemberPanel = ({
         </button>
       </div>
 
-      <div style={{ fontSize: 12, lineHeight: 1.6, color: 'var(--text-3)', marginTop: 12 }}>
-        {missing.length > 0 ? `${t('tree.needPerm')} ${missing.join(' · ')}` : t('tree.movePhase')}
-      </div>
+      {/* Only rendered when something is actually missing: Move is a real action now, so there
+          is no permanent "not available yet" filler to fall back to when nothing is missing. */}
+      {missing.length > 0 && (
+        <div style={{ fontSize: 12, lineHeight: 1.6, color: 'var(--text-3)', marginTop: 12 }}>
+          {t('tree.needPerm')} {missing.join(' · ')}
+        </div>
+      )}
     </aside>
   )
 }

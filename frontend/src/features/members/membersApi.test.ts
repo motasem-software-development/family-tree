@@ -139,4 +139,35 @@ describe('membersApi', () => {
     )
     expect(result).toEqual(page)
   })
+
+  it('posts a move to the dedicated command endpoint', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse({ id: 'm1', name: 'محمد', parentId: 'p1', version: 4 }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    await membersApi.move('m1', 'p1', 3)
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/v1/family-members/m1/move',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ parentId: 'p1', version: 3 }),
+      }),
+    )
+  })
+
+  it('sends a null parent when promoting to the first generation', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse({ id: 'm1', name: 'محمد', parentId: null, version: 4 }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    await membersApi.move('m1', null, 3)
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/v1/family-members/m1/move',
+      expect.objectContaining({ body: JSON.stringify({ parentId: null, version: 3 }) }),
+    )
+  })
 })

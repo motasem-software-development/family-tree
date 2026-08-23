@@ -67,6 +67,13 @@ public static class FamilyMemberEndpoints
             Results.Ok(await members.UpdateAsync(id, request, ct)))
             .RequirePermission(Permissions.Member.Edit);
 
+        // A dedicated command rather than a field on PUT (design spec §4.6): it carries a rule
+        // no other edit does, and PUT goes on rejecting parentId outright.
+        group.MapPost("/{id:guid}/move", async (
+            Guid id, MoveFamilyMemberRequest request, IFamilyMemberService members, CancellationToken ct) =>
+            Results.Ok(await members.MoveAsync(id, request, ct)))
+            .RequirePermission(Permissions.Member.Move);
+
         group.MapDelete("/{id:guid}", async (
             Guid id, IFamilyMemberService members, CancellationToken ct) =>
         {

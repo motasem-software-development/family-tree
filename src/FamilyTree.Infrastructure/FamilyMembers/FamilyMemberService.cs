@@ -132,6 +132,79 @@ public sealed class FamilyMemberService(
         return Map(member);
     }
 
+    public async Task<FamilyMemberResponse> MoveAsync(
+        Guid id, MoveFamilyMemberRequest request, CancellationToken ct = default)
+    {
+        // One transaction for the check and the write, so the CTE reads the snapshot the write
+        // lands on. Design spec §4.6 also puts an audit insert in here; there is no audit_logs
+        // table yet, and the transaction exists so adding it later is one statement rather
+        // than a restructuring.
+        await using var transaction = await context.Database.BeginTransactionAsync(ct);
+
+        // Design §3.2: two moves can each be acyclic against their own snapshot and jointly
+        // form a cycle. The lock is transaction-scoped and per-tenant, exactly as
+        // AdministratorGuard.SerializeOnTenantAsync does it for the last-administrator rule.
+        // The GUID is folded to a bigint because the advisory-lock namespace is one bigint; a
+        // collision between two tenants costs contention, never a wrong answer.
+        var lockKey = BitConverter.ToInt64(tenant.TenantId.ToByteArray(), 0);
+        await context.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT pg_advisory_xact_lock({lockKey})", ct);
+
+        var member = await context.FamilyMembers.FirstOrDefaultAsync(m => m.Id == id, ct)
+            ?? throw new NotFoundException("MEMBER_NOT_FOUND", "Member not found.");
+
+        // Design spec §3.2, layer 2: see the identical assertion in UpdateAsync for rationale.
+        if (member.TenantId != tenant.TenantId)
+            throw new NotFoundException("MEMBER_NOT_FOUND", "Member not found.");
+
+        if (request.ParentId is { } targetId && targetId != Guid.Empty)
+        {
+            // Same tree as well as same tenant: cross-tree moves are out of scope, and this is
+            // the check that keeps them out. Reported as MEMBER_NOT_FOUND rather than a
+            // distinct code — from the client's side both mean "that id names nothing here".
+            var targetExists = await context.FamilyMembers
+                .AnyAsync(m => m.Id == targetId && m.FamilyTreeId == member.FamilyTreeId, ct);
+
+            if (!targetExists)
+                throw new NotFoundException("MEMBER_NOT_FOUND", "Member not found.");
+
+            if (await CycleCheckQuery.WouldCreateCycleAsync(context, tenant.TenantId, id, targetId, ct))
+                throw new ConflictException(
+                    "MOVE_CREATES_CYCLE",
+                    "This member cannot be moved under their own descendant.");
+        }
+
+        member.MoveTo(request.ParentId, timeProvider.GetUtcNow());
+
+        // Load-bearing for the same reason as in UpdateAsync: without it EF compares the
+        // version it just read, and the concurrency token is inert.
+        context.Entry(member).Property(m => m.Version).OriginalValue = request.Version;
+
+        try
+        {
+            await context.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            throw new ConflictException(
+                "CONCURRENCY_CONFLICT", "This member was changed by someone else. Reload and try again.");
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: ForeignKeyViolation })
+        {
+            // Check-then-act: the targetExists check above can lose a race to a concurrent
+            // delete of the target between the check and this save. The raw fk_member_parent
+            // violation carries no code of its own, so it must be mapped to the same
+            // MEMBER_NOT_FOUND the pre-check would have thrown -- the target has vanished, and
+            // the client must not be able to tell that apart from an id that never existed
+            // (design spec section 4.4).
+            throw new NotFoundException("MEMBER_NOT_FOUND", "Member not found.");
+        }
+
+        await transaction.CommitAsync(ct);
+
+        return Map(member);
+    }
+
     public async Task DeleteAsync(Guid id, CancellationToken ct = default)
     {
         var member = await context.FamilyMembers.FirstOrDefaultAsync(m => m.Id == id, ct)

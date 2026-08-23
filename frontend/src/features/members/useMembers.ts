@@ -66,6 +66,24 @@ export const useUpdateMember = () => {
   })
 }
 
+export const useMoveMember = () => {
+  const invalidate = useInvalidateMembers()
+  return useMutation({
+    mutationFn: ({
+      id,
+      parentId,
+      version,
+    }: {
+      id: string
+      parentId: string | null
+      version: number
+    }) => membersApi.move(id, parentId, version),
+    // The whole members namespace, as every other mutation does: a move changes the tree's
+    // shape, the moved member's version, and every ancestor path the search results carry.
+    onSuccess: invalidate,
+  })
+}
+
 export const useDeleteMember = () => {
   const invalidate = useInvalidateMembers()
   return useMutation({

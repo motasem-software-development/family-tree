@@ -1,7 +1,9 @@
 using System.Net;
 using System.Net.Http.Headers;
+using System.Net.Http.Json;
 using FluentAssertions;
 using FamilyTree.Api.IntegrationTests.Fixtures;
+using FamilyTree.Contracts.FamilyMembers;
 using FamilyTree.Domain.Authorization;
 using FamilyTree.Application.Auth;
 using Microsoft.Extensions.DependencyInjection;
@@ -112,6 +114,21 @@ public sealed class AuthorizationTests(PostgresFixture fixture) : IAsyncLifetime
             new AuthenticationHeaderValue("Bearer", TokenWith(Permissions.Member.View));
 
         var response = await _client.DeleteAsync($"/api/v1/family-members/{Guid.CreateVersion7()}");
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task Move_member_returns_403_for_a_caller_lacking_the_move_permission()
+    {
+        // Member.Edit is deliberately present: move is its own permission, and holding the
+        // edit permission must not confer the right to restructure the tree.
+        _client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", TokenWith(Permissions.Member.View, Permissions.Member.Edit));
+
+        var response = await _client.PostAsJsonAsync(
+            "/api/v1/family-members/0199a0b1-0000-7000-8000-000000000001/move",
+            new MoveFamilyMemberRequest(null, 1));
 
         response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }

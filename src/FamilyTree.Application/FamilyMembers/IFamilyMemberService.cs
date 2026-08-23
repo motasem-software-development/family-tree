@@ -25,5 +25,14 @@ public interface IFamilyMemberService
     Task<FamilyMemberResponse> UpdateAsync(
         Guid id, UpdateFamilyMemberRequest request, CancellationToken ct = default);
 
+    /// <summary>
+    /// Re-parents a member, or promotes them to first generation with a null parent id.
+    /// Throws <c>MOVE_CREATES_CYCLE</c> when the target is the member or one of their
+    /// descendants, and <c>MEMBER_NOT_FOUND</c> when either id names nothing visible to the
+    /// caller's tenant.
+    /// </summary>
+    Task<FamilyMemberResponse> MoveAsync(
+        Guid id, MoveFamilyMemberRequest request, CancellationToken ct = default);
+
     Task DeleteAsync(Guid id, CancellationToken ct = default);
 }

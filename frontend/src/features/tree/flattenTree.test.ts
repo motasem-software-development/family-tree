@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ancestorIds, descendantCount, findNode, flattenTree, treeStats } from './flattenTree'
+import { ancestorIds, descendantCount, descendantIds, findNode, flattenTree, treeStats } from './flattenTree'
 import type { FamilyTreeNode } from '../members/types'
 
 const node = (
@@ -157,5 +157,36 @@ describe('flattenTree life details', () => {
 
     expect(rows.every((r) => !r.life.isDeceased)).toBe(true)
     expect(rows.every((r) => r.life.dateOfBirth === null)).toBe(true)
+  })
+})
+
+describe('descendantIds', () => {
+  it('collects every descendant, however deep', () => {
+    const roots = [
+      node('s1', 'سليمان', 1, [
+        node('f1', 'فارس', 2, [node('o1', 'عمر', 3, [], 'f1')], 's1'),
+        node('k1', 'خالد', 2, [], 's1'),
+      ]),
+    ]
+
+    expect(descendantIds(roots, 's1')).toEqual(new Set(['f1', 'o1', 'k1']))
+  })
+
+  it('excludes the member themselves, who is disabled for a different reason', () => {
+    const roots = [node('s1', 'سليمان', 1, [node('f1', 'فارس', 2, [], 's1')])]
+
+    expect(descendantIds(roots, 's1').has('s1')).toBe(false)
+  })
+
+  it('returns nothing for a leaf', () => {
+    const roots = [node('s1', 'سليمان', 1, [node('f1', 'فارس', 2, [], 's1')])]
+
+    expect(descendantIds(roots, 'f1').size).toBe(0)
+  })
+
+  it('returns nothing for an id that is not in the tree', () => {
+    const roots = [node('s1', 'سليمان', 1)]
+
+    expect(descendantIds(roots, 'nope').size).toBe(0)
   })
 })

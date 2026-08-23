@@ -30,7 +30,7 @@ export const membersApi = {
 
   /**
    * Sends name, version, and the life details. parentId is deliberately absent: the server
-   * rejects it outright (design spec §4.6), and re-parenting is the Phase 5 move command.
+   * rejects it outright (design spec §4.6); re-parenting goes through `membersApi.move` instead.
    *
    * The life details are replace-semantics on the server, so they are always sent in full —
    * omitting a cleared date would leave the old value in place and make an unmarked death
@@ -40,6 +40,17 @@ export const membersApi = {
     apiFetch<FamilyMember>(`${MEMBERS}/${id}`, {
       method: 'PUT',
       body: JSON.stringify({ name, version, ...life }),
+    }),
+
+  /**
+   * Re-parents a member; a null parentId promotes them to the first generation. A dedicated
+   * command, not a field on update: the server rejects parentId on PUT outright (design spec
+   * §4.6), because a move carries a rule no other edit does.
+   */
+  move: (id: string, parentId: string | null, version: number): Promise<FamilyMember> =>
+    apiFetch<FamilyMember>(`${MEMBERS}/${id}/move`, {
+      method: 'POST',
+      body: JSON.stringify({ parentId, version }),
     }),
 
   remove: (id: string): Promise<void> => apiFetch<void>(`${MEMBERS}/${id}`, { method: 'DELETE' }),

@@ -88,8 +88,8 @@ export function MemberForm({ member, parents, isSaving, onSubmit, onCancel }: Me
         />
       </div>
 
-      {/* Parent is fixed at creation: the server rejects a parent change on update, and
-          re-parenting is the Phase 5 move command. */}
+      {/* Parent is fixed at creation: the server rejects a parent change on update; re-parenting
+          goes through the move dialog instead. */}
       {member === undefined && (
         <div style={{ marginBottom: 'var(--space-4)' }}>
           <label htmlFor="member-parent" style={labelStyle}>

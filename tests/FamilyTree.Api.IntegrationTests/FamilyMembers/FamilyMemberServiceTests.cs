@@ -407,4 +407,146 @@ public sealed class FamilyMemberServiceTests(PostgresFixture fixture) : Database
 
         (await service.ListAsync(default)).Should().BeEmpty();
     }
+
+    [Fact]
+    public async Task MoveAsync_reattaches_a_member_to_a_new_parent()
+    {
+        var (tenantId, _) = await SeedTenantWithTreeAsync("mv-alpha");
+        await using var context = ContextFor(tenantId);
+        var service = ServiceFor(context, tenantId);
+
+        var first = await service.CreateAsync(new CreateFamilyMemberRequest("سليمان", null), default);
+        var second = await service.CreateAsync(new CreateFamilyMemberRequest("داوود", null), default);
+        var child = await service.CreateAsync(new CreateFamilyMemberRequest("فارس", first.Id), default);
+
+        var moved = await service.MoveAsync(
+            child.Id, new MoveFamilyMemberRequest(second.Id, child.Version), default);
+
+        moved.ParentId.Should().Be(second.Id);
+        moved.Version.Should().Be(child.Version + 1);
+    }
+
+    [Fact]
+    public async Task MoveAsync_promotes_a_member_to_first_generation()
+    {
+        var (tenantId, _) = await SeedTenantWithTreeAsync("mv-beta");
+        await using var context = ContextFor(tenantId);
+        var service = ServiceFor(context, tenantId);
+
+        var parent = await service.CreateAsync(new CreateFamilyMemberRequest("سليمان", null), default);
+        var child = await service.CreateAsync(new CreateFamilyMemberRequest("فارس", parent.Id), default);
+
+        var moved = await service.MoveAsync(
+            child.Id, new MoveFamilyMemberRequest(null, child.Version), default);
+
+        moved.ParentId.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task MoveAsync_refuses_a_move_under_the_members_own_descendant()
+    {
+        var (tenantId, _) = await SeedTenantWithTreeAsync("mv-gamma");
+        await using var context = ContextFor(tenantId);
+        var service = ServiceFor(context, tenantId);
+
+        var grandparent = await service.CreateAsync(new CreateFamilyMemberRequest("سليمان", null), default);
+        var parent = await service.CreateAsync(
+            new CreateFamilyMemberRequest("فارس", grandparent.Id), default);
+        var child = await service.CreateAsync(new CreateFamilyMemberRequest("عمر", parent.Id), default);
+
+        var act = async () => await service.MoveAsync(
+            grandparent.Id, new MoveFamilyMemberRequest(child.Id, grandparent.Version), default);
+
+        (await act.Should().ThrowAsync<ConflictException>()).Which.Code.Should().Be("MOVE_CREATES_CYCLE");
+    }
+
+    [Fact]
+    public async Task MoveAsync_refuses_a_move_under_the_member_themselves()
+    {
+        var (tenantId, _) = await SeedTenantWithTreeAsync("mv-delta");
+        await using var context = ContextFor(tenantId);
+        var service = ServiceFor(context, tenantId);
+
+        var member = await service.CreateAsync(new CreateFamilyMemberRequest("سليمان", null), default);
+
+        var act = async () => await service.MoveAsync(
+            member.Id, new MoveFamilyMemberRequest(member.Id, member.Version), default);
+
+        (await act.Should().ThrowAsync<ConflictException>()).Which.Code.Should().Be("MOVE_CREATES_CYCLE");
+    }
+
+    [Fact]
+    public async Task MoveAsync_reports_a_missing_member_as_not_found()
+    {
+        var (tenantId, _) = await SeedTenantWithTreeAsync("mv-epsilon");
+        await using var context = ContextFor(tenantId);
+        var service = ServiceFor(context, tenantId);
+
+        var act = async () => await service.MoveAsync(
+            Guid.CreateVersion7(), new MoveFamilyMemberRequest(null, 1), default);
+
+        (await act.Should().ThrowAsync<NotFoundException>()).Which.Code.Should().Be("MEMBER_NOT_FOUND");
+    }
+
+    [Fact]
+    public async Task MoveAsync_reports_a_target_in_another_tenant_as_not_found()
+    {
+        var (tenantId, _) = await SeedTenantWithTreeAsync("mv-zeta");
+        var (otherTenantId, _) = await SeedTenantWithTreeAsync("mv-eta");
+
+        Guid strangerId;
+        await using (var otherContext = ContextFor(otherTenantId))
+        {
+            var otherService = ServiceFor(otherContext, otherTenantId);
+            strangerId = (await otherService.CreateAsync(
+                new CreateFamilyMemberRequest("داوود", null), default)).Id;
+        }
+
+        await using var context = ContextFor(tenantId);
+        var service = ServiceFor(context, tenantId);
+        var member = await service.CreateAsync(new CreateFamilyMemberRequest("سليمان", null), default);
+
+        var act = async () => await service.MoveAsync(
+            member.Id, new MoveFamilyMemberRequest(strangerId, member.Version), default);
+
+        // Not 403, and not a distinct PARENT_NOT_FOUND: another tenant's id must be
+        // indistinguishable from an id that never existed (design spec §4.4).
+        (await act.Should().ThrowAsync<NotFoundException>()).Which.Code.Should().Be("MEMBER_NOT_FOUND");
+    }
+
+    [Fact]
+    public async Task MoveAsync_rejects_a_stale_version()
+    {
+        var (tenantId, _) = await SeedTenantWithTreeAsync("mv-theta");
+        await using var context = ContextFor(tenantId);
+        var service = ServiceFor(context, tenantId);
+
+        var parent = await service.CreateAsync(new CreateFamilyMemberRequest("سليمان", null), default);
+        var member = await service.CreateAsync(new CreateFamilyMemberRequest("فارس", null), default);
+        await service.UpdateAsync(
+            member.Id, new UpdateFamilyMemberRequest("فارس أحمد", member.Version), default);
+
+        var act = async () => await service.MoveAsync(
+            member.Id, new MoveFamilyMemberRequest(parent.Id, member.Version), default);
+
+        (await act.Should().ThrowAsync<ConflictException>()).Which.Code.Should().Be("CONCURRENCY_CONFLICT");
+    }
+
+    [Fact]
+    public async Task MoveAsync_accepts_a_move_to_the_parent_the_member_already_has()
+    {
+        var (tenantId, _) = await SeedTenantWithTreeAsync("mv-iota");
+        await using var context = ContextFor(tenantId);
+        var service = ServiceFor(context, tenantId);
+
+        var parent = await service.CreateAsync(new CreateFamilyMemberRequest("سليمان", null), default);
+        var child = await service.CreateAsync(new CreateFamilyMemberRequest("فارس", parent.Id), default);
+
+        // Design §6 rule 4: a no-op move is not an error. No user could tell the refusal apart
+        // from success, and a third error code would have to be translated for it.
+        var moved = await service.MoveAsync(
+            child.Id, new MoveFamilyMemberRequest(parent.Id, child.Version), default);
+
+        moved.ParentId.Should().Be(parent.Id);
+    }
 }
