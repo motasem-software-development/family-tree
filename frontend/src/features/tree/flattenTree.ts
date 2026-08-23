@@ -92,6 +92,23 @@ export const descendantCount = (node: FamilyTreeNode): number =>
   node.children.reduce((total, child) => total + 1 + descendantCount(child), 0)
 
 /**
+ * Every descendant of `id`, so the move dialog can grey out the targets the server would
+ * refuse. A courtesy, not the rule: the server's cycle CTE remains the only authority, and a
+ * client working from a stale tree still gets a translated 409.
+ *
+ * The member themselves is excluded — they are disabled too, but for a reason the dialog
+ * states differently.
+ */
+export const descendantIds = (
+  rootMembers: readonly FamilyTreeNode[],
+  id: string,
+): Set<string> => {
+  const subject = findNode(rootMembers, id)
+  if (subject === undefined) return new Set()
+  return new Set(allNodes(subject.children).map((node) => node.id))
+}
+
+/**
  * Ids of every ancestor of `id`, so revealing a search hit can open the branches above it.
  * Returns an empty array when the id is not in the tree.
  */
