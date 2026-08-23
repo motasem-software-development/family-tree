@@ -57,11 +57,15 @@ public sealed class FamilyMemberEndpointsTests(PostgresFixture fixture) : IAsync
     [InlineData("GET", "/api/v1/family-members/0199a0b1-0000-7000-8000-000000000001")]
     [InlineData("PUT", "/api/v1/family-members/0199a0b1-0000-7000-8000-000000000001")]
     [InlineData("DELETE", "/api/v1/family-members/0199a0b1-0000-7000-8000-000000000001")]
+    [InlineData("POST", "/api/v1/family-members/0199a0b1-0000-7000-8000-000000000001/move")]
     public async Task Endpoints_require_authentication(string method, string path)
     {
         var request = new HttpRequestMessage(new HttpMethod(method), path);
         if (method == "POST")
-            request.Content = JsonContent.Create(new CreateFamilyMemberRequest("فارس", null));
+            // Move takes a different body shape than create, so branch on the route.
+            request.Content = path.EndsWith("/move")
+                ? JsonContent.Create(new MoveFamilyMemberRequest(null, 1))
+                : JsonContent.Create(new CreateFamilyMemberRequest("فارس", null));
         if (method == "PUT")
             request.Content = JsonContent.Create(new UpdateFamilyMemberRequest("فارس", 1));
 
@@ -458,5 +462,102 @@ public sealed class FamilyMemberEndpointsTests(PostgresFixture fixture) : IAsync
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         (await CodeOf(response)).Should().Be("MEMBER_DEATH_BEFORE_BIRTH");
+    }
+
+    [Fact]
+    public async Task Post_move_reattaches_a_member_to_a_new_parent()
+    {
+        await AuthenticateAsync();
+        var first = await CreateAsync("سليمان");
+        var second = await CreateAsync("داوود");
+        var child = await CreateAsync("فارس", first.Id);
+
+        var response = await _client.PostAsJsonAsync(
+            $"/api/v1/family-members/{child.Id}/move",
+            new MoveFamilyMemberRequest(second.Id, child.Version));
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var moved = (await response.Content.ReadFromJsonAsync<FamilyMemberResponse>())!;
+        moved.ParentId.Should().Be(second.Id);
+    }
+
+    [Fact]
+    public async Task Post_move_promotes_a_member_to_first_generation()
+    {
+        await AuthenticateAsync();
+        var parent = await CreateAsync("سليمان");
+        var child = await CreateAsync("فارس", parent.Id);
+
+        var response = await _client.PostAsJsonAsync(
+            $"/api/v1/family-members/{child.Id}/move",
+            new MoveFamilyMemberRequest(null, child.Version));
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var moved = (await response.Content.ReadFromJsonAsync<FamilyMemberResponse>())!;
+        moved.ParentId.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Post_move_returns_409_for_a_move_under_a_descendant()
+    {
+        await AuthenticateAsync();
+        var grandparent = await CreateAsync("سليمان");
+        var parent = await CreateAsync("فارس", grandparent.Id);
+        var child = await CreateAsync("عمر", parent.Id);
+
+        var response = await _client.PostAsJsonAsync(
+            $"/api/v1/family-members/{grandparent.Id}/move",
+            new MoveFamilyMemberRequest(child.Id, grandparent.Version));
+
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await CodeOf(response)).Should().Be("MOVE_CREATES_CYCLE");
+    }
+
+    [Fact]
+    public async Task Post_move_returns_409_for_a_move_under_the_member_themselves()
+    {
+        await AuthenticateAsync();
+        var member = await CreateAsync("سليمان");
+
+        var response = await _client.PostAsJsonAsync(
+            $"/api/v1/family-members/{member.Id}/move",
+            new MoveFamilyMemberRequest(member.Id, member.Version));
+
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await CodeOf(response)).Should().Be("MOVE_CREATES_CYCLE");
+    }
+
+    [Fact]
+    public async Task Post_move_returns_404_for_a_target_that_does_not_exist()
+    {
+        await AuthenticateAsync();
+        var member = await CreateAsync("سليمان");
+
+        var response = await _client.PostAsJsonAsync(
+            $"/api/v1/family-members/{member.Id}/move",
+            new MoveFamilyMemberRequest(Guid.CreateVersion7(), member.Version));
+
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        (await CodeOf(response)).Should().Be("MEMBER_NOT_FOUND");
+    }
+
+    [Fact]
+    public async Task Post_move_returns_409_for_a_stale_version()
+    {
+        await AuthenticateAsync();
+        var parent = await CreateAsync("سليمان");
+        var member = await CreateAsync("فارس");
+
+        var rename = await _client.PutAsJsonAsync(
+            $"/api/v1/family-members/{member.Id}",
+            new UpdateFamilyMemberRequest("فارس أحمد", member.Version));
+        rename.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var response = await _client.PostAsJsonAsync(
+            $"/api/v1/family-members/{member.Id}/move",
+            new MoveFamilyMemberRequest(parent.Id, member.Version));
+
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await CodeOf(response)).Should().Be("CONCURRENCY_CONFLICT");
     }
 }
