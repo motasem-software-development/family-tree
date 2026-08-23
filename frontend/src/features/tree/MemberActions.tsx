@@ -21,6 +21,7 @@ interface ContextMenuProps {
   onViewDetails: () => void
   onAdd: () => void
   onEdit: () => void
+  onMove: () => void
   onDelete: () => void
 }
 
@@ -44,6 +45,7 @@ export const ContextMenu = ({
   onViewDetails,
   onAdd,
   onEdit,
+  onMove,
   onDelete,
 }: ContextMenuProps) => {
   const { t } = useTranslation()
@@ -98,9 +100,9 @@ export const ContextMenu = ({
         <button
           type="button"
           role="menuitem"
-          disabled
-          title={t('tree.movePhase')}
-          style={menuItemStyle(false)}
+          onClick={onMove}
+          disabled={!permissions.canMove}
+          style={menuItemStyle(permissions.canMove)}
         >
           {t('tree.move')}
         </button>
@@ -414,7 +416,8 @@ export const MemberModal = ({
           >
             {kind === 'blocked' ? t('modal.close') : t('modal.cancel')}
           </button>
-          {/* A blocked delete has nothing to confirm — Move, its designed way out, is Phase 5. */}
+          {/* A blocked delete has nothing to confirm — Move, its designed way out, is available
+              from the panel and context menu instead. */}
           {kind !== 'blocked' && (
             <button
               type="submit"

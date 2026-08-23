@@ -16,6 +16,7 @@ import {
   useCreateMember,
   useDeleteMember,
   useMembersQuery,
+  useMoveMember,
   useTreeQuery,
   useUpdateMember,
 } from '../members/useMembers'
@@ -23,6 +24,7 @@ import { ExportDialog } from './ExportDialog'
 import {
   allNodes,
   ancestorIds,
+  descendantIds,
   findNode,
   flattenTree,
   treeStats,
@@ -30,6 +32,7 @@ import {
 } from './flattenTree'
 import { ContextMenu, MemberModal, Toast, type MenuAnchor, type ModalKind } from './MemberActions'
 import { MemberPanel } from './MemberPanel'
+import { MoveDialog } from './MoveDialog'
 import { TreeCanvas } from './TreeCanvas'
 import { useSearch } from './useSearch'
 
@@ -86,6 +89,8 @@ export const TreePage = () => {
   const createMember = useCreateMember()
   const updateMember = useUpdateMember()
   const deleteMember = useDeleteMember()
+  const moveMember = useMoveMember()
+  const [moveOpen, setMoveOpen] = useState(false)
 
   useEffect(
     () => () => {
@@ -155,6 +160,7 @@ export const TreePage = () => {
     canCreate: hasPermission('Member.Create'),
     canEdit: hasPermission('Member.Edit'),
     canDelete: hasPermission('Member.Delete'),
+    canMove: hasPermission('Member.Move'),
   }
 
   const familyName = view?.name ?? ''
@@ -296,6 +302,28 @@ export const TreePage = () => {
     }
   }
 
+  const confirmMove = (parentId: string | null) => {
+    if (selected === undefined) return
+    // The version comes from the flat list, the same join the editor reads — a move is a
+    // write like any other and must carry the version the client actually held.
+    const version = detailById.get(selected.id)?.version
+    if (version === undefined) return
+
+    setErrorCode(null)
+    moveMember.mutate(
+      { id: selected.id, parentId, version },
+      {
+        onSuccess: () => {
+          setMoveOpen(false)
+          showToast(t('toast.moved', { name: fullName(selected, byId) }))
+        },
+        // The dialog stays open on failure: the user's next act is to choose a different
+        // target, and closing would make them find the member again first.
+        onError: (error) => setErrorCode(codeOf(error)),
+      },
+    )
+  }
+
   const parentNameOf = (node: FamilyTreeNode | undefined): string => {
     if (node === undefined || node.parentId === null) return familyName
     return findNode(roots, node.parentId)?.name ?? familyName
@@ -362,6 +390,7 @@ export const TreePage = () => {
           }}
           onAdd={() => openModal('add')}
           onEdit={() => openModal('edit', selected.name)}
+          onMove={() => setMoveOpen(true)}
           onDelete={() => openDelete(selected)}
         />
       )}
@@ -387,6 +416,7 @@ export const TreePage = () => {
                 : (detailById.get(selectedId)?.life ?? EMPTY_LIFE_DETAILS),
             )
           }
+          onMove={() => setMoveOpen(true)}
           onDelete={() => {
             if (selected !== undefined) openDelete(selected)
           }}
@@ -407,6 +437,23 @@ export const TreePage = () => {
           onLifeChange={setLifeValue}
           onCancel={closeModal}
           onConfirm={confirm}
+        />
+      )}
+
+      {moveOpen && selected !== undefined && (
+        <MoveDialog
+          member={selected}
+          familyName={familyName}
+          // The member and everyone beneath them. Computed here because the page holds the
+          // tree; the dialog only knows the member it was handed.
+          blockedIds={new Set([selected.id, ...descendantIds(roots, selected.id)])}
+          errorCode={errorCode}
+          isSaving={moveMember.isPending}
+          onCancel={() => {
+            setMoveOpen(false)
+            setErrorCode(null)
+          }}
+          onConfirm={confirmMove}
         />
       )}
 

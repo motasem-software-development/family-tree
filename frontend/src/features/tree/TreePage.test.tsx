@@ -13,7 +13,7 @@ import { TreePage } from './TreePage'
 
 vi.mock('../members/membersApi')
 
-let permissions = ['Member.View', 'Member.Create', 'Member.Edit', 'Member.Delete']
+let permissions = ['Member.View', 'Member.Create', 'Member.Edit', 'Member.Delete', 'Member.Move']
 
 vi.mock('../auth/AuthContext', () => ({
   useAuth: () => ({
@@ -68,12 +68,13 @@ const renderPage = () => renderPageAt('/')
 
 describe('TreePage', () => {
   beforeEach(() => {
-    permissions = ['Member.View', 'Member.Create', 'Member.Edit', 'Member.Delete']
+    permissions = ['Member.View', 'Member.Create', 'Member.Edit', 'Member.Delete', 'Member.Move']
     vi.mocked(membersApi.tree).mockResolvedValue(VIEW)
     vi.mocked(membersApi.list).mockResolvedValue(FLAT)
     vi.mocked(membersApi.create).mockResolvedValue({ ...FLAT[0], id: 'new', name: 'خالد' })
     vi.mocked(membersApi.update).mockResolvedValue({ ...FLAT[1], name: 'فارس أحمد', version: 4 })
     vi.mocked(membersApi.remove).mockResolvedValue(undefined)
+    vi.mocked(membersApi.move).mockResolvedValue({ ...FLAT[1], parentId: 's2', version: 4 })
     vi.mocked(membersApi.search).mockResolvedValue({ total: 0, items: [] })
   })
 
@@ -129,13 +130,13 @@ describe('TreePage', () => {
     ).toBeInTheDocument()
   })
 
-  it('renders Move disabled, because its backend command is a later phase', async () => {
+  it('enables Move now that the backend command exists', async () => {
     const user = userEvent.setup()
     renderPage()
     await user.click(await screen.findByText('سليمان'))
 
     const panel = await screen.findByRole('complementary', { name: 'سليمان' })
-    expect(within(panel).getByRole('button', { name: i18n.t('tree.move') })).toBeDisabled()
+    expect(within(panel).getByRole('button', { name: i18n.t('tree.move') })).toBeEnabled()
   })
 
   it('sends the version it read when renaming', async () => {
@@ -357,5 +358,91 @@ describe('TreePage', () => {
       )
       expect(selected).toHaveLength(0)
     })
+  })
+
+  it('moves a member to the parent chosen in the dialog', async () => {
+    vi.mocked(membersApi.search).mockResolvedValue({
+      total: 1,
+      items: [{ id: 's2', name: 'عمر', generation: 1, ancestors: [] }],
+    })
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText('سليمان')
+    const treeitem = screen.getByRole('treeitem', { name: /سليمان/ })
+    await user.click(within(treeitem).getByRole('button', { name: i18n.t('tree.expand') }))
+    await user.click(await screen.findByText('فارس'))
+
+    const panel = await screen.findByRole('complementary', { name: 'فارس سليمان' })
+    await user.click(within(panel).getByRole('button', { name: i18n.t('tree.move') }))
+
+    // Scoped to the dialog: its own "نقل" confirm button shares the panel's Move-button copy,
+    // and the tree row for عمر (still mounted behind the dialog) shares the search hit's name —
+    // an unscoped query would match more than one element for either.
+    const dialog = within(await screen.findByRole('dialog', { name: i18n.t('move.title') }))
+    await user.type(await dialog.findByLabelText(i18n.t('move.searchPlaceholder')), 'عمر')
+    await user.click(await dialog.findByRole('button', { name: /عمر/ }))
+    await user.click(dialog.getByRole('button', { name: i18n.t('move.confirm') }))
+
+    // Version 3 comes from the flat list, the same join the editor reads: a move is a write
+    // like any other and must carry the version the client actually held.
+    await waitFor(() => expect(membersApi.move).toHaveBeenCalledWith('f1', 's2', 3))
+  })
+
+  it('promotes a member to the first generation from the dialog', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText('سليمان')
+    const treeitem = screen.getByRole('treeitem', { name: /سليمان/ })
+    await user.click(within(treeitem).getByRole('button', { name: i18n.t('tree.expand') }))
+    await user.click(await screen.findByText('فارس'))
+
+    const panel = await screen.findByRole('complementary', { name: 'فارس سليمان' })
+    await user.click(within(panel).getByRole('button', { name: i18n.t('tree.move') }))
+    // Scoped to the dialog: its "نقل" confirm button shares the panel's Move-button copy, so an
+    // unscoped query would match both the still-mounted panel trigger and this button.
+    const dialog = within(await screen.findByRole('dialog', { name: i18n.t('move.title') }))
+    await user.click(
+      await dialog.findByRole('button', {
+        name: i18n.t('move.rootOption', { family: 'عائلة السقا' }),
+      }),
+    )
+    await user.click(dialog.getByRole('button', { name: i18n.t('move.confirm') }))
+
+    await waitFor(() => expect(membersApi.move).toHaveBeenCalledWith('f1', null, 3))
+  })
+
+  it('translates a rejected move rather than showing the raw code', async () => {
+    vi.mocked(membersApi.move).mockRejectedValue(new ApiError('MOVE_CREATES_CYCLE', 409))
+    vi.mocked(membersApi.search).mockResolvedValue({
+      total: 1,
+      items: [{ id: 's2', name: 'عمر', generation: 1, ancestors: [] }],
+    })
+    const user = userEvent.setup()
+    renderPage()
+    await user.click(await screen.findByText('سليمان'))
+
+    const panel = await screen.findByRole('complementary', { name: 'سليمان' })
+    await user.click(within(panel).getByRole('button', { name: i18n.t('tree.move') }))
+    // Scoped to the dialog for the same reason as the other move tests: its confirm button and
+    // the عمر search hit both collide with something else still mounted behind the dialog.
+    const dialog = within(await screen.findByRole('dialog', { name: i18n.t('move.title') }))
+    await user.type(await dialog.findByLabelText(i18n.t('move.searchPlaceholder')), 'عمر')
+    await user.click(await dialog.findByRole('button', { name: /عمر/ }))
+    await user.click(dialog.getByRole('button', { name: i18n.t('move.confirm') }))
+
+    expect(await screen.findByText(i18n.t('errors.MOVE_CREATES_CYCLE'))).toBeInTheDocument()
+    // The dialog stays open, so the next act is choosing another target rather than finding
+    // the member again.
+    expect(screen.getByLabelText(i18n.t('move.searchPlaceholder'))).toBeInTheDocument()
+  })
+
+  it('disables Move for a caller without the permission', async () => {
+    permissions = ['Member.View']
+    const user = userEvent.setup()
+    renderPage()
+    await user.click(await screen.findByText('سليمان'))
+
+    const panel = await screen.findByRole('complementary', { name: 'سليمان' })
+    expect(within(panel).getByRole('button', { name: i18n.t('tree.move') })).toBeDisabled()
   })
 })
