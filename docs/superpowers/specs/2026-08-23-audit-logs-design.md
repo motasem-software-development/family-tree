@@ -117,6 +117,9 @@ an operator reads in the table matches what the API returns.
 public sealed record AuditEntryResponse(
     Guid Id,
     Guid UserId,
+    /// Resolved at read time by joining the user store. Null when the account has since been
+    /// deleted — the id is kept regardless, because it is what the stored row actually holds.
+    string? UserEmail,
     string Action,
     string EntityType,
     Guid EntityId,
@@ -130,6 +133,12 @@ public sealed record AuditPageResponse(int Total, IReadOnlyList<AuditEntryRespon
 
 `Total` is the untruncated count, following the rule the reports endpoint established: a client
 must be able to say "50 of 1,284", never `items.length`.
+
+The email is resolved when the page is read rather than copied into the row at write time. An
+audit row must record what was true when the change happened, but an email is an attribute of
+the account rather than of the change — copying it would leave the trail showing an address the
+person no longer uses. The id is what the row stores, and the id is what identifies them; the
+email is a convenience for the reader, which is why it is allowed to be null.
 
 ## 6. API and authorization
 
