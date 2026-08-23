@@ -428,6 +428,10 @@ describe('TreePage', () => {
     const menu = await screen.findByRole('menu')
     await user.click(within(menu).getByRole('menuitem', { name: i18n.t('tree.move') }))
 
+    // The menu's backdrop sits over the dialog; it must close before interaction or the first
+    // click is swallowed.
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+
     // Scoped to the dialog: its "نقل" confirm button shares the panel's Move-button copy, and
     // the tree row for عمر (still mounted behind the dialog) shares the search hit's name — an
     // unscoped query would match more than one element for either.

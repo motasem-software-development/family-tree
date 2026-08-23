@@ -71,8 +71,9 @@ the member is an ancestor of its own proposed parent and the move is refused.
 
 The walk terminates because the tree is acyclic, which is the invariant this check exists to
 preserve — so a cycle already in the data would make it non-terminating. A depth bound well
-past any real genealogy (100) is not a substitute for correctness, but it turns a
-corrupted-data case from a hung connection into an error, and costs nothing on healthy data.
+past any real genealogy (100) is not a substitute for correctness, but it truncates the walk
+beyond that point and degrades to "no cycle found within 100 generations" on corrupted data,
+and costs nothing on healthy data.
 
 ### 3.2 Concurrent moves
 
