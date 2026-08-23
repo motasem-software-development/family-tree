@@ -92,12 +92,16 @@ table whose entire purpose is being readable after the fact.
 |---|---|---|---|
 | Create | `CREATE` | null | the full member |
 | Update | `UPDATE` | name, dates, deceased flag — before | the same fields, after |
-| Move | `MOVE` | `{ "parentId": "…" }` | `{ "parentId": "…" }` |
+| Move | `MOVE` | `{ "name": "…", "parentId": "…" }` | `{ "name": "…", "parentId": "…" }` |
 | Delete | `DELETE` | the full member snapshot | null |
 
 Update records only the fields that command can change, because those are the only ones that
 can differ; recording the whole member would bury one changed name in eight unchanged values.
-Move records `parentId` alone, which is SRS §32's own worked example.
+
+Move records `parentId`, which is SRS §32's own worked example, **and the name, unchanged in
+both halves**. The name is redundant as a record of the change and load-bearing as a record of
+*whose* change it was: §7 requires the viewer to name a row's subject without a lookup, and a
+row carrying only two parent ids cannot say who moved. Every row therefore carries the name.
 
 Delete is the exception that carries everything. After a hard delete the row is gone, so its
 `old_values` is the last remaining evidence the member existed — including the name, which the
