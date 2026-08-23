@@ -72,16 +72,21 @@ public sealed class ConcurrentMoveTests(PostgresFixture fixture) : DatabaseTestB
 
         var outcomes = await Task.WhenAll(moveA, moveB);
 
-        // At most one may commit. Which one is not the point — the point is that the pair
-        // cannot both land, because the loser reads the winner's committed row.
-        outcomes.Count(succeeded => succeeded).Should().BeLessThanOrEqualTo(1);
+        // Exactly one, not "at most one": the lock is held to commit, so the loser reads the
+        // winner's committed row and is refused. A run where NEITHER move lands means the
+        // command is broken, not that the lock worked.
+        outcomes.Count(succeeded => succeeded).Should().Be(1);
 
         await using var verify = ContextFor(tenantId);
         var members = verify.FamilyMembers.ToList();
         var firstRow = members.Single(m => m.Id == first.Id);
         var secondRow = members.Single(m => m.Id == second.Id);
 
-        // The loop, stated directly: neither may point at the other while the other points back.
-        (firstRow.ParentId == second.Id && secondRow.ParentId == first.Id).Should().BeFalse();
+        // Exactly one direction landed. This states the loop's absence and the winner's
+        // effect in one assertion: both true would be the cycle, neither true would be the
+        // silent no-op the count above already forbids.
+        var firstMoved = firstRow.ParentId == second.Id;
+        var secondMoved = secondRow.ParentId == first.Id;
+        (firstMoved ^ secondMoved).Should().BeTrue();
     }
 }
