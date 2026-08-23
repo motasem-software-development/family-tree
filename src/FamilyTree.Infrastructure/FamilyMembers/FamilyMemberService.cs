@@ -189,6 +189,16 @@ public sealed class FamilyMemberService(
             throw new ConflictException(
                 "CONCURRENCY_CONFLICT", "This member was changed by someone else. Reload and try again.");
         }
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: ForeignKeyViolation })
+        {
+            // Check-then-act: the targetExists check above can lose a race to a concurrent
+            // delete of the target between the check and this save. The raw fk_member_parent
+            // violation carries no code of its own, so it must be mapped to the same
+            // MEMBER_NOT_FOUND the pre-check would have thrown -- the target has vanished, and
+            // the client must not be able to tell that apart from an id that never existed
+            // (design spec section 4.4).
+            throw new NotFoundException("MEMBER_NOT_FOUND", "Member not found.");
+        }
 
         await transaction.CommitAsync(ct);
 
