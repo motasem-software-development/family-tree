@@ -30,7 +30,7 @@ export const membersApi = {
 
   /**
    * Sends name, version, and the life details. parentId is deliberately absent: the server
-   * rejects it outright (design spec §4.6), and re-parenting is the Phase 5 move command.
+   * rejects it outright (design spec §4.6); re-parenting goes through `membersApi.move` instead.
    *
    * The life details are replace-semantics on the server, so they are always sent in full —
    * omitting a cleared date would leave the old value in place and make an unmarked death

@@ -12,8 +12,8 @@ namespace FamilyTree.Contracts.FamilyMembers;
 /// The three trailing properties exist ONLY so the API can reject them explicitly. Design
 /// spec §4.6 requires that an attempt to change parentId, tenantId, or familyTreeId fail
 /// loudly rather than be silently dropped; a client that believed it had re-parented a member
-/// would corrupt the operator's mental model of the tree. Re-parenting is the dedicated move
-/// command in Phase 5.
+/// would corrupt the operator's mental model of the tree. Re-parenting goes through the
+/// dedicated move command instead: POST /api/v1/family-members/{id}/move.
 /// </summary>
 public sealed record UpdateFamilyMemberRequest(
     string Name,

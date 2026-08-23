@@ -60,7 +60,6 @@
     "delete": "Delete",
     "gen": "Generation",
     "needPerm": "Requires",
-    "movePhase": "Move isn't available yet.",
     "treeLabel": "Family tree",
     "resultCount_one": "{{count}} result",
     "resultCount_other": "{{count}} results",
