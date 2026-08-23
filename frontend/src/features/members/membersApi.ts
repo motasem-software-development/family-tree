@@ -42,6 +42,17 @@ export const membersApi = {
       body: JSON.stringify({ name, version, ...life }),
     }),
 
+  /**
+   * Re-parents a member; a null parentId promotes them to the first generation. A dedicated
+   * command, not a field on update: the server rejects parentId on PUT outright (design spec
+   * §4.6), because a move carries a rule no other edit does.
+   */
+  move: (id: string, parentId: string | null, version: number): Promise<FamilyMember> =>
+    apiFetch<FamilyMember>(`${MEMBERS}/${id}/move`, {
+      method: 'POST',
+      body: JSON.stringify({ parentId, version }),
+    }),
+
   remove: (id: string): Promise<void> => apiFetch<void>(`${MEMBERS}/${id}`, { method: 'DELETE' }),
 
   /**
