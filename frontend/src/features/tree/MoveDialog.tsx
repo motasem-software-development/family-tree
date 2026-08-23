@@ -1,4 +1,4 @@
-import { useState, type CSSProperties, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { FamilyTreeNode } from '../members/types'
 import { MIN_QUERY_LENGTH, useSearch } from './useSearch'
@@ -100,6 +100,23 @@ export const MoveDialog = ({
   const [query, setQuery] = useState('')
   const [choice, setChoice] = useState<Choice>({ kind: 'none' })
   const { page } = useSearch(query)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  // Mirrors MemberModal (MemberActions.tsx): the search field is this dialog's equivalent of the
+  // name field, so it gets the same autofocus-on-mount treatment the sibling modals give theirs.
+  useEffect(() => {
+    inputRef.current?.focus()
+  }, [])
+
+  // Mirrors MemberModal and ContextMenu (MemberActions.tsx): every other overlay on this screen
+  // closes on Escape, so Move should too rather than requiring the mouse to dismiss.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onCancel()
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [onCancel])
 
   const reasonFor = (id: string): string | null => {
     if (id === member.id) return t('move.self')
@@ -155,6 +172,7 @@ export const MoveDialog = ({
             </label>
             <input
               id="move-search"
+              ref={inputRef}
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder={t('move.searchPlaceholder')}
@@ -184,22 +202,35 @@ export const MoveDialog = ({
                     type="button"
                     disabled={reason !== null}
                     aria-pressed={pressed}
+                    aria-describedby={
+                      hit.ancestors.length > 0 ? `move-hit-${hit.id}-path` : undefined
+                    }
                     onClick={() => setChoice({ kind: 'member', id: hit.id })}
                     style={optionButtonStyle(reason !== null, pressed)}
                   >
                     {hit.name}
-                    {/* The ancestor path is what tells the many repeated names apart — the reason
-                        design spec §5.4 asked the search endpoint for it. aria-hidden because it
-                        is a visual disambiguator, not part of the option's name: two members
-                        named the same would otherwise both match a screen reader's or a test's
-                        search for either one's name. */}
-                    {hit.ancestors.length > 0 && (
-                      <span aria-hidden="true" style={{ color: 'var(--text-2)', fontSize: 12 }}>
-                        {' '}
-                        {hit.ancestors.map((ancestor) => ancestor.name).join(' ‹ ')}
-                      </span>
-                    )}
                   </button>
+                  {/* The ancestor path is what tells the many repeated names apart — the reason
+                      design spec §5.4 asked the search endpoint for it. It is a *description* of
+                      the option, not part of its name — but nesting it inside the <button> makes
+                      it part of the name regardless of aria-describedby (accname computation walks
+                      the whole subtree; describedby only adds a description, it does not remove
+                      descendant text from the name), so every option whose ancestor list contains
+                      e.g. "سليمان" would still match a search for "سليمان" too, defeating the very
+                      disambiguation the path exists to provide. Keeping the span a *sibling* of the
+                      button — referenced by aria-describedby, the pattern MemberActions.tsx uses
+                      for its name-field error — is what actually keeps it out of the name while
+                      still exposing it: a screen reader announces the name, then (via the
+                      description) the path, so a listener choosing between two same-named people
+                      is not left with two indistinguishable options. */}
+                  {hit.ancestors.length > 0 && (
+                    <span
+                      id={`move-hit-${hit.id}-path`}
+                      style={{ display: 'block', color: 'var(--text-2)', fontSize: 12, marginTop: 2 }}
+                    >
+                      {hit.ancestors.map((ancestor) => ancestor.name).join(' ‹ ')}
+                    </span>
+                  )}
                   {reason !== null && (
                     <div style={{ fontSize: 12, color: 'var(--text-2)', marginTop: 2 }}>
                       {reason}

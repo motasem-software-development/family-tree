@@ -110,4 +110,13 @@ describe('MoveDialog', () => {
     expect(screen.getByText(i18n.t('errors.MOVE_CREATES_CYCLE'))).toBeInTheDocument()
     expect(screen.queryByText('MOVE_CREATES_CYCLE')).not.toBeInTheDocument()
   })
+
+  it('closes on Escape, like the sibling modals', async () => {
+    const user = userEvent.setup()
+    const props = renderDialog()
+
+    await user.keyboard('{Escape}')
+
+    expect(props.onCancel).toHaveBeenCalled()
+  })
 })
