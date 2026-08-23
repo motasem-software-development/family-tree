@@ -1,5 +1,6 @@
 import { useEffect, useRef, type CSSProperties, type FormEvent, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useIsCompact } from '../../app/useIsCompact'
 import type { Country } from '../countries/types'
 import { ContactFields } from '../members/ContactFields'
 import type { ContactDetails } from '../members/contactDetails'
@@ -76,6 +77,11 @@ export const ContextMenu = ({
           borderRadius: 'var(--r-md)',
           boxShadow: 'var(--shadow-high)',
           overflow: 'hidden',
+          // The anchor is a viewport coordinate (the overlay is position:fixed), so the space
+          // left below it is all this menu can have. Without the bound, a row near the bottom
+          // of a short screen opens a menu whose last item is off-screen and unscrollable.
+          maxHeight: `calc(100dvh - ${anchor.top}px - 8px)`,
+          overflowY: 'auto',
           animation: 'fadeUp var(--motion-fast) var(--ease-standard)',
         }}
       >
@@ -263,7 +269,9 @@ export const MemberModal = ({
         alignItems: 'center',
         justifyContent: 'center',
         zIndex: 400,
-        padding: 24,
+        // A fixed 24px gutter costs a 320px screen 15% of its width. Scales with the viewport
+        // and stops at the designed 24px, so wide screens are unchanged.
+        padding: 'clamp(12px, 4vw, 24px)',
       }}
     >
       <form
@@ -274,9 +282,11 @@ export const MemberModal = ({
         style={{
           width: '100%',
           maxWidth: 440,
-          // Contact details made this dialog taller than a laptop viewport. The body scrolls
-          // and the buttons stay put, so Save never drifts off the bottom of the screen.
-          maxHeight: 'calc(100vh - 48px)',
+          // A name field, contact details, two date fields and a parent readout are taller than
+          // a laptop viewport, and taller still on a phone in landscape or with the keyboard up.
+          // 100% of the padded overlay, rather than a vh figure that is wrong on a mobile
+          // browser with a collapsing URL bar; the body scrolls and the footer stays reachable.
+          maxHeight: '100%',
           display: 'flex',
           flexDirection: 'column',
           background: 'var(--surface)',
@@ -286,7 +296,14 @@ export const MemberModal = ({
           animation: 'fadeUp var(--motion-base) var(--ease-standard)',
         }}
       >
-        <div style={{ padding: '22px 24px 0', overflowY: 'auto', flex: '1 1 auto' }}>
+        <div
+          style={{
+            padding: '22px clamp(16px, 5vw, 24px) 0',
+            flex: '1 1 auto',
+            minHeight: 0,
+            overflowY: 'auto',
+          }}
+        >
           <div style={{ display: 'flex', gap: 13, alignItems: 'flex-start' }}>
             <div
               style={{
@@ -466,10 +483,11 @@ export const MemberModal = ({
         <div
           style={{
             display: 'flex',
+            flexWrap: 'wrap',
             justifyContent: 'flex-end',
             gap: 8,
-            padding: '22px 24px',
             flex: '0 0 auto',
+            padding: '22px clamp(16px, 5vw, 24px)',
           }}
         >
           <button
@@ -520,14 +538,19 @@ export const MemberModal = ({
 
 /* ------------------------------------------------------------------------ toast */
 
-export const Toast = ({ message }: { message: string }) => (
+export const Toast = ({ message }: { message: string }) => {
+  // Compact puts the export button on the bottom inline-end corner, so the toast steps up to
+  // clear it rather than landing on top of the control that is still being used.
+  const isCompact = useIsCompact()
+
+  return (
   <div
     role="status"
     aria-live="polite"
     style={{
       position: 'fixed',
-      bottom: 24,
-      insetInlineEnd: 24,
+      bottom: isCompact ? 76 : 24,
+      insetInlineEnd: isCompact ? 12 : 24,
       zIndex: 600,
       background: 'var(--surface)',
       border: '1px solid var(--border)',
@@ -537,7 +560,8 @@ export const Toast = ({ message }: { message: string }) => (
       display: 'flex',
       gap: 11,
       alignItems: 'flex-start',
-      maxWidth: 340,
+      // 340px plus its own inset overflows a 320px screen; the viewport is the real bound.
+      maxWidth: 'min(340px, calc(100vw - 24px))',
       animation: 'fadeUp var(--motion-base) var(--ease-standard)',
     }}
   >
@@ -558,4 +582,5 @@ export const Toast = ({ message }: { message: string }) => (
     </svg>
     <div style={{ fontSize: 13, lineHeight: 1.6, color: 'var(--text-1)' }}>{message}</div>
   </div>
-)
+  )
+}

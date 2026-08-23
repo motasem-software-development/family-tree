@@ -35,7 +35,9 @@
     "audit": "سجل التغييرات",
     "share": "المشاركة العامة",
     "settings": "الإعدادات",
-    "comingSoon": "قريبًا"
+    "comingSoon": "قريبًا",
+    "openMenu": "فتح القائمة",
+    "closeMenu": "إغلاق القائمة"
   },
   "tree": {
     "searchPlaceholder": "ابحث في أفراد العائلة…",

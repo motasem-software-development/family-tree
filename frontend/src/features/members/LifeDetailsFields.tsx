@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useIsCompact } from '../../app/useIsCompact'
 import {
   dateInputValue,
   fromDateInput,
@@ -32,11 +33,22 @@ export const LifeDetailsFields = ({
   controlStyle,
 }: LifeDetailsFieldsProps) => {
   const { t } = useTranslation()
+  // A native date input has a wide intrinsic minimum — the picker has to fit YYYY-MM-DD plus its
+  // calendar affordance — so two of them side by side clip their own text below roughly 560px.
+  // Stacked, each gets the full row.
+  const isCompact = useIsCompact()
   const today = new Date().toISOString().slice(0, 10)
 
   return (
     <>
-      <div style={{ display: 'flex', gap: 12, marginBottom: 'var(--space-4)' }}>
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: isCompact ? 'column' : 'row',
+          gap: 12,
+          marginBottom: 'var(--space-4)',
+        }}
+      >
         <div style={{ flex: 1, minWidth: 0 }}>
           <label htmlFor={`${idPrefix}-dob`} style={labelStyle}>
             {t('members.dateOfBirth')}

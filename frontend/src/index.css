@@ -192,3 +192,33 @@ textarea {
     transition-duration: 0.01ms !important;
   }
 }
+
+/*
+ * The two rules below exist in CSS rather than in a component's inline `style` because neither
+ * can be expressed inline: the first needs two declarations of one property (the dvh fallback
+ * pair), and the second has to outrank an inline declaration.
+ */
+
+/*
+ * The app shell's full-height box. `100dvh` tracks the mobile browser's collapsing URL bar,
+ * which `100vh` does not — on iOS Safari a 100vh shell puts its bottom row permanently under
+ * the toolbar. The 100vh line is the fallback for browsers without dvh.
+ */
+.app-shell-root {
+  height: 100vh;
+  height: 100dvh;
+}
+
+/*
+ * iOS Safari zooms the page whenever a focused form control's text is under 16px, and it never
+ * zooms back out. Every control in this app is styled inline at 13–14px, so this is the one
+ * place `!important` is warranted: nothing else can outrank an inline declaration. Scoped to
+ * form controls, and only below the compact breakpoint — desktop keeps the designed 13/14px.
+ */
+@media (max-width: 768px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}

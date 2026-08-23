@@ -1,5 +1,6 @@
 import { useEffect, useRef, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useIsCompact } from '../../app/useIsCompact'
 import { LifeStatusDot } from '../members/LifeStatusDot'
 import { lifeYears } from '../members/lifeDetails'
 import type { Direction } from '../../i18n/useDirection'
@@ -105,6 +106,10 @@ export const TreeCanvas = ({
 }: TreeCanvasProps) => {
   const { t } = useTranslation()
   const rtl = direction === 'rtl'
+  // A deep outline is genuinely wider than a phone — the indent rail is the information — so
+  // this canvas keeps its own horizontal scroll. What compact changes is the chrome around it:
+  // smaller gutters, and row controls sized for a fingertip rather than a cursor.
+  const isCompact = useIsCompact()
 
   const scrollRef = useRef<HTMLDivElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
@@ -177,7 +182,9 @@ export const TreeCanvas = ({
 
       <div
         style={{
-          padding: '36px 40px 120px',
+          // 40px of inline gutter is a quarter of a 320px screen. Scales with the viewport and
+          // stops at the designed 36/40, so wide screens keep the original framing.
+          padding: 'clamp(16px, 5vw, 36px) clamp(12px, 5vw, 40px) 120px',
           minHeight: '100%',
           // CSS `zoom`, not `transform: scale()`. A transform is purely visual: it never grows
           // the scroll container's scrollHeight, so zooming past 1.0 pushed content outside the
@@ -196,7 +203,10 @@ export const TreeCanvas = ({
           aria-expanded={rootOpen}
           style={{
             height: 44,
-            minWidth: 200,
+            // Never wider than the canvas: the family name can be long, and the root button is
+            // the one control that must be reachable before anything is expanded.
+            minWidth: 'min(200px, 100%)',
+            maxWidth: '100%',
             background: 'var(--primary)',
             border: 'none',
             borderRadius: 'var(--r-md)',
@@ -213,7 +223,17 @@ export const TreeCanvas = ({
             boxShadow: 'var(--shadow-low)',
           }}
         >
-          <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+              minWidth: 0,
+              overflow: 'hidden',
+              whiteSpace: 'nowrap',
+              textOverflow: 'ellipsis',
+            }}
+          >
             <FamilyIcon />
             {familyName}
           </span>
@@ -240,6 +260,7 @@ export const TreeCanvas = ({
               key={row.id}
               row={row}
               rtl={rtl}
+              isCompact={isCompact}
               selected={selectedId === row.id}
               // Windowing removes rows from the DOM; without these a screen reader would
               // announce the size of the window instead of the size of the family.
@@ -254,7 +275,7 @@ export const TreeCanvas = ({
         </div>
 
         {!isLoading && rows.length === 0 && rootOpen && (
-          <div style={{ maxWidth: 380, margin: '60px auto', textAlign: 'center' }}>
+          <div style={{ maxWidth: 'min(380px, 100%)', margin: '60px auto', textAlign: 'center' }}>
             <div
               style={{
                 width: 48,
@@ -302,7 +323,7 @@ export const TreeCanvas = ({
           position: 'sticky',
           bottom: 24,
           width: 40,
-          marginInlineStart: 24,
+          marginInlineStart: 'clamp(12px, 4vw, 24px)',
           display: 'inline-flex',
           flexDirection: 'column',
           background: 'var(--surface)',
@@ -341,6 +362,8 @@ export const TreeCanvas = ({
 interface TreeRowViewProps {
   row: TreeRow
   rtl: boolean
+  /** Sizes the row's two icon buttons for touch. See TreeCanvas. */
+  isCompact: boolean
   selected: boolean
   setSize: number
   posInSet: number
@@ -352,6 +375,7 @@ interface TreeRowViewProps {
 const TreeRowView = ({
   row,
   rtl,
+  isCompact,
   selected,
   setSize,
   posInSet,
@@ -443,12 +467,14 @@ const TreeRowView = ({
         tabIndex={hasChildren ? 0 : -1}
         style={{
           width: 22,
-          height: 22,
+          // Taller, not wider: the width sits in the indent chain with the rail and the elbow,
+          // so growing it sideways would move every node. The row is 44px tall regardless.
+          height: isCompact ? 44 : 22,
           flex: '0 0 22px',
           border: 'none',
           background: 'transparent',
           color: 'var(--text-3)',
-          fontSize: 13,
+          fontSize: isCompact ? 15 : 13,
           lineHeight: 1,
           cursor: hasChildren ? 'pointer' : 'default',
           borderRadius: 'var(--r-sm)',
@@ -545,17 +571,20 @@ const TreeRowView = ({
         title={t('tree.actions')}
         aria-label={`${t('tree.actions')} — ${row.name}`}
         style={{
-          width: 26,
-          height: 26,
+          // Last in the row, so widening it for touch pushes nothing out of alignment.
+          width: isCompact ? 34 : 26,
+          height: isCompact ? 40 : 26,
           marginInlineStart: 6,
           border: 'none',
           background: 'transparent',
           color: 'var(--text-3)',
-          fontSize: 15,
+          fontSize: isCompact ? 17 : 15,
           lineHeight: 1,
           cursor: 'pointer',
           borderRadius: 'var(--r-sm)',
-          opacity: selected ? 1 : 0.45,
+          // Faded until selected is a hover-era cue: a touch screen has no hover, so the only
+          // way to discover the row menu would be to tap something nearly invisible.
+          opacity: selected || isCompact ? 1 : 0.45,
         }}
       >
         ⋮

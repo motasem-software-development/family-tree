@@ -80,7 +80,9 @@ export const ExportDialog = ({ rootId, fileName, onClose }: ExportDialogProps) =
         alignItems: 'center',
         justifyContent: 'center',
         zIndex: 400,
-        padding: 24,
+        // A fixed 24px gutter costs a 320px screen 15% of its width. Scales with the viewport
+        // and stops at the designed 24px, so wide screens are unchanged.
+        padding: 'clamp(12px, 4vw, 24px)',
       }}
     >
       <div
@@ -90,6 +92,11 @@ export const ExportDialog = ({ rootId, fileName, onClose }: ExportDialogProps) =
         style={{
           width: '100%',
           maxWidth: 420,
+          // Short in portrait, but two rows of options plus a failure message is taller than a
+          // phone in landscape. Capped and scrolled, like the other dialogs.
+          maxHeight: '100%',
+          display: 'flex',
+          flexDirection: 'column',
           background: 'var(--surface)',
           borderRadius: 'var(--r-lg)',
           boxShadow: 'var(--shadow-high)',
@@ -97,7 +104,14 @@ export const ExportDialog = ({ rootId, fileName, onClose }: ExportDialogProps) =
           animation: 'fadeUp var(--motion-base) var(--ease-standard)',
         }}
       >
-        <div style={{ padding: '22px 24px 0' }}>
+        <div
+          style={{
+            padding: '22px clamp(16px, 5vw, 24px) 0',
+            flex: '1 1 auto',
+            minHeight: 0,
+            overflowY: 'auto',
+          }}
+        >
           <div style={{ fontSize: 17, fontWeight: 600, lineHeight: 1.35 }}>
             {t('tree.export.title')}
           </div>
@@ -106,8 +120,8 @@ export const ExportDialog = ({ rootId, fileName, onClose }: ExportDialogProps) =
             <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>
               {t('tree.export.style')}
             </div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <label style={{ ...optionStyle(style === 'xmind'), flex: 1 }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              <label style={{ ...optionStyle(style === 'xmind'), flex: '1 1 140px' }}>
                 <input
                   type="radio"
                   name="export-style"
@@ -116,7 +130,7 @@ export const ExportDialog = ({ rootId, fileName, onClose }: ExportDialogProps) =
                 />
                 {t('tree.export.styleXmind')}
               </label>
-              <label style={{ ...optionStyle(style === 'clean'), flex: 1 }}>
+              <label style={{ ...optionStyle(style === 'clean'), flex: '1 1 140px' }}>
                 <input
                   type="radio"
                   name="export-style"
@@ -132,8 +146,8 @@ export const ExportDialog = ({ rootId, fileName, onClose }: ExportDialogProps) =
             <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>
               {t('tree.export.page')}
             </div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <label style={{ ...optionStyle(page === 'sheet'), flex: 1 }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              <label style={{ ...optionStyle(page === 'sheet'), flex: '1 1 140px' }}>
                 <input
                   type="radio"
                   name="export-page"
@@ -142,7 +156,7 @@ export const ExportDialog = ({ rootId, fileName, onClose }: ExportDialogProps) =
                 />
                 {t('tree.export.pageSheet')}
               </label>
-              <label style={{ ...optionStyle(page === 'a4'), flex: 1 }}>
+              <label style={{ ...optionStyle(page === 'a4'), flex: '1 1 140px' }}>
                 <input
                   type="radio"
                   name="export-page"
@@ -161,7 +175,16 @@ export const ExportDialog = ({ rootId, fileName, onClose }: ExportDialogProps) =
           )}
         </div>
 
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, padding: '22px 24px' }}>
+        <div
+          style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            justifyContent: 'flex-end',
+            gap: 8,
+            flex: '0 0 auto',
+            padding: '22px clamp(16px, 5vw, 24px)',
+          }}
+        >
           <button
             type="button"
             onClick={onClose}

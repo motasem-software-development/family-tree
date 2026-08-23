@@ -35,7 +35,9 @@
     "audit": "Audit history",
     "share": "Public sharing",
     "settings": "Settings",
-    "comingSoon": "Coming soon"
+    "comingSoon": "Coming soon",
+    "openMenu": "Open menu",
+    "closeMenu": "Close menu"
   },
   "tree": {
     "searchPlaceholder": "Search family members…",

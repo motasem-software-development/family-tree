@@ -182,13 +182,23 @@ export function MembersPage() {
 
   return (
     <AppShell familyName={familyName} statLine={t('tree.membersCount', { count: unfiltered.length })}>
-      <div style={{ flex: 1, minWidth: 0, overflow: 'auto', padding: 'var(--space-8)' }}>
+      {/* 32px of gutter on each side takes a fifth of a 320px screen. Scales with the viewport
+          and stops at the designed --space-8, so wide screens are unchanged. */}
+      <div
+        style={{
+          flex: 1,
+          minWidth: 0,
+          overflow: 'auto',
+          padding: 'clamp(var(--space-4), 4vw, var(--space-8))',
+        }}
+      >
         <div style={{ maxWidth: 900, margin: '0 auto' }}>
           <div
             style={{
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
+              flexWrap: 'wrap',
               gap: 'var(--space-4)',
               marginBottom: 'var(--space-6)',
             }}
@@ -348,89 +358,95 @@ export function MembersPage() {
                 overflow: 'hidden',
               }}
             >
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr>
-                    <th style={headCellStyle}>{t('members.name')}</th>
-                    <th style={headCellStyle}>{t('members.parent')}</th>
-                    <th style={headCellStyle}>{t('filters.country')}</th>
-                    <th style={headCellStyle}>{t('filters.branch')}</th>
-                    <th style={headCellStyle} />
-                  </tr>
-                </thead>
-                <tbody>
-                  {all.map((current) => (
-                    <tr key={current.id}>
-                      <td style={{ ...cellStyle, fontWeight: 500 }}>
-                        <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <LifeStatusDot deceased={lifeDetailsOf(current).isDeceased} />
-                          {/* Own name, then father, grandfather and great-grandfather. The
-                              lineage is muted so the row still scans by given name — it is
-                              context, not four names of equal weight. */}
-                          <span>
-                            {current.name}
-                            {lineageName(current, byId) !== '' && (
-                              <span style={{ fontWeight: 400, color: 'var(--text-3)' }}>
-                                {' '}
-                                {lineageName(current, byId)}
+              {/* The one place horizontal scrolling is right rather than a failure: five columns of
+                  member data cannot be read at 320px, and folding them into stacked cards would
+                  drop the column headers that say what each value is. The scroll is contained
+                  by the card, so the page itself never scrolls sideways. */}
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', minWidth: 720, borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr>
+                      <th style={headCellStyle}>{t('members.name')}</th>
+                      <th style={headCellStyle}>{t('members.parent')}</th>
+                      <th style={headCellStyle}>{t('filters.country')}</th>
+                      <th style={headCellStyle}>{t('filters.branch')}</th>
+                      <th style={headCellStyle} />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {all.map((current) => (
+                      <tr key={current.id}>
+                        <td style={{ ...cellStyle, fontWeight: 500 }}>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <LifeStatusDot deceased={lifeDetailsOf(current).isDeceased} />
+                            {/* Own name, then father, grandfather and great-grandfather. The
+                                lineage is muted so the row still scans by given name — it is
+                                context, not four names of equal weight. */}
+                            <span>
+                              {current.name}
+                              {lineageName(current, byId) !== '' && (
+                                <span style={{ fontWeight: 400, color: 'var(--text-3)' }}>
+                                  {' '}
+                                  {lineageName(current, byId)}
+                                </span>
+                              )}
+                            </span>
+                            {/* Same treatment as the tree outline, so a member reads the same way
+                                whichever screen they are looked at on. */}
+                            {yearsOf(current) !== null && (
+                              <span
+                                style={{
+                                  fontFamily: 'var(--mono)',
+                                  fontSize: 11,
+                                  fontWeight: 400,
+                                  color: 'var(--text-3)',
+                                }}
+                              >
+                                {yearsOf(current)}
                               </span>
                             )}
                           </span>
-                          {/* Same treatment as the tree outline, so a member reads the same way
-                              whichever screen they are looked at on. */}
-                          {yearsOf(current) !== null && (
-                            <span
-                              style={{
-                                fontFamily: 'var(--mono)',
-                                fontSize: 11,
-                                fontWeight: 400,
-                                color: 'var(--text-3)',
-                              }}
-                            >
-                              {yearsOf(current)}
-                            </span>
-                          )}
-                        </span>
-                      </td>
-                      <td style={{ ...cellStyle, color: 'var(--text-3)' }}>
-                        {current.parentId === null
-                          ? t('members.noParent')
-                          : (byId.get(current.parentId)?.name ?? '—')}
-                      </td>
-                      <td style={{ ...cellStyle, color: 'var(--text-3)', whiteSpace: 'nowrap' }}>
-                        {countryCell(current)}
-                      </td>
-                      <td style={{ ...cellStyle, color: 'var(--text-3)' }}>
-                        {/* The root belongs to no branch; specification §21 renders that as
-                            "Root" rather than as a blank cell. */}
-                        {current.branchName ?? t('filters.branchRoot')}
-                      </td>
-                      <td style={{ ...cellStyle, whiteSpace: 'nowrap' }}>
-                        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                          {hasPermission('Member.Edit') && (
-                            <button
-                              type="button"
-                              onClick={() => setEditing({ mode: 'edit', member: current })}
-                              style={rowButtonStyle(false)}
-                            >
-                              {t('members.edit')}
-                            </button>
-                          )}
-                          {hasPermission('Member.Delete') && (
-                            <button
-                              type="button"
-                              onClick={() => setPendingDelete(current)}
-                              style={rowButtonStyle(true)}
-                            >
-                              {t('members.delete')}
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                        </td>
+                        <td style={{ ...cellStyle, color: 'var(--text-3)' }}>
+                          {current.parentId === null
+                            ? t('members.noParent')
+                            : (byId.get(current.parentId)?.name ?? '—')}
+                        </td>
+                        <td style={{ ...cellStyle, color: 'var(--text-3)', whiteSpace: 'nowrap' }}>
+                          {countryCell(current)}
+                        </td>
+                        <td style={{ ...cellStyle, color: 'var(--text-3)' }}>
+                          {/* The root belongs to no branch; specification §21 renders that as
+                              "Root" rather than as a blank cell. */}
+                          {current.branchName ?? t('filters.branchRoot')}
+                        </td>
+                        <td style={{ ...cellStyle, whiteSpace: 'nowrap' }}>
+                          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                            {hasPermission('Member.Edit') && (
+                              <button
+                                type="button"
+                                onClick={() => setEditing({ mode: 'edit', member: current })}
+                                style={rowButtonStyle(false)}
+                              >
+                                {t('members.edit')}
+                              </button>
+                            )}
+                            {hasPermission('Member.Delete') && (
+                              <button
+                                type="button"
+                                onClick={() => setPendingDelete(current)}
+                                style={rowButtonStyle(true)}
+                              >
+                                {t('members.delete')}
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
         </div>
@@ -448,7 +464,9 @@ export function MembersPage() {
             alignItems: 'center',
             justifyContent: 'center',
             zIndex: 400,
-            padding: 24,
+            // A fixed 24px gutter costs a 320px screen 15% of its width. Scales with the
+            // viewport and stops at the designed 24px, so wide screens are unchanged.
+            padding: 'clamp(12px, 4vw, 24px)',
           }}
         >
           <div
@@ -458,6 +476,10 @@ export function MembersPage() {
             style={{
               width: '100%',
               maxWidth: 420,
+              // Never taller than the viewport, so the confirm and cancel buttons stay on
+              // screen on a short phone or in landscape.
+              maxHeight: '100%',
+              overflowY: 'auto',
               padding: 'var(--space-6)',
               background: 'var(--surface)',
               borderRadius: 'var(--r-lg)',

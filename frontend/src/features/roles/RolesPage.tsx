@@ -96,13 +96,23 @@ export function RolesPage() {
 
   return (
     <AppShell familyName={familyName} statLine={t('roles.count', { count: all.length })}>
-      <div style={{ flex: 1, minWidth: 0, overflow: 'auto', padding: 'var(--space-8)' }}>
+      {/* 32px of gutter on each side takes a fifth of a 320px screen. Scales with the viewport
+          and stops at the designed --space-8, so wide screens are unchanged. */}
+      <div
+        style={{
+          flex: 1,
+          minWidth: 0,
+          overflow: 'auto',
+          padding: 'clamp(var(--space-4), 4vw, var(--space-8))',
+        }}
+      >
         <div style={{ maxWidth: 900, margin: '0 auto' }}>
           <div
             style={{
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
+              flexWrap: 'wrap',
               gap: 'var(--space-4)',
               marginBottom: 'var(--space-6)',
             }}
@@ -186,58 +196,64 @@ export function RolesPage() {
                 overflow: 'hidden',
               }}
             >
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr>
-                    <th style={headCellStyle}>{t('roles.name')}</th>
-                    <th style={headCellStyle}>{t('roles.description')}</th>
-                    <th style={headCellStyle}>{t('roles.members')}</th>
-                    <th style={headCellStyle} />
-                  </tr>
-                </thead>
-                <tbody>
-                  {all.map((current) => (
-                    <tr key={current.id}>
-                      <td style={{ ...cellStyle, fontWeight: 500 }}>
-                        {current.name}
-                        {current.isSystem && <span style={badgeStyle}>{t('roles.systemRole')}</span>}
-                      </td>
-                      <td style={{ ...cellStyle, color: 'var(--text-3)' }}>
-                        {current.description ?? ''}
-                      </td>
-                      <td style={cellStyle}>{current.userCount}</td>
-                      <td style={{ ...cellStyle, whiteSpace: 'nowrap' }}>
-                        {current.isSystem ? (
-                          <span style={{ fontSize: 12, color: 'var(--text-3)' }}>
-                            {t('roles.systemRoleHint')}
-                          </span>
-                        ) : (
-                          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                            {hasPermission('Role.Edit') && (
-                              <button
-                                type="button"
-                                onClick={() => setEditing({ mode: 'edit', role: current })}
-                                style={rowButtonStyle(false)}
-                              >
-                                {t('roles.edit')}
-                              </button>
-                            )}
-                            {hasPermission('Role.Delete') && (
-                              <button
-                                type="button"
-                                onClick={() => setPendingDelete(current)}
-                                style={rowButtonStyle(true)}
-                              >
-                                {t('roles.delete')}
-                              </button>
-                            )}
-                          </div>
-                        )}
-                      </td>
+              {/* The one place horizontal scrolling is right rather than a failure: four columns of
+                  member data cannot be read at 320px, and folding them into stacked cards would
+                  drop the column headers that say what each value is. The scroll is contained
+                  by the card, so the page itself never scrolls sideways. */}
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', minWidth: 620, borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr>
+                      <th style={headCellStyle}>{t('roles.name')}</th>
+                      <th style={headCellStyle}>{t('roles.description')}</th>
+                      <th style={headCellStyle}>{t('roles.members')}</th>
+                      <th style={headCellStyle} />
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {all.map((current) => (
+                      <tr key={current.id}>
+                        <td style={{ ...cellStyle, fontWeight: 500 }}>
+                          {current.name}
+                          {current.isSystem && <span style={badgeStyle}>{t('roles.systemRole')}</span>}
+                        </td>
+                        <td style={{ ...cellStyle, color: 'var(--text-3)' }}>
+                          {current.description ?? ''}
+                        </td>
+                        <td style={cellStyle}>{current.userCount}</td>
+                        <td style={{ ...cellStyle, whiteSpace: 'nowrap' }}>
+                          {current.isSystem ? (
+                            <span style={{ fontSize: 12, color: 'var(--text-3)' }}>
+                              {t('roles.systemRoleHint')}
+                            </span>
+                          ) : (
+                            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                              {hasPermission('Role.Edit') && (
+                                <button
+                                  type="button"
+                                  onClick={() => setEditing({ mode: 'edit', role: current })}
+                                  style={rowButtonStyle(false)}
+                                >
+                                  {t('roles.edit')}
+                                </button>
+                              )}
+                              {hasPermission('Role.Delete') && (
+                                <button
+                                  type="button"
+                                  onClick={() => setPendingDelete(current)}
+                                  style={rowButtonStyle(true)}
+                                >
+                                  {t('roles.delete')}
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
         </div>
@@ -255,7 +271,9 @@ export function RolesPage() {
             alignItems: 'center',
             justifyContent: 'center',
             zIndex: 400,
-            padding: 24,
+            // A fixed 24px gutter costs a 320px screen 15% of its width. Scales with the
+            // viewport and stops at the designed 24px, so wide screens are unchanged.
+            padding: 'clamp(12px, 4vw, 24px)',
           }}
         >
           <div
@@ -265,6 +283,10 @@ export function RolesPage() {
             style={{
               width: '100%',
               maxWidth: 420,
+              // Never taller than the viewport, so the confirm and cancel buttons stay on
+              // screen on a short phone or in landscape.
+              maxHeight: '100%',
+              overflowY: 'auto',
               padding: 'var(--space-6)',
               background: 'var(--surface)',
               borderRadius: 'var(--r-lg)',
