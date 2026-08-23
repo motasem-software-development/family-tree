@@ -34,7 +34,7 @@
 - Consumes: nothing.
 - Produces: `void FamilyMember.MoveTo(Guid? newParentId, DateTimeOffset now)` — sets `ParentId`, increments `Version`, calls `Touch(now)`. Throws `DomainException` with code `MOVE_CREATES_CYCLE` when `newParentId == Id`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Append to `tests/FamilyTree.Domain.Tests/FamilyMembers/FamilyMemberTests.cs`, inside the existing `FamilyMemberTests` class. The fixtures `Now`, `TenantId`, and `TreeId` are already declared at the top of that file.
 
@@ -109,12 +109,12 @@ Append to `tests/FamilyTree.Domain.Tests/FamilyMembers/FamilyMemberTests.cs`, in
     }
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `dotnet test tests/FamilyTree.Domain.Tests --filter FullyQualifiedName~FamilyMemberTests`
 Expected: FAIL to compile — `FamilyMember` does not contain a definition for `MoveTo`.
 
-- [ ] **Step 3: Implement the command**
+- [x] **Step 3: Implement the command**
 
 Add to `src/FamilyTree.Domain/FamilyMembers/FamilyMember.cs`, immediately after `Rename`:
 
@@ -143,12 +143,12 @@ Add to `src/FamilyTree.Domain/FamilyMembers/FamilyMember.cs`, immediately after 
     }
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `dotnet test tests/FamilyTree.Domain.Tests --filter FullyQualifiedName~FamilyMemberTests`
 Expected: PASS — the six new tests plus every existing one.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/FamilyTree.Domain/FamilyMembers/FamilyMember.cs tests/FamilyTree.Domain.Tests/FamilyMembers/FamilyMemberTests.cs
@@ -179,7 +179,7 @@ Deeper cycles need the ancestor chain and belong to the database."
 >   </ItemGroup>
 > ```
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `tests/FamilyTree.Api.IntegrationTests/FamilyMembers/CycleCheckQueryTests.cs`:
 
@@ -293,12 +293,12 @@ public sealed class CycleCheckQueryTests(PostgresFixture fixture) : DatabaseTest
 }
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `dotnet test tests/FamilyTree.Api.IntegrationTests --filter FullyQualifiedName~CycleCheckQueryTests`
 Expected: FAIL to compile — `CycleCheckQuery` does not exist. (Docker must be running.)
 
-- [ ] **Step 3: Write the query**
+- [x] **Step 3: Write the query**
 
 Create `src/FamilyTree.Infrastructure/FamilyMembers/CycleCheckQuery.cs`:
 
@@ -400,12 +400,12 @@ internal static class CycleCheckQuery
 }
 ```
 
-- [ ] **Step 4: Run the test to verify it passes**
+- [x] **Step 4: Run the test to verify it passes**
 
 Run: `dotnet test tests/FamilyTree.Api.IntegrationTests --filter FullyQualifiedName~CycleCheckQueryTests`
 Expected: PASS — five tests.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/FamilyTree.Infrastructure/FamilyMembers/CycleCheckQuery.cs tests/FamilyTree.Api.IntegrationTests/FamilyMembers/CycleCheckQueryTests.cs
@@ -431,7 +431,7 @@ query filter."
 - Consumes: `FamilyMember.MoveTo` (Task 1), `CycleCheckQuery.WouldCreateCycleAsync` (Task 2).
 - Produces: `record MoveFamilyMemberRequest(Guid? ParentId, int Version)` and `Task<FamilyMemberResponse> IFamilyMemberService.MoveAsync(Guid id, MoveFamilyMemberRequest request, CancellationToken ct = default)`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Append to `tests/FamilyTree.Api.IntegrationTests/FamilyMembers/FamilyMemberServiceTests.cs`. The helpers `SeedTenantWithTreeAsync`, `ServiceFor`, and `ContextFor` already exist in that file.
 
@@ -579,12 +579,12 @@ Append to `tests/FamilyTree.Api.IntegrationTests/FamilyMembers/FamilyMemberServi
     }
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `dotnet test tests/FamilyTree.Api.IntegrationTests --filter FullyQualifiedName~FamilyMemberServiceTests`
 Expected: FAIL to compile — `MoveFamilyMemberRequest` and `MoveAsync` do not exist.
 
-- [ ] **Step 3: Add the contract**
+- [x] **Step 3: Add the contract**
 
 Create `src/FamilyTree.Contracts/FamilyMembers/MoveFamilyMemberRequest.cs`:
 
@@ -603,7 +603,7 @@ namespace FamilyTree.Contracts.FamilyMembers;
 public sealed record MoveFamilyMemberRequest(Guid? ParentId, int Version);
 ```
 
-- [ ] **Step 4: Declare the command on the interface**
+- [x] **Step 4: Declare the command on the interface**
 
 Add to `src/FamilyTree.Application/FamilyMembers/IFamilyMemberService.cs`, after `UpdateAsync`:
 
@@ -618,7 +618,7 @@ Add to `src/FamilyTree.Application/FamilyMembers/IFamilyMemberService.cs`, after
         Guid id, MoveFamilyMemberRequest request, CancellationToken ct = default);
 ```
 
-- [ ] **Step 5: Implement the command**
+- [x] **Step 5: Implement the command**
 
 Add to `src/FamilyTree.Infrastructure/FamilyMembers/FamilyMemberService.cs`, after `UpdateAsync`:
 
@@ -687,12 +687,12 @@ Add to `src/FamilyTree.Infrastructure/FamilyMembers/FamilyMemberService.cs`, aft
     }
 ```
 
-- [ ] **Step 6: Run the tests to verify they pass**
+- [x] **Step 6: Run the tests to verify they pass**
 
 Run: `dotnet test tests/FamilyTree.Api.IntegrationTests --filter FullyQualifiedName~FamilyMemberServiceTests`
 Expected: PASS — the eight new tests plus the existing ones.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/FamilyTree.Contracts/FamilyMembers/MoveFamilyMemberRequest.cs src/FamilyTree.Application/FamilyMembers/IFamilyMemberService.cs src/FamilyTree.Infrastructure/FamilyMembers/FamilyMemberService.cs tests/FamilyTree.Api.IntegrationTests/FamilyMembers/FamilyMemberServiceTests.cs
@@ -717,7 +717,7 @@ never as forbidden."
 - Consumes: `IFamilyMemberService.MoveAsync` (Task 3).
 - Produces: `POST /api/v1/family-members/{id:guid}/move` → 200 with `FamilyMemberResponse`; 404 `MEMBER_NOT_FOUND`; 409 `MOVE_CREATES_CYCLE` / `CONCURRENCY_CONFLICT`; 401 unauthenticated; 403 without `Member.Move`.
 
-- [ ] **Step 1: Write the failing endpoint tests**
+- [x] **Step 1: Write the failing endpoint tests**
 
 Append to `tests/FamilyTree.Api.IntegrationTests/Endpoints/FamilyMemberEndpointsTests.cs`. The helpers `AuthenticateAsync`, `CreateAsync`, and `CodeOf` already exist there.
 
@@ -835,7 +835,7 @@ and make that test's POST body depend on the path, since move takes a different 
                 : JsonContent.Create(new CreateFamilyMemberRequest("فارس", null));
 ```
 
-- [ ] **Step 2: Write the permission test**
+- [x] **Step 2: Write the permission test**
 
 Append to `tests/FamilyTree.Api.IntegrationTests/Endpoints/AuthorizationTests.cs`. Read `Delete_member_returns_403_for_a_caller_lacking_the_delete_permission` in that file first and mirror its setup exactly — including how it obtains a client and calls `TokenWith(...)`.
 
@@ -857,12 +857,12 @@ Append to `tests/FamilyTree.Api.IntegrationTests/Endpoints/AuthorizationTests.cs
     }
 ```
 
-- [ ] **Step 3: Run the tests to verify they fail**
+- [x] **Step 3: Run the tests to verify they fail**
 
 Run: `dotnet test tests/FamilyTree.Api.IntegrationTests --filter "FullyQualifiedName~FamilyMemberEndpointsTests|FullyQualifiedName~AuthorizationTests"`
 Expected: FAIL — 404 from an unmapped route.
 
-- [ ] **Step 4: Map the endpoint**
+- [x] **Step 4: Map the endpoint**
 
 Add to `src/FamilyTree.Api/Endpoints/FamilyMembers/FamilyMemberEndpoints.cs`, between the `MapPut` and `MapDelete` registrations:
 
@@ -875,12 +875,12 @@ Add to `src/FamilyTree.Api/Endpoints/FamilyMembers/FamilyMemberEndpoints.cs`, be
             .RequirePermission(Permissions.Member.Move);
 ```
 
-- [ ] **Step 5: Run the tests to verify they pass**
+- [x] **Step 5: Run the tests to verify they pass**
 
 Run: `dotnet test tests/FamilyTree.Api.IntegrationTests --filter "FullyQualifiedName~FamilyMemberEndpointsTests|FullyQualifiedName~AuthorizationTests"`
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/FamilyTree.Api/Endpoints/FamilyMembers/FamilyMemberEndpoints.cs tests/FamilyTree.Api.IntegrationTests/Endpoints/FamilyMemberEndpointsTests.cs tests/FamilyTree.Api.IntegrationTests/Endpoints/AuthorizationTests.cs
@@ -901,7 +901,7 @@ confer the right to restructure the tree."
 **Interfaces:**
 - Consumes: `IFamilyMemberService.MoveAsync` (Task 3). Adds no production code — this task exists so the advisory lock cannot be deleted as ceremony.
 
-- [ ] **Step 1: Write the test**
+- [x] **Step 1: Write the test**
 
 Create `tests/FamilyTree.Api.IntegrationTests/FamilyMembers/ConcurrentMoveTests.cs`:
 
@@ -995,14 +995,14 @@ public sealed class ConcurrentMoveTests(PostgresFixture fixture) : DatabaseTestB
 }
 ```
 
-- [ ] **Step 2: Run the test**
+- [x] **Step 2: Run the test**
 
 Run: `dotnet test tests/FamilyTree.Api.IntegrationTests --filter FullyQualifiedName~ConcurrentMoveTests`
 Expected: PASS — the lock added in Task 3 is what makes it pass.
 
 > If it fails, the fault is in Task 3's implementation, not in this test. Check that the lock is taken *before* the member is loaded, and that `CycleCheckQuery` sets `command.Transaction`. A cycle check reading outside the transaction sees a stale snapshot, and both moves pass.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add tests/FamilyTree.Api.IntegrationTests/FamilyMembers/ConcurrentMoveTests.cs
@@ -1026,7 +1026,7 @@ is what stops the lock being deleted as ceremony."
 - Consumes: the endpoint from Task 4.
 - Produces: `membersApi.move(id: string, parentId: string | null, version: number): Promise<FamilyMember>` and `useMoveMember()`, a mutation taking `{ id, parentId, version }`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `frontend/src/features/members/membersApi.test.ts`, matching the mocking style already used there for `update` and `remove` — read the top of that file and reuse its fetch stub rather than introducing a second one. Adjust the mock's variable name below to whatever that file already calls it.
 
@@ -1053,12 +1053,12 @@ Append to `frontend/src/features/members/membersApi.test.ts`, matching the mocki
   })
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `cd frontend && npx vitest run src/features/members/membersApi.test.ts`
 Expected: FAIL — `membersApi.move is not a function`.
 
-- [ ] **Step 3: Add the call**
+- [x] **Step 3: Add the call**
 
 Add to `frontend/src/features/members/membersApi.ts`, after `update`:
 
@@ -1075,7 +1075,7 @@ Add to `frontend/src/features/members/membersApi.ts`, after `update`:
     }),
 ```
 
-- [ ] **Step 4: Add the hook**
+- [x] **Step 4: Add the hook**
 
 Add to `frontend/src/features/members/useMembers.ts`, after `useUpdateMember`:
 
@@ -1099,12 +1099,12 @@ export const useMoveMember = () => {
 }
 ```
 
-- [ ] **Step 5: Run the tests to verify they pass**
+- [x] **Step 5: Run the tests to verify they pass**
 
 Run: `cd frontend && npx vitest run src/features/members`
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add frontend/src/features/members/membersApi.ts frontend/src/features/members/useMembers.ts frontend/src/features/members/membersApi.test.ts
@@ -1127,7 +1127,7 @@ member's version, and every ancestor path search returns."
 - Consumes: `allNodes`, `findNode`, and `FamilyTreeNode`, all already in `flattenTree.ts`.
 - Produces: `descendantIds(rootMembers: readonly FamilyTreeNode[], id: string): Set<string>` — every descendant of `id`, excluding `id` itself. Empty for an unknown id.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `frontend/src/features/tree/flattenTree.test.ts`, reusing the `node` fixture helper already defined at the top of that file and adding `descendantIds` to its import from `./flattenTree`.
 
@@ -1164,12 +1164,12 @@ describe('descendantIds', () => {
 })
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `cd frontend && npx vitest run src/features/tree/flattenTree.test.ts`
 Expected: FAIL — `descendantIds` is not exported.
 
-- [ ] **Step 3: Implement it**
+- [x] **Step 3: Implement it**
 
 Add to `frontend/src/features/tree/flattenTree.ts`, after `descendantCount`:
 
@@ -1192,12 +1192,12 @@ export const descendantIds = (
 }
 ```
 
-- [ ] **Step 4: Run the test to verify it passes**
+- [x] **Step 4: Run the test to verify it passes**
 
 Run: `cd frontend && npx vitest run src/features/tree/flattenTree.test.ts`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add frontend/src/features/tree/flattenTree.ts frontend/src/features/tree/flattenTree.test.ts
@@ -1234,7 +1234,7 @@ export interface MoveDialogProps {
 }
 ```
 
-- [ ] **Step 1: Add the translation keys**
+- [x] **Step 1: Add the translation keys**
 
 In `frontend/src/i18n/locales/en.json`, add a `move` block as a sibling of the existing `modal` block:
 
@@ -1286,12 +1286,12 @@ In `frontend/src/i18n/locales/ar.json`, the same keys:
     "moved": "تم نقل {{name}}."
 ```
 
-- [ ] **Step 2: Run the locale parity test**
+- [x] **Step 2: Run the locale parity test**
 
 Run: `cd frontend && npx vitest run src/i18n/locales.test.ts`
 Expected: PASS. A key in one file but not the other fails here, before any component reads it.
 
-- [ ] **Step 3: Write the failing component test**
+- [x] **Step 3: Write the failing component test**
 
 Create `frontend/src/features/tree/MoveDialog.test.tsx`:
 
@@ -1411,12 +1411,12 @@ describe('MoveDialog', () => {
 })
 ```
 
-- [ ] **Step 4: Run the test to verify it fails**
+- [x] **Step 4: Run the test to verify it fails**
 
 Run: `cd frontend && npx vitest run src/features/tree/MoveDialog.test.tsx`
 Expected: FAIL — cannot resolve `./MoveDialog`.
 
-- [ ] **Step 5: Write the component**
+- [x] **Step 5: Write the component**
 
 Create `frontend/src/features/tree/MoveDialog.tsx`. Read `MemberActions.tsx` first and reuse its overlay, card, input, and button styles verbatim — this dialog must be indistinguishable from the add/edit/delete modals, not a second visual language. The structure below is what the tests pin; the styling is what you copy across.
 
@@ -1539,12 +1539,12 @@ export const MoveDialog = ({
 
 > Verify while writing: the exact exported name and shape of the search-hit type in `frontend/src/features/members/types.ts` (used above as objects with `id`, `name`, `generation`, `ancestors`). If the field names differ, follow that file and fix the test fixtures to match.
 
-- [ ] **Step 6: Run the test to verify it passes**
+- [x] **Step 6: Run the test to verify it passes**
 
 Run: `cd frontend && npx vitest run src/features/tree/MoveDialog.test.tsx`
 Expected: PASS — five tests.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add frontend/src/features/tree/MoveDialog.tsx frontend/src/features/tree/MoveDialog.test.tsx frontend/src/i18n/locales/en.json frontend/src/i18n/locales/ar.json
@@ -1570,7 +1570,7 @@ disabled with the reason, which the server still enforces."
 - Consumes: `useMoveMember` (Task 6), `descendantIds` (Task 7), `MoveDialog` (Task 8).
 - Produces: no new exports. `MemberPermissions` in `MemberPanel.tsx` gains `canMove: boolean`, and both `MemberPanel` and `ContextMenu` gain an `onMove: () => void` prop.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 In `frontend/src/features/tree/TreePage.test.tsx`, add `'Member.Move'` to the default `permissions` array assigned in `beforeEach`, and stub the new call beside the existing `update`/`remove` stubs:
 
@@ -1671,12 +1671,12 @@ Replace the existing test named `renders Move disabled, because its backend comm
   })
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `cd frontend && npx vitest run src/features/tree/TreePage.test.tsx`
 Expected: FAIL — Move is still disabled, so the click does nothing and no dialog appears.
 
-- [ ] **Step 3: Wire the page**
+- [x] **Step 3: Wire the page**
 
 In `frontend/src/features/tree/TreePage.tsx`, add the imports:
 
@@ -1746,18 +1746,18 @@ Wire both triggers — `MemberPanel`'s `onMove` and `ContextMenu`'s `onMove` —
 
 > Verify while writing: `detailById`'s value shape. It is built from the flat members list and is read elsewhere in this file as `detailById.get(id)?.life`; confirm the version is reachable as `?.version` and adjust if the map stores something narrower.
 
-- [ ] **Step 4: Enable the buttons**
+- [x] **Step 4: Enable the buttons**
 
 In `frontend/src/features/tree/MemberPanel.tsx`: add `canMove: boolean` to `MemberPermissions`, add an `onMove: () => void` prop, and replace the hard-disabled Move button — deleting the comment that calls it a Phase 5 command — with one gated on `permissions.canMove`, written exactly like the Add/Edit/Delete buttons above it.
 
 In `frontend/src/features/tree/MemberActions.tsx`: the same for the context menu's Move item, and update the blocked-delete comment and copy so Move reads as the available way out rather than a later phase.
 
-- [ ] **Step 5: Run the tests to verify they pass**
+- [x] **Step 5: Run the tests to verify they pass**
 
 Run: `cd frontend && npx vitest run src/features/tree`
 Expected: PASS — the whole tree suite.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add frontend/src/features/tree
@@ -1779,7 +1779,7 @@ finding the member again."
 - Modify: `frontend/src/features/members/MemberForm.tsx`
 - Modify: `src/FamilyTree.Contracts/FamilyMembers/UpdateFamilyMemberRequest.cs`
 
-- [ ] **Step 1: Run every test**
+- [x] **Step 1: Run every test**
 
 Run: `dotnet test`
 Expected: PASS — all four test projects. Docker must be running.
@@ -1787,12 +1787,12 @@ Expected: PASS — all four test projects. Docker must be running.
 Run: `cd frontend && npm test`
 Expected: PASS — the whole component suite.
 
-- [ ] **Step 2: Run the linter and the type check**
+- [x] **Step 2: Run the linter and the type check**
 
 Run: `cd frontend && npm run lint && npx tsc --noEmit`
 Expected: no errors, and no warnings beyond the two pre-existing `only-export-components` ones in `providers.tsx` and `AuthContext.tsx`.
 
-- [ ] **Step 3: Correct the stale Phase 5 references**
+- [x] **Step 3: Correct the stale Phase 5 references**
 
 Three comments say re-parenting is a future phase. They are now false — update each to name `membersApi.move` / the move endpoint instead:
 
@@ -1802,7 +1802,7 @@ Three comments say re-parenting is a future phase. They are now false — update
 
 Leave `src/FamilyTree.Application/FamilyTrees/FamilyTreeAssembler.cs` and `src/FamilyTree.Api/Authorization/PasswordChangeGateMiddleware.cs` alone: the first describes the validation this command now performs and can be updated only if its sentence is actually wrong, and the second is about public share links, which are Phase 6.
 
-- [ ] **Step 4: Document the command**
+- [x] **Step 4: Document the command**
 
 Add to `README.md`, after the paragraph describing the members screen and the tree outline:
 
@@ -1823,7 +1823,7 @@ Unlike design spec §4.6, the move transaction does not yet write an audit row: 
 `audit_logs` table. The transaction exists so that insert can be added without restructuring.
 ```
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add README.md frontend/src/features/members/membersApi.ts frontend/src/features/members/MemberForm.tsx src/FamilyTree.Contracts/FamilyMembers/UpdateFamilyMemberRequest.cs
