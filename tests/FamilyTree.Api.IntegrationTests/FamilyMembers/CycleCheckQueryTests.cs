@@ -4,6 +4,7 @@ using FamilyTree.Domain.FamilyTrees;
 using FamilyTree.Domain.Tenants;
 using FamilyTree.Infrastructure.FamilyMembers;
 using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
 
 namespace FamilyTree.Api.IntegrationTests.FamilyMembers;
 
@@ -101,6 +102,64 @@ public sealed class CycleCheckQueryTests(PostgresFixture fixture) : DatabaseTest
         // finds nothing to walk rather than climbing into it.
         var result = await CycleCheckQuery.WouldCreateCycleAsync(
             context, otherTenantId, chain[0], chain[1], default);
+
+        result.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Does_not_climb_into_another_tenant_through_a_corrupted_parent_id()
+    {
+        // Tenant B: the ancestry the walk must never be able to reach into.
+        var (_, chainB) = await SeedChainAsync("cyc-g", "داوود", "زياد");
+
+        // Tenant A: a normal chain, seeded the ordinary way.
+        var (tenantAId, _) = await SeedChainAsync("cyc-h", "سليمان", "فارس");
+
+        await using var tenantAReadContext = ContextFor(tenantAId);
+        var treeAId = await tenantAReadContext.FamilyTrees.Select(t => t.Id).SingleAsync();
+
+        // A member whose parent_id points into another tenant is exactly what the service
+        // layer's move validation exists to prevent: it looks the proposed parent up scoped to
+        // the caller's tenant and refuses one it cannot find there, so going through the service
+        // can never produce a row like this. Two composite foreign keys — fk_member_parent
+        // (parent_id, family_tree_id) -> (id, family_tree_id), and family_tree_id/tenant_id's own
+        // FK to family_trees — also make it physically unrepresentable through a normal EF
+        // Add + SaveChanges, by design (spec §3.3). The only way to put a corrupted row like this
+        // on disk — the kind a restored backup or a future relaxation of those constraints could
+        // still produce — is to disable FK enforcement for this one insert, which is what
+        // session_replication_role does. ContextFor(Guid.Empty) is used only as the connection
+        // for that insert, the same insert-only pattern SeedChainAsync itself relies on: the
+        // tenant query filter governs reads, not writes, so which tenant id the context carries
+        // is irrelevant here.
+        var corrupted = FamilyMember.Create(tenantAId, treeAId, chainB[1], "يوسف", Now);
+        await using (var seedContext = ContextFor(Guid.Empty))
+        {
+            seedContext.FamilyMembers.Add(corrupted);
+
+            // session_replication_role is connection-scoped, so the connection has to be opened
+            // explicitly here and kept open across the SET and the SaveChanges — otherwise EF
+            // opens its own connection lazily inside SaveChanges and the setting never applies.
+            await seedContext.Database.OpenConnectionAsync();
+            try
+            {
+                await seedContext.Database.ExecuteSqlRawAsync("SET session_replication_role = replica;");
+                await seedContext.SaveChangesAsync();
+            }
+            finally
+            {
+                await seedContext.Database.ExecuteSqlRawAsync("SET session_replication_role = DEFAULT;");
+                await seedContext.Database.CloseConnectionAsync();
+            }
+        }
+
+        await using var context = ContextFor(tenantAId);
+
+        // Walking upward from the corrupted member climbs into tenant B (زياد, then داوود) only
+        // if the recursive term's own tenant_id predicate is missing. member_id here is داوود:
+        // reachable only by crossing that boundary, so a correctly tenant-pinned walk must
+        // report no cycle.
+        var result = await CycleCheckQuery.WouldCreateCycleAsync(
+            context, tenantAId, chainB[0], corrupted.Id, default);
 
         result.Should().BeFalse();
     }

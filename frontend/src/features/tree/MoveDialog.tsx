@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { FamilyTreeNode } from '../members/types'
-import { MIN_QUERY_LENGTH, useSearch } from './useSearch'
+import { useSearch } from './useSearch'
 
 export interface MoveDialogProps {
   member: FamilyTreeNode
@@ -99,7 +99,7 @@ export const MoveDialog = ({
   const { t } = useTranslation()
   const [query, setQuery] = useState('')
   const [choice, setChoice] = useState<Choice>({ kind: 'none' })
-  const { page } = useSearch(query)
+  const { page, isSearching, belowThreshold } = useSearch(query)
   const inputRef = useRef<HTMLInputElement>(null)
 
   // Mirrors MemberModal (MemberActions.tsx): the search field is this dialog's equivalent of the
@@ -130,7 +130,10 @@ export const MoveDialog = ({
     onConfirm(choice.kind === 'root' ? null : choice.id)
   }
 
-  const searched = query.trim().length >= MIN_QUERY_LENGTH
+  // "No matches" is a claim about a completed search: withhold it while a request is in
+  // flight (isSearching) or while there aren't yet enough characters to search (belowThreshold),
+  // the same guard AppShell's global search dropdown applies for the same reason.
+  const hasQuery = query.trim().length > 0
 
   return (
     <div
@@ -238,9 +241,13 @@ export const MoveDialog = ({
               )
             })}
 
-            {searched && page.items.length === 0 && (
+            {hasQuery && page.items.length === 0 && (
               <div style={{ fontSize: 13, color: 'var(--text-2)', marginTop: 8 }}>
-                {t('move.noResults')}
+                {belowThreshold
+                  ? t('tree.keepTyping')
+                  : isSearching
+                    ? t('tree.searching')
+                    : t('move.noResults')}
               </div>
             )}
           </div>

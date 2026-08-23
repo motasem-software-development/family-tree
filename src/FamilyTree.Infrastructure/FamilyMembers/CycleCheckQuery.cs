@@ -22,8 +22,11 @@ internal static class CycleCheckQuery
     /// <summary>
     /// Far past any real genealogy. The walk already terminates on acyclic data — which is the
     /// invariant this check exists to preserve — so the bound is not part of the correctness
-    /// argument. It exists so that data already corrupted fails as an error rather than as a
-    /// hung connection.
+    /// argument. It exists to cut off the walk on data that is already corrupted, but the cutoff
+    /// is fail-OPEN, not fail-closed: past this depth the CTE simply stops climbing and EXISTS
+    /// reports false, so the check degrades to "no cycle found within 100 generations" rather
+    /// than surfacing an error. A corrupted or deeper-than-100 ancestry lets the move through
+    /// silently instead of hanging the connection.
     /// </summary>
     private const int MaxDepth = 100;
 

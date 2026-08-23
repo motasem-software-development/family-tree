@@ -411,6 +411,34 @@ describe('TreePage', () => {
     await waitFor(() => expect(membersApi.move).toHaveBeenCalledWith('f1', null, 3))
   })
 
+  it('opens Move from the context menu and completes the move', async () => {
+    vi.mocked(membersApi.search).mockResolvedValue({
+      total: 1,
+      items: [{ id: 's2', name: 'عمر', generation: 1, ancestors: [] }],
+    })
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText('سليمان')
+    const treeitem = screen.getByRole('treeitem', { name: /سليمان/ })
+    await user.click(within(treeitem).getByRole('button', { name: i18n.t('tree.expand') }))
+    await user.click(
+      await screen.findByRole('button', { name: `${i18n.t('tree.actions')} — فارس` }),
+    )
+
+    const menu = await screen.findByRole('menu')
+    await user.click(within(menu).getByRole('menuitem', { name: i18n.t('tree.move') }))
+
+    // Scoped to the dialog: its "نقل" confirm button shares the panel's Move-button copy, and
+    // the tree row for عمر (still mounted behind the dialog) shares the search hit's name — an
+    // unscoped query would match more than one element for either.
+    const dialog = within(await screen.findByRole('dialog', { name: i18n.t('move.title') }))
+    await user.type(await dialog.findByLabelText(i18n.t('move.searchPlaceholder')), 'عمر')
+    await user.click(await dialog.findByRole('button', { name: /عمر/ }))
+    await user.click(dialog.getByRole('button', { name: i18n.t('move.confirm') }))
+
+    await waitFor(() => expect(membersApi.move).toHaveBeenCalledWith('f1', 's2', 3))
+  })
+
   it('translates a rejected move rather than showing the raw code', async () => {
     vi.mocked(membersApi.move).mockRejectedValue(new ApiError('MOVE_CREATES_CYCLE', 409))
     vi.mocked(membersApi.search).mockResolvedValue({

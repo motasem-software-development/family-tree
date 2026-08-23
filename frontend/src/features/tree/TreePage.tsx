@@ -416,7 +416,10 @@ export const TreePage = () => {
                 : (detailById.get(selectedId)?.life ?? EMPTY_LIFE_DETAILS),
             )
           }
-          onMove={() => setMoveOpen(true)}
+          onMove={() => {
+            setMenu(null)
+            setMoveOpen(true)
+          }}
           onDelete={() => {
             if (selected !== undefined) openDelete(selected)
           }}
