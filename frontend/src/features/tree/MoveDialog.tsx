@@ -202,6 +202,14 @@ export const MoveDialog = ({
                     type="button"
                     disabled={reason !== null}
                     aria-pressed={pressed}
+                    // aria-label supersedes name-from-content outright, so the accessible name is
+                    // pinned to the given name alone even with the breadcrumb nested back inside —
+                    // without it the breadcrumb's text would fold into the name and two same-named
+                    // members would become indistinguishable to a name-based lookup. The path still
+                    // reaches assistive tech, as a description via aria-describedby below, so it
+                    // stays both audible and part of the clickable option (unlike a sibling
+                    // element, which would look attached but land outside the click target).
+                    aria-label={hit.name}
                     aria-describedby={
                       hit.ancestors.length > 0 ? `move-hit-${hit.id}-path` : undefined
                     }
@@ -209,28 +217,18 @@ export const MoveDialog = ({
                     style={optionButtonStyle(reason !== null, pressed)}
                   >
                     {hit.name}
+                    {/* The ancestor path is what tells the many repeated names apart — the reason
+                        design spec §5.4 asked the search endpoint for it. Purely visual/description
+                        text: the button's aria-label above already fixes the accessible name, so
+                        this can sit back inline inside the button, part of the click target, as it
+                        did originally. */}
+                    {hit.ancestors.length > 0 && (
+                      <span id={`move-hit-${hit.id}-path`} style={{ color: 'var(--text-2)', fontSize: 12 }}>
+                        {' '}
+                        {hit.ancestors.map((ancestor) => ancestor.name).join(' ‹ ')}
+                      </span>
+                    )}
                   </button>
-                  {/* The ancestor path is what tells the many repeated names apart — the reason
-                      design spec §5.4 asked the search endpoint for it. It is a *description* of
-                      the option, not part of its name — but nesting it inside the <button> makes
-                      it part of the name regardless of aria-describedby (accname computation walks
-                      the whole subtree; describedby only adds a description, it does not remove
-                      descendant text from the name), so every option whose ancestor list contains
-                      e.g. "سليمان" would still match a search for "سليمان" too, defeating the very
-                      disambiguation the path exists to provide. Keeping the span a *sibling* of the
-                      button — referenced by aria-describedby, the pattern MemberActions.tsx uses
-                      for its name-field error — is what actually keeps it out of the name while
-                      still exposing it: a screen reader announces the name, then (via the
-                      description) the path, so a listener choosing between two same-named people
-                      is not left with two indistinguishable options. */}
-                  {hit.ancestors.length > 0 && (
-                    <span
-                      id={`move-hit-${hit.id}-path`}
-                      style={{ display: 'block', color: 'var(--text-2)', fontSize: 12, marginTop: 2 }}
-                    >
-                      {hit.ancestors.map((ancestor) => ancestor.name).join(' ‹ ')}
-                    </span>
-                  )}
                   {reason !== null && (
                     <div style={{ fontSize: 12, color: 'var(--text-2)', marginTop: 2 }}>
                       {reason}
