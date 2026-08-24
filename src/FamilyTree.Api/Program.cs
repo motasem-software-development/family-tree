@@ -1,6 +1,7 @@
 using System.Text;
 using FamilyTree.Api.Authorization;
 using FamilyTree.Api.Endpoints.Auth;
+using FamilyTree.Api.Endpoints.Countries;
 using FamilyTree.Api.Endpoints.FamilyMembers;
 using FamilyTree.Api.Endpoints.FamilyTrees;
 using FamilyTree.Api.Endpoints.Me;
@@ -77,6 +78,7 @@ if (app.Environment.IsDevelopment())
 
 app.MapGet("/health", () => Results.Ok(new { status = "ok" })).AllowAnonymous();
 app.MapAuthEndpoints();
+app.MapCountryEndpoints();
 app.MapMeEndpoints();
 app.MapFamilyMemberEndpoints();
 app.MapFamilyTreeEndpoints();
