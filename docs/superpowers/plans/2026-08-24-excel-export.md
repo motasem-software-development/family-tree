@@ -77,11 +77,14 @@ Both are recorded in full below: §7.3 named a server-side twin of `nameParts` t
 (Task 2 writes it), and its instruction to append the family/tree name is **not** followed,
 because `fullName.ts` does not and the exported name must match the page.
 
-### One flake seen, not chased
+### The "flake" was not a flake
 
-`TreePage.test.tsx > renders the root family and its first generation` failed once in a full-suite
-run and passed in isolation and in three subsequent full runs. It is a pre-existing test in a
-heavy suite (windowing, stubbed `ResizeObserver`) and nothing in this plan touches it.
+`TreePage.test.tsx > renders the root family and its first generation` failed once here and was
+recorded as flakiness. A later `/code-review` pass established otherwise: `main` was stable
+across three full runs while this branch failed intermittently across unrelated files. Plan 3 had
+added the filter bar's reference queries to both pages without extending those files' mocks, so
+they resolved `undefined`, TanStack Query rejected them on every render, and the cost surfaced as
+`findBy` timeouts elsewhere. Fixed in `58ebeca`; five consecutive full runs are clean.
 
 ---
 
