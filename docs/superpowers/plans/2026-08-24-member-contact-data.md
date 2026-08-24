@@ -14,6 +14,58 @@ This is **Plan 1 of 4** from the spec's §9 decomposition. It ships alone: conta
 
 Section references of the form §N point at the design spec above, or — where the text says "specification §N" — at the source requirement document it implements.
 
+---
+
+## STATUS: COMPLETE (2026-08-24)
+
+All nine tasks are done and verified. Do **not** re-run them — check `git log main..HEAD`
+before assuming otherwise; the commits are the authority, this heading is a summary.
+
+**Verified end to end:** backend 582 tests pass, frontend 279 pass, lint and build clean,
+en/ar key parity clean, and specification §27's acceptance criteria were exercised against the
+running API (valid save, 9-digit rule, per-tenant duplicate, dial-code disagreement, clearing a
+number back to null).
+
+### Follow-up work shipped after the plan, on the same branch
+
+Requested during review; none of it is in this plan or in Plans 2-4.
+
+- **Country catalog expanded from 22 to 239** — every ISO 3166-1 country and inhabited
+  territory. Names generated from CLDR by `tools/generate-country-catalog.cjs`; `PS`, `SA`
+  and `AE` are pinned by hand. No migration: the seeder inserts only codes the database
+  lacks, so deployments pick the new rows up on their next boot.
+- **`SearchableSelect`** (`frontend/src/components/`) replaces the native `<select>` for
+  country and dialing code. Folds Latin accents, Arabic hamza/ة/ى spellings, Arabic-Indic
+  digits and punctuation before matching. Renders its list through a portal so the tree
+  dialog cannot clip it.
+- **The tree's member dialog** now carries the same `ContactFields` as the members form, and
+  scrolls its own body.
+- **Ancestry beside the editable name** in both editors, inert, via `lineageName`.
+- **Phone row pinned to LTR** in the Arabic interface, the portalled list included.
+
+### Bugs found and fixed along the way
+
+- The tree detail panel's Edit button seeded only the name into the dialog. Since `Update`
+  replaces rather than merges, renaming from the panel **cleared the member's dates**. Both
+  entry points now go through one `openEdit`. Regression test in `TreePage.test.tsx`.
+- A dialing code could not be chosen before the number: `joinPhone` returns null with an empty
+  local part, so the choice round-tripped through a value that cannot hold it and the picker
+  snapped back to "—". `PhoneInput` now holds a `pendingDial`.
+- Editing a member from a row far down the members list opened the form off-screen.
+
+### What is NOT done
+
+Plans 2-4 from spec §9, none of which has been started:
+
+1. Derivation and the shared query (branch, generation, the filtered member query)
+2. Filter UI
+3. Excel export
+
+The members list and tree still show no contact data — capture only, by design.
+
+---
+
+
 ## Global Constraints
 
 - Target framework `net10.0`; `Nullable` enable; `TreatWarningsAsErrors` true (Directory.Build.props) — a warning fails the build.
@@ -50,7 +102,7 @@ Both raise the same code, `MEMBER_PHONE_INVALID`, so the split is invisible to c
 - Consumes: nothing.
 - Produces: `Country.Create(string code, string nameAr, string nameEn, string dialCode) -> Country`; instance properties `int Id`, `string Code`, `string NameAr`, `string NameEn`, `string DialCode`. Used by Tasks 2, 3, 4 and 7.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `tests/FamilyTree.Domain.Tests/Countries/CountryTests.cs`:
 
@@ -108,13 +160,13 @@ public class CountryTests
 }
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `dotnet test tests/FamilyTree.Domain.Tests --filter FullyQualifiedName~CountryTests`
 
 Expected: FAIL — the build cannot resolve `FamilyTree.Domain.Countries.Country`.
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 Create `src/FamilyTree.Domain/Countries/Country.cs`:
 
@@ -192,13 +244,13 @@ public sealed partial class Country
 }
 ```
 
-- [ ] **Step 4: Run the test to verify it passes**
+- [x] **Step 4: Run the test to verify it passes**
 
 Run: `dotnet test tests/FamilyTree.Domain.Tests --filter FullyQualifiedName~CountryTests`
 
 Expected: PASS — 10 tests (xunit counts each `InlineData` case separately: 1 + 4 + 4 + 1).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/FamilyTree.Domain/Countries/Country.cs tests/FamilyTree.Domain.Tests/Countries/CountryTests.cs
@@ -220,7 +272,7 @@ git commit -m "feat: add Country reference entity"
 - Consumes: `Country.Create(...)` from Task 1.
 - Produces: `context.Countries` (`DbSet<Country>`); `CountryCatalog.All` (`IReadOnlyList<(string Code, string NameAr, string NameEn, string DialCode)>`). Used by Tasks 3, 4, 5, 6 and 7.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `tests/FamilyTree.Api.IntegrationTests/Persistence/CountrySeedTests.cs`:
 
@@ -267,13 +319,13 @@ public sealed class CountrySeedTests(PostgresFixture fixture) : DatabaseTestBase
 
 Read `tests/FamilyTree.Api.IntegrationTests/Fixtures/DatabaseTestBase.cs` before running this: it supplies `ContextFor(Guid tenantId)` and `Now`, and this test relies on the seeder having run against the fixture database. If the base class does not seed, add the seed call the way the neighbouring `Persistence` tests do rather than inventing a new path.
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `dotnet test tests/FamilyTree.Api.IntegrationTests --filter FullyQualifiedName~CountrySeedTests`
 
 Expected: FAIL — `context.Countries` and `CountryCatalog` do not exist (build error). Docker must be running; the fixture starts PostgreSQL in a container.
 
-- [ ] **Step 3: Write the catalog**
+- [x] **Step 3: Write the catalog**
 
 Create `src/FamilyTree.Infrastructure/Persistence/Seed/CountryCatalog.cs`:
 
@@ -317,7 +369,7 @@ public static class CountryCatalog
 }
 ```
 
-- [ ] **Step 4: Write the EF configuration**
+- [x] **Step 4: Write the EF configuration**
 
 Create `src/FamilyTree.Infrastructure/Persistence/Configurations/CountryConfiguration.cs`:
 
@@ -351,7 +403,7 @@ public sealed class CountryConfiguration : IEntityTypeConfiguration<Country>
 }
 ```
 
-- [ ] **Step 5: Register the DbSet**
+- [x] **Step 5: Register the DbSet**
 
 In `src/FamilyTree.Infrastructure/Persistence/ApplicationDbContext.cs`, add the using and the DbSet beside the existing ones:
 
@@ -380,7 +432,7 @@ with:
 
 **Do not** add a `HasQueryFilter` for `Country`. A filter would hide the entire list from every caller and break the member form's dropdown.
 
-- [ ] **Step 6: Seed the catalog**
+- [x] **Step 6: Seed the catalog**
 
 In `src/FamilyTree.Infrastructure/Persistence/Seed/DatabaseSeeder.cs`, add the using:
 
@@ -417,7 +469,7 @@ Add the method beside `SeedPermissionCatalogAsync`, which it deliberately mirror
     }
 ```
 
-- [ ] **Step 7: Generate the migration**
+- [x] **Step 7: Generate the migration**
 
 ```bash
 dotnet ef migrations add AddCountries \
@@ -428,7 +480,7 @@ dotnet ef migrations add AddCountries \
 
 Open the generated `*_AddCountries.cs` and confirm `Up` creates the `countries` table with an identity `id`, four text columns, and a unique index on `code`. It must **not** touch any other table. If it does, the model has drifted — stop and investigate rather than editing the migration by hand.
 
-- [ ] **Step 8: Apply the migration and run the test**
+- [x] **Step 8: Apply the migration and run the test**
 
 ```bash
 docker compose up -d postgres
@@ -439,7 +491,7 @@ dotnet test tests/FamilyTree.Api.IntegrationTests --filter FullyQualifiedName~Co
 
 Expected: PASS — 2 tests.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add src/FamilyTree.Infrastructure tests/FamilyTree.Api.IntegrationTests/Persistence/CountrySeedTests.cs
@@ -465,7 +517,7 @@ git commit -m "feat: seed the country reference catalog"
 
 Authenticated only, with **no permission requirement** (spec §5.2): the list is public reference data, and gating it would break the member form's dropdown for a user who can edit but not view members.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `tests/FamilyTree.Api.IntegrationTests/Endpoints/CountryEndpointTests.cs`. Read one existing file in `tests/FamilyTree.Api.IntegrationTests/Endpoints/` first and reuse its client-and-token setup verbatim — the helper below is named for illustration and must be replaced with whatever that fixture actually exposes.
 
@@ -503,13 +555,13 @@ public sealed class CountryEndpointTests(ApiFactory factory) : IClassFixture<Api
 }
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `dotnet test tests/FamilyTree.Api.IntegrationTests --filter FullyQualifiedName~CountryEndpointTests`
 
 Expected: FAIL — `CountryResponse` does not exist (build error).
 
-- [ ] **Step 3: Write the contract**
+- [x] **Step 3: Write the contract**
 
 Create `src/FamilyTree.Contracts/Countries/CountryResponse.cs`:
 
@@ -531,7 +583,7 @@ public sealed record CountryResponse(
     string DialCode);
 ```
 
-- [ ] **Step 4: Write the service interface**
+- [x] **Step 4: Write the service interface**
 
 Create `src/FamilyTree.Application/Countries/ICountryService.cs`:
 
@@ -547,7 +599,7 @@ public interface ICountryService
 }
 ```
 
-- [ ] **Step 5: Write the service**
+- [x] **Step 5: Write the service**
 
 Create `src/FamilyTree.Infrastructure/Countries/CountryService.cs`:
 
@@ -575,7 +627,7 @@ public sealed class CountryService(ApplicationDbContext context) : ICountryServi
 }
 ```
 
-- [ ] **Step 6: Register the service and map the endpoint**
+- [x] **Step 6: Register the service and map the endpoint**
 
 In `src/FamilyTree.Infrastructure/DependencyInjection.cs`, register it beside the other scoped services:
 
@@ -620,13 +672,13 @@ using FamilyTree.Api.Endpoints.Countries;
 app.MapCountryEndpoints();
 ```
 
-- [ ] **Step 7: Run the test to verify it passes**
+- [x] **Step 7: Run the test to verify it passes**
 
 Run: `dotnet test tests/FamilyTree.Api.IntegrationTests --filter FullyQualifiedName~CountryEndpointTests`
 
 Expected: PASS — 2 tests.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add src/FamilyTree.Contracts/Countries src/FamilyTree.Application/Countries src/FamilyTree.Infrastructure/Countries src/FamilyTree.Infrastructure/DependencyInjection.cs src/FamilyTree.Api tests/FamilyTree.Api.IntegrationTests/Endpoints/CountryEndpointTests.cs
@@ -654,7 +706,7 @@ The heart of the plan. Validation must precede mutation so a rejected edit leave
   - Properties `string? NationalId`, `string? MobileNumber`, `string? WhatsAppNumber`, `int? CountryId`.
   - Used by Tasks 5 and 6.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `tests/FamilyTree.Domain.Tests/FamilyMembers/FamilyMemberContactTests.cs`:
 
@@ -822,13 +874,13 @@ public class FamilyMemberContactTests
 }
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `dotnet test tests/FamilyTree.Domain.Tests --filter FullyQualifiedName~FamilyMemberContactTests`
 
 Expected: FAIL — `ContactDetails` does not exist and `Update` has no six-argument overload (build error).
 
-- [ ] **Step 3: Add the `ContactDetails` value type**
+- [x] **Step 3: Add the `ContactDetails` value type**
 
 Create `src/FamilyTree.Domain/FamilyMembers/ContactDetails.cs`:
 
@@ -852,7 +904,7 @@ public readonly record struct ContactDetails(
 }
 ```
 
-- [ ] **Step 4: Extend the aggregate**
+- [x] **Step 4: Extend the aggregate**
 
 In `src/FamilyTree.Domain/FamilyMembers/FamilyMember.cs`:
 
@@ -1026,7 +1078,7 @@ Add the private helpers beside `ApplyLifeDetails` / `ValidateLifeDetails`:
     private static partial Regex PhoneSeparators();
 ```
 
-- [ ] **Step 5: Fix the one existing caller the signature change breaks**
+- [x] **Step 5: Fix the one existing caller the signature change breaks**
 
 `Update`'s new parameter breaks `FamilyMemberService.UpdateAsync`. Task 6 rewrites that call properly; for now, make the build pass by threading the member's current values through — **this is a temporary line that Task 6 replaces, and Task 9 Step 4 checks it is gone.**
 
@@ -1043,13 +1095,13 @@ In `src/FamilyTree.Infrastructure/FamilyMembers/FamilyMemberService.cs`, change 
             timeProvider.GetUtcNow());
 ```
 
-- [ ] **Step 6: Run the tests to verify they pass**
+- [x] **Step 6: Run the tests to verify they pass**
 
 Run: `dotnet test tests/FamilyTree.Domain.Tests`
 
 Expected: PASS — the new `FamilyMemberContactTests` plus the existing `FamilyMemberTests`, all green. The existing tests must not need editing; if one fails, the change altered behaviour it should not have.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/FamilyTree.Domain/FamilyMembers src/FamilyTree.Infrastructure/FamilyMembers/FamilyMemberService.cs tests/FamilyTree.Domain.Tests/FamilyMembers/FamilyMemberContactTests.cs
@@ -1069,7 +1121,7 @@ git commit -m "feat: validate member contact details in the aggregate"
 - Consumes: the four properties from Task 4; the `countries` table from Task 2.
 - Produces: the `ux_family_members_tenant_national_id` filtered unique index, which Task 6 relies on by name to detect duplicates.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `tests/FamilyTree.Api.IntegrationTests/FamilyMembers/MemberContactPersistenceTests.cs`:
 
@@ -1215,13 +1267,13 @@ public sealed class MemberContactPersistenceTests(PostgresFixture fixture) : Dat
 }
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `dotnet test tests/FamilyTree.Api.IntegrationTests --filter FullyQualifiedName~MemberContactPersistenceTests`
 
 Expected: FAIL — the `national_id` column does not exist; EF reports a missing-column error at query time.
 
-- [ ] **Step 3: Configure the columns**
+- [x] **Step 3: Configure the columns**
 
 In `src/FamilyTree.Infrastructure/Persistence/Configurations/FamilyMemberConfiguration.cs`, add the using at the top:
 
@@ -1281,7 +1333,7 @@ Add the indexes beside the existing ones:
         builder.HasIndex(x => x.IsDeceased);
 ```
 
-- [ ] **Step 4: Generate the migration**
+- [x] **Step 4: Generate the migration**
 
 ```bash
 dotnet ef migrations add AddMemberContactDetails \
@@ -1292,7 +1344,7 @@ dotnet ef migrations add AddMemberContactDetails \
 
 Open the generated file and confirm `Up` adds four columns, one check constraint, one filtered unique index, two plain indexes, and one foreign key to `countries` — and nothing else. Confirm `Down` reverses all of them.
 
-- [ ] **Step 5: Apply the migration and run the tests**
+- [x] **Step 5: Apply the migration and run the tests**
 
 ```bash
 dotnet ef database update --project src/FamilyTree.Infrastructure --startup-project src/FamilyTree.Api
@@ -1301,7 +1353,7 @@ dotnet test tests/FamilyTree.Api.IntegrationTests --filter FullyQualifiedName~Me
 
 Expected: PASS — 5 tests.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/FamilyTree.Infrastructure tests/FamilyTree.Api.IntegrationTests/FamilyMembers/MemberContactPersistenceTests.cs
@@ -1323,7 +1375,7 @@ git commit -m "feat: persist member contact details"
 - Consumes: `ContactDetails` (Task 4), the `ux_family_members_tenant_national_id` index (Task 5), `context.Countries` (Task 2).
 - Produces: `FamilyMemberResponse` with five extra trailing members — `NationalId`, `MobileNumber`, `WhatsAppNumber`, `CountryId`, `CountryCode` — consumed by Tasks 7–8 and by Plans 2–4.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `tests/FamilyTree.Api.IntegrationTests/FamilyMembers/MemberContactServiceTests.cs`:
 
@@ -1481,13 +1533,13 @@ public sealed class MemberContactServiceTests(PostgresFixture fixture) : Databas
 }
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `dotnet test tests/FamilyTree.Api.IntegrationTests --filter FullyQualifiedName~MemberContactServiceTests`
 
 Expected: FAIL — `UpdateFamilyMemberRequest` has no `NationalId` parameter (build error).
 
-- [ ] **Step 3: Extend the contracts**
+- [x] **Step 3: Extend the contracts**
 
 `src/FamilyTree.Contracts/FamilyMembers/FamilyMemberResponse.cs` — append five members. **Append, never reorder:** these are positional records, and inserting a member in the middle silently re-maps every existing call site.
 
@@ -1559,7 +1611,7 @@ to:
 
 > The life details and contact details are replace-semantics, not patch-semantics: omitting a date, a phone number, or a national ID clears it. That is what makes correcting a mistaken death record — or a wrong phone number — possible.
 
-- [ ] **Step 4: Wire the service**
+- [x] **Step 4: Wire the service**
 
 In `src/FamilyTree.Infrastructure/FamilyMembers/FamilyMemberService.cs`:
 
@@ -1737,13 +1789,13 @@ Replace `ListAsync`'s body with a single query — a per-member lookup here woul
 
 `ContactDetails` lives in `FamilyTree.Domain.FamilyMembers`, which this file already imports; no new using is needed for it.
 
-- [ ] **Step 5: Run the whole backend suite**
+- [x] **Step 5: Run the whole backend suite**
 
 Run: `dotnet test`
 
 Expected: PASS. The five appended `FamilyMemberResponse` members break any test that constructs one positionally with the old arity — fix those by appending the trailing arguments (`null, null, null, null, null`). **Do not reorder the record** to make a call site compile.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/FamilyTree.Contracts src/FamilyTree.Infrastructure/FamilyMembers/FamilyMemberService.cs tests/FamilyTree.Api.IntegrationTests/FamilyMembers/MemberContactServiceTests.cs
@@ -1766,7 +1818,7 @@ git commit -m "feat: carry member contact details through the API"
 - Consumes: `GET /api/v1/countries` from Task 3.
 - Produces: `Country` interface; `countriesApi.list()`; `useCountriesQuery()`; `flagEmoji(code: string): string`; `countryName(country: Country, language: string): string`. Used by Task 8 and by Plan 3's country filter.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `frontend/src/features/countries/flagEmoji.test.ts`:
 
@@ -1842,13 +1894,13 @@ describe('countriesApi', () => {
 })
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `cd frontend && npx vitest run src/features/countries`
 
 Expected: FAIL — cannot resolve `./flagEmoji` or `./countriesApi`.
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 Create `frontend/src/features/countries/types.ts`:
 
@@ -1936,13 +1988,13 @@ export const useCountriesQuery = () =>
   })
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `cd frontend && npx vitest run src/features/countries`
 
 Expected: PASS — 7 tests.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add frontend/src/features/countries
@@ -1972,7 +2024,7 @@ git commit -m "feat: add country reference data to the client"
 
 `contactDetailsOf` mirrors `lifeDetailsOf` and exists for the reason its doc comment gives: an API deployed a step behind the frontend omits these fields entirely, and they arrive as `undefined`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `frontend/src/features/members/contactDetails.test.ts`:
 
@@ -2086,13 +2138,13 @@ describe('isValidNationalId', () => {
 })
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `cd frontend && npx vitest run src/features/members/contactDetails.test.ts`
 
 Expected: FAIL — cannot resolve `./contactDetails`.
 
-- [ ] **Step 3: Write the contact details module**
+- [x] **Step 3: Write the contact details module**
 
 Create `frontend/src/features/members/contactDetails.ts`:
 
@@ -2181,20 +2233,20 @@ export const joinPhone = (dialCode: string, local: string): string | null => {
 }
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `cd frontend && npx vitest run src/features/members/contactDetails.test.ts`
 
 Expected: PASS — 14 tests.
 
-- [ ] **Step 5: Commit the module**
+- [x] **Step 5: Commit the module**
 
 ```bash
 git add frontend/src/features/members/contactDetails.ts frontend/src/features/members/contactDetails.test.ts
 git commit -m "feat: add contact details helpers to the member form model"
 ```
 
-- [ ] **Step 6: Add the translation keys**
+- [x] **Step 6: Add the translation keys**
 
 In `frontend/src/i18n/locales/en.json`, add to the `members` block:
 
@@ -2252,13 +2304,13 @@ In `frontend/src/i18n/locales/ar.json`, add the same keys to the same two blocks
     "COUNTRY_DIAL_CODE_INVALID": "رمز الاتصال غير صالح."
 ```
 
-- [ ] **Step 7: Verify key parity**
+- [x] **Step 7: Verify key parity**
 
 Run: `cd frontend && npx vitest run src/i18n/locales.test.ts`
 
 Expected: PASS. A failure here means a key exists in one file and not the other — add the missing key rather than deleting the present one.
 
-- [ ] **Step 8: Write the failing component test**
+- [x] **Step 8: Write the failing component test**
 
 Create `frontend/src/features/members/ContactFields.test.tsx`. Read `frontend/src/features/members/MembersPage.test.tsx` first and reuse its render wrapper (i18n provider setup) rather than building a second one.
 
@@ -2345,13 +2397,13 @@ describe('ContactFields', () => {
 })
 ```
 
-- [ ] **Step 9: Run the test to verify it fails**
+- [x] **Step 9: Run the test to verify it fails**
 
 Run: `cd frontend && npx vitest run src/features/members/ContactFields.test.tsx`
 
 Expected: FAIL — cannot resolve `./ContactFields`.
 
-- [ ] **Step 10: Write `PhoneInput`**
+- [x] **Step 10: Write `PhoneInput`**
 
 Create `frontend/src/features/members/PhoneInput.tsx`:
 
@@ -2448,7 +2500,7 @@ export function PhoneInput({
 }
 ```
 
-- [ ] **Step 11: Write `ContactFields`**
+- [x] **Step 11: Write `ContactFields`**
 
 Create `frontend/src/features/members/ContactFields.tsx`:
 
@@ -2609,13 +2661,13 @@ export function ContactFields({
 }
 ```
 
-- [ ] **Step 12: Run the component test to verify it passes**
+- [x] **Step 12: Run the component test to verify it passes**
 
 Run: `cd frontend && npx vitest run src/features/members/ContactFields.test.tsx`
 
 Expected: PASS — 6 tests.
 
-- [ ] **Step 13: Wire the types, the API client, and the mutations**
+- [x] **Step 13: Wire the types, the API client, and the mutations**
 
 `frontend/src/features/members/types.ts` — extend the `FamilyMember` interface:
 
@@ -2712,7 +2764,7 @@ export const useUpdateMember = () => {
 }
 ```
 
-- [ ] **Step 14: Wire the form and the page**
+- [x] **Step 14: Wire the form and the page**
 
 `frontend/src/features/members/MemberForm.tsx` — add the imports:
 
@@ -2814,13 +2866,13 @@ and thread the contact through both handlers:
 
 Update the `MemberForm` usages in this file so their `onSubmit` closures accept the fourth argument.
 
-- [ ] **Step 15: Run the whole frontend suite**
+- [x] **Step 15: Run the whole frontend suite**
 
 Run: `cd frontend && npm test`
 
 Expected: PASS. `MembersPage.test.tsx` renders `MemberForm`, which now calls `useCountriesQuery` — if a test fails on an unmocked request, add `/api/v1/countries` returning `[]` to that file's existing fetch stub rather than changing the component.
 
-- [ ] **Step 16: Lint and type-check**
+- [x] **Step 16: Lint and type-check**
 
 ```bash
 cd frontend && npm run lint && npm run build
@@ -2828,7 +2880,7 @@ cd frontend && npm run lint && npm run build
 
 Expected: both clean. `tsc -b` runs as part of `build` and is the real check that every call site was updated.
 
-- [ ] **Step 17: Commit**
+- [x] **Step 17: Commit**
 
 ```bash
 git add frontend/src
@@ -2841,7 +2893,7 @@ git commit -m "feat: capture member contact details in the form"
 
 **Files:** none created or modified unless a check fails.
 
-- [ ] **Step 1: Run the full backend suite**
+- [x] **Step 1: Run the full backend suite**
 
 ```bash
 dotnet test
@@ -2849,7 +2901,7 @@ dotnet test
 
 Expected: PASS, all four test projects. Docker must be running.
 
-- [ ] **Step 2: Run the full frontend suite, lint, and build**
+- [x] **Step 2: Run the full frontend suite, lint, and build**
 
 ```bash
 cd frontend && npm test && npm run lint && npm run build
@@ -2857,7 +2909,7 @@ cd frontend && npm test && npm run lint && npm run build
 
 Expected: all clean.
 
-- [ ] **Step 3: Exercise it by hand**
+- [x] **Step 3: Exercise it by hand**
 
 ```bash
 docker compose up -d
@@ -2875,7 +2927,7 @@ Sign in, open `/members`, and confirm against specification §27's acceptance cr
 
 Any failure here is a bug in a previous task, not a step to skip. Fix it there and re-run that task's tests.
 
-- [ ] **Step 4: Confirm the temporary code is gone**
+- [x] **Step 4: Confirm the temporary code is gone**
 
 ```bash
 grep -n "member.NationalId, member.MobileNumber" src/FamilyTree.Infrastructure/FamilyMembers/FamilyMemberService.cs
@@ -2883,7 +2935,7 @@ grep -n "member.NationalId, member.MobileNumber" src/FamilyTree.Infrastructure/F
 
 Expected: **no match.** A match means Task 6 Step 4 did not replace the placeholder from Task 4 Step 5, and every edit silently preserves the old contact details instead of applying the request's — a bug no test above would catch, because the placeholder returns plausible data.
 
-- [ ] **Step 5: Confirm the branch is clean**
+- [x] **Step 5: Confirm the branch is clean**
 
 ```bash
 git status --porcelain
