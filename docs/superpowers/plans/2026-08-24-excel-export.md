@@ -117,7 +117,7 @@ Its own task and its own commit, so a reviewer sees the dependency arrive on its
 - Produces: `MemberNameComposer.Compose(Guid id, IReadOnlyDictionary<Guid, (string Name, Guid? ParentId)> byId) -> string`
   and `MemberNameComposer.MaxParts` (4). Used by Task 3.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Mirror `fullName.test.ts` case for case, and add the ones the export makes reachable:
 
@@ -132,13 +132,13 @@ Mirror `fullName.test.ts` case for case, and add the ones the export makes reach
 - Parts are joined with exactly one space, and a name with surrounding whitespace does not
   produce a double space (specification §20).
 
-- [ ] **Step 2: Implement**
+- [x] **Step 2: Implement**
 
 A bounded upward walk, structurally identical to `nameParts`. Keep the doc comment pointing at
 `fullName.ts` in both directions — two implementations of one rule need to say so.
 
-- [ ] **Step 3: Run the tests** — `dotnet test tests/FamilyTree.Application.Tests` passes.
-- [ ] **Step 4: Commit** — `feat: compose a member's full name server-side`
+- [x] **Step 3: Run the tests** — `dotnet test tests/FamilyTree.Application.Tests` passes.
+- [x] **Step 4: Commit** — `feat: compose a member's full name server-side`
 
 ---
 
