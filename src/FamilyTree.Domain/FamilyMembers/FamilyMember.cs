@@ -117,18 +117,6 @@ public sealed partial class FamilyMember : Entity, ITenantOwned
     }
 
     /// <summary>
-    /// Back-compatibility overload for callers that only ever knew about life details.
-    /// Delegates to the six-parameter <see cref="Update"/> with the member's current contact
-    /// details threaded through, so an old-style call preserves contact data instead of
-    /// wiping it — the same threading pattern <see cref="Rename"/> uses.
-    /// </summary>
-    public void Update(
-        string name, DateOnly? dateOfBirth, DateOnly? dateOfDeath, bool isDeceased, DateTimeOffset now) =>
-        Update(
-            name, dateOfBirth, dateOfDeath, isDeceased,
-            new ContactDetails(NationalId, MobileNumber, WhatsAppNumber, CountryId), now);
-
-    /// <summary>
     /// Changes only the name, leaving the life and contact details as they are. A delegate to
     /// <see cref="Update"/> rather than its own validate-then-mutate block, so there is exactly
     /// one path through the member's write rules and no way for the two to drift apart.
