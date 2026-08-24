@@ -471,7 +471,7 @@ flagged as a non-match, because dropping them would detach the subtree.
   `IFamilyTreeService.GetViewAsync(MemberFilter, int? maxDepth, CancellationToken)`.
   Used by Tasks 8 and 9.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Extend `FamilyTreeAssemblerTests`:
 
@@ -490,7 +490,7 @@ Extend `FamilyTreeAssemblerTests`:
 - `maxDepth` and a filter together: the depth limit still applies, and `HasMoreChildren` reflects
   children that exist and are kept, not children that exist.
 
-- [ ] **Step 2: Add `Matches` to the node**
+- [x] **Step 2: Add `Matches` to the node**
 
 ```csharp
 /// <summary>
@@ -503,7 +503,7 @@ bool Matches
 
 Placed last in the record so existing positional construction in tests stays readable.
 
-- [ ] **Step 3: Change the assembler**
+- [x] **Step 3: Change the assembler**
 
 `Assemble` takes the `MemberFilter` in place of the bare `rootId` — the root now arrives as
 `filter.RootId`. When `filter.IsEmpty`, take the existing path unchanged and stamp
@@ -518,15 +518,15 @@ Note in the code that `Generation` in the output stays absolute while the predic
 root-relative placement — with a pointer to spec §1.2, because it reads like an inconsistency and
 is not one.
 
-- [ ] **Step 4: Change the service and the interface**
+- [x] **Step 4: Change the service and the interface**
 
 `GetViewAsync(Guid? rootId, int? maxDepth, ...)` becomes
 `GetViewAsync(MemberFilter filter, int? maxDepth, ...)`. `maxDepth` stays a separate parameter:
 it is a transport concern (how much of the tree to ship), not a filter, and spec §5.1 lists it
 outside the shared shape.
 
-- [ ] **Step 5: Run the tests** — passes.
-- [ ] **Step 6: Commit** — `feat: filter the tree view, keeping ancestors of a match visible`
+- [x] **Step 5: Run the tests** — passes.
+- [x] **Step 6: Commit** — `feat: filter the tree view, keeping ancestors of a match visible`
 
 ---
 

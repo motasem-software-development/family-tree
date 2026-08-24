@@ -1,3 +1,4 @@
+using FamilyTree.Application.FamilyMembers;
 using FamilyTree.Application.FamilyTrees;
 using FamilyTree.Domain.FamilyMembers;
 using FluentAssertions;
@@ -27,7 +28,7 @@ public class FamilyTreeAssemblerTests
     [Fact]
     public void Assemble_returns_an_empty_list_for_an_empty_tree()
     {
-        FamilyTreeAssembler.Assemble([], null, null).Should().BeEmpty();
+        FamilyTreeAssembler.Assemble([], MemberFilter.None, null).Should().BeEmpty();
     }
 
     [Fact]
@@ -35,7 +36,7 @@ public class FamilyTreeAssemblerTests
     {
         var (suleiman, faris, mahmoud, omar) = ThreeGenerations();
 
-        var roots = FamilyTreeAssembler.Assemble([suleiman, faris, mahmoud, omar], null, null);
+        var roots = FamilyTreeAssembler.Assemble([suleiman, faris, mahmoud, omar], MemberFilter.None, null);
 
         roots.Select(n => n.Name).Should().BeEquivalentTo(["سليمان", "عمر"]);
     }
@@ -45,7 +46,7 @@ public class FamilyTreeAssemblerTests
     {
         var (suleiman, faris, mahmoud, omar) = ThreeGenerations();
 
-        var roots = FamilyTreeAssembler.Assemble([suleiman, faris, mahmoud, omar], null, null);
+        var roots = FamilyTreeAssembler.Assemble([suleiman, faris, mahmoud, omar], MemberFilter.None, null);
 
         var suleimanNode = roots.Single(n => n.Name == "سليمان");
         var farisNode = suleimanNode.Children.Should().ContainSingle().Subject;
@@ -58,7 +59,7 @@ public class FamilyTreeAssemblerTests
     {
         var (suleiman, faris, mahmoud, omar) = ThreeGenerations();
 
-        var roots = FamilyTreeAssembler.Assemble([suleiman, faris, mahmoud, omar], null, null);
+        var roots = FamilyTreeAssembler.Assemble([suleiman, faris, mahmoud, omar], MemberFilter.None, null);
 
         var suleimanNode = roots.Single(n => n.Name == "سليمان");
         suleimanNode.Generation.Should().Be(1);
@@ -73,7 +74,7 @@ public class FamilyTreeAssemblerTests
         var zayd = Member("زيد", suleiman.Id);
         var ahmad = Member("أحمد", suleiman.Id);
 
-        var roots = FamilyTreeAssembler.Assemble([suleiman, zayd, ahmad], null, null);
+        var roots = FamilyTreeAssembler.Assemble([suleiman, zayd, ahmad], MemberFilter.None, null);
 
         roots[0].Children.Select(c => c.Name).Should().ContainInOrder("أحمد", "زيد");
     }
@@ -83,7 +84,7 @@ public class FamilyTreeAssemblerTests
     {
         var (suleiman, faris, mahmoud, omar) = ThreeGenerations();
 
-        var roots = FamilyTreeAssembler.Assemble([suleiman, faris, mahmoud, omar], faris.Id, null);
+        var roots = FamilyTreeAssembler.Assemble([suleiman, faris, mahmoud, omar], MemberFilter.None with { RootId = faris.Id }, null);
 
         var only = roots.Should().ContainSingle().Subject;
         only.Name.Should().Be("فارس");
@@ -96,7 +97,7 @@ public class FamilyTreeAssemblerTests
         // A caller who fetched a subtree still needs to know how deep it sits in the family.
         var (suleiman, faris, mahmoud, omar) = ThreeGenerations();
 
-        var roots = FamilyTreeAssembler.Assemble([suleiman, faris, mahmoud, omar], faris.Id, null);
+        var roots = FamilyTreeAssembler.Assemble([suleiman, faris, mahmoud, omar], MemberFilter.None with { RootId = faris.Id }, null);
 
         roots[0].Generation.Should().Be(2);
         roots[0].Children[0].Generation.Should().Be(3);
@@ -107,7 +108,7 @@ public class FamilyTreeAssemblerTests
     {
         var (suleiman, faris, mahmoud, omar) = ThreeGenerations();
 
-        FamilyTreeAssembler.Assemble([suleiman, faris, mahmoud, omar], Guid.CreateVersion7(), null)
+        FamilyTreeAssembler.Assemble([suleiman, faris, mahmoud, omar], MemberFilter.None with { RootId = Guid.CreateVersion7() }, null)
             .Should().BeEmpty();
     }
 
@@ -116,7 +117,7 @@ public class FamilyTreeAssemblerTests
     {
         var (suleiman, faris, mahmoud, omar) = ThreeGenerations();
 
-        var roots = FamilyTreeAssembler.Assemble([suleiman, faris, mahmoud, omar], null, 2);
+        var roots = FamilyTreeAssembler.Assemble([suleiman, faris, mahmoud, omar], MemberFilter.None, 2);
 
         var suleimanNode = roots.Single(n => n.Name == "سليمان");
         suleimanNode.HasMoreChildren.Should().BeFalse();
@@ -131,7 +132,7 @@ public class FamilyTreeAssemblerTests
     {
         var (suleiman, faris, mahmoud, omar) = ThreeGenerations();
 
-        var roots = FamilyTreeAssembler.Assemble([suleiman, faris, mahmoud, omar], null, 1);
+        var roots = FamilyTreeAssembler.Assemble([suleiman, faris, mahmoud, omar], MemberFilter.None, 1);
 
         roots.Single(n => n.Name == "عمر").HasMoreChildren.Should()
              .BeFalse("عمر has no children at all, truncated or otherwise");
@@ -143,7 +144,7 @@ public class FamilyTreeAssemblerTests
     {
         var (suleiman, faris, mahmoud, omar) = ThreeGenerations();
 
-        var roots = FamilyTreeAssembler.Assemble([suleiman, faris, mahmoud, omar], null, 1);
+        var roots = FamilyTreeAssembler.Assemble([suleiman, faris, mahmoud, omar], MemberFilter.None, 1);
 
         roots.Should().HaveCount(2);
         roots.Should().OnlyContain(n => n.Children.Count == 0);
@@ -156,7 +157,7 @@ public class FamilyTreeAssemblerTests
         // tree, which would look like "this family has no members".
         var (suleiman, faris, mahmoud, omar) = ThreeGenerations();
 
-        var roots = FamilyTreeAssembler.Assemble([suleiman, faris, mahmoud, omar], null, 0);
+        var roots = FamilyTreeAssembler.Assemble([suleiman, faris, mahmoud, omar], MemberFilter.None, 0);
 
         roots.Should().HaveCount(2);
         roots.Single(n => n.Name == "سليمان").Children.Should().ContainSingle();
@@ -171,7 +172,7 @@ public class FamilyTreeAssemblerTests
         var faris = Member("فارس", suleiman.Id);
         var mahmoud = Member("محمود", faris.Id);
 
-        var roots = FamilyTreeAssembler.Assemble([suleiman, mahmoud], null, null);
+        var roots = FamilyTreeAssembler.Assemble([suleiman, mahmoud], MemberFilter.None, null);
 
         roots.Should().ContainSingle().Which.Name.Should().Be("سليمان");
         roots[0].Children.Should().BeEmpty();
@@ -185,7 +186,7 @@ public class FamilyTreeAssemblerTests
             .Select(i => Member($"ابن {i:D3}", suleiman.Id))
             .ToList();
 
-        var roots = FamilyTreeAssembler.Assemble([suleiman, .. children], null, null);
+        var roots = FamilyTreeAssembler.Assemble([suleiman, .. children], MemberFilter.None, null);
 
         roots.Should().ContainSingle().Which.Children.Should().HaveCount(500);
     }

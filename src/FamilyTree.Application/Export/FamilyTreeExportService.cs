@@ -1,3 +1,4 @@
+using FamilyTree.Application.FamilyMembers;
 using FamilyTree.Application.FamilyTrees;
 using FamilyTree.Contracts.FamilyTrees;
 using FamilyTree.Domain.Common;
@@ -26,7 +27,8 @@ public sealed class FamilyTreeExportService(
         CaptionLanguage language,
         CancellationToken ct)
     {
-        var view = await trees.GetViewAsync(rootId, maxDepth, ct);
+        // The PDF is tree-wide and carries no filter (design spec §1.2): only the root moves.
+        var view = await trees.GetViewAsync(MemberFilter.None with { RootId = rootId }, maxDepth, ct);
 
         // Assemble returns an empty list for an unknown id; the tenant-safe response is the
         // same 404 an unknown member gets anywhere else (design §5.3).

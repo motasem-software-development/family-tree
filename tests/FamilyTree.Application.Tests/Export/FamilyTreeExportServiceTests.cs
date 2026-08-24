@@ -1,4 +1,5 @@
 using FamilyTree.Application.Export;
+using FamilyTree.Application.FamilyMembers;
 using FamilyTree.Application.FamilyTrees;
 using FamilyTree.Contracts.FamilyTrees;
 using FluentAssertions;
@@ -17,7 +18,17 @@ public sealed class FamilyTreeExportServiceTests
             throw new NotSupportedException();
 
         public Task<FamilyTreeViewResponse> GetViewAsync(
-            Guid? rootId, int? maxDepth, CancellationToken ct = default) => Task.FromResult(view);
+            MemberFilter filter, int? maxDepth, CancellationToken ct = default) => Task.FromResult(view);
+
+        // The PDF is tree-wide and never filtered (design spec §1.2), so the exporter has no
+        // reason to reach for the reference lists.
+        public Task<IReadOnlyList<BranchResponse>> ListBranchesAsync(
+            Guid? rootId, CancellationToken ct = default) =>
+            throw new NotSupportedException();
+
+        public Task<IReadOnlyList<int>> ListGenerationsAsync(
+            Guid? rootId, CancellationToken ct = default) =>
+            throw new NotSupportedException();
     }
 
     /// <summary>

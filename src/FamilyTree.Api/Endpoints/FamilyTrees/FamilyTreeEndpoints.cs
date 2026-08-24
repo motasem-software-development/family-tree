@@ -1,6 +1,7 @@
 using FamilyTree.Api.Authorization;
 using FamilyTree.Api.Errors;
 using FamilyTree.Application.Export;
+using FamilyTree.Application.FamilyMembers;
 using FamilyTree.Application.FamilyTrees;
 using FamilyTree.Contracts.FamilyTrees;
 using FamilyTree.Domain.Authorization;
@@ -24,7 +25,7 @@ public static class FamilyTreeEndpoints
 
         group.MapGet("/view", async (
             Guid? rootId, int? maxDepth, IFamilyTreeService trees, CancellationToken ct) =>
-            Results.Ok(await trees.GetViewAsync(rootId, maxDepth, ct)))
+            Results.Ok(await trees.GetViewAsync(MemberFilter.None with { RootId = rootId }, maxDepth, ct)))
             .RequirePermission(Permissions.FamilyTree.View);
 
         // Guarded by FamilyTree.View, not a new permission: the export reveals exactly the data
