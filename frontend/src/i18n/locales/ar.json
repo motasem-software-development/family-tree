@@ -187,7 +187,7 @@
   },
   "filters": {
     "title": "عوامل التصفية",
-    "search": "الاسم",
+    "search": "البحث بالاسم",
     "searchPlaceholder": "ابحث بالاسم",
     "status": "الحالة",
     "statusAll": "الكل",

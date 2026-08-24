@@ -171,7 +171,7 @@
   },
   "filters": {
     "title": "Filters",
-    "search": "Name",
+    "search": "Name search",
     "searchPlaceholder": "Search by name",
     "status": "Status",
     "statusAll": "All",

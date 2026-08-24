@@ -4,6 +4,10 @@ import { useQueryClient } from '@tanstack/react-query'
 import { AppShell } from '../../app/AppShell'
 import { useAuth } from '../auth/AuthContext'
 import { ApiError } from '../../services/apiClient'
+import { countryName, flagEmoji } from '../countries/flagEmoji'
+import { useCountriesQuery } from '../countries/useCountries'
+import { FilterControls } from '../filters/FilterControls'
+import { useMemberFilters } from '../filters/useMemberFilters'
 import type { ContactDetails } from './contactDetails'
 import { fullName, indexById, lineageName } from './fullName'
 import { lifeDetailsOf, lifeYears, type LifeDetails } from './lifeDetails'
@@ -16,7 +20,7 @@ import {
   useMembersQuery,
   useUpdateMember,
 } from './useMembers'
-import type { FamilyMember } from './types'
+import type { FamilyMember, FamilyMemberListItem } from './types'
 
 type Editing = { mode: 'none' } | { mode: 'add' } | { mode: 'edit'; member: FamilyMember }
 
@@ -56,7 +60,17 @@ export function MembersPage() {
   const yearsOf = (m: FamilyMember): string | null => lifeYears(lifeDetailsOf(m), i18n.language)
   const { user, hasPermission } = useAuth()
   const queryClient = useQueryClient()
-  const { data: members, isLoading } = useMembersQuery()
+  const { filters, activeCount, setFilter, reset } = useMemberFilters()
+  const { data: members, isLoading } = useMembersQuery(filters)
+  /**
+   * The whole family, unfiltered. Two things need it and neither is about what is on screen:
+   * the lineage index — a filtered list has holes in it, and a member whose father was filtered
+   * out must not lose their father's name — and the parent picker, which has to offer every
+   * member regardless of the current view. One extra cached query against a 351-row endpoint,
+   * against a name that would otherwise change as the user filters.
+   */
+  const { data: everyone } = useMembersQuery()
+  const { data: countries } = useCountriesQuery()
   const createMember = useCreateMember()
   const updateMember = useUpdateMember()
   const deleteMember = useDeleteMember()
@@ -133,12 +147,22 @@ export function MembersPage() {
   }
 
   const all = members ?? []
+  const unfiltered = everyone ?? []
   // Indexed once per render: every row needs to walk its own parent chain to compose the name.
-  const byId = indexById(all)
+  // Built from the unfiltered list — see the query above.
+  const byId = indexById(unfiltered)
   const familyName = user?.familyTreeName ?? ''
+  const isFiltered = activeCount > 0
+
+  /** The flag and the localised name, or a dash when the member has no country on file. */
+  const countryCell = (member: FamilyMemberListItem): string => {
+    const country = countries?.find((candidate) => candidate.id === member.countryId)
+    if (country === undefined) return '—'
+    return `${flagEmoji(country.code)} ${countryName(country, i18n.language)}`
+  }
 
   return (
-    <AppShell familyName={familyName} statLine={t('tree.membersCount', { count: all.length })}>
+    <AppShell familyName={familyName} statLine={t('tree.membersCount', { count: unfiltered.length })}>
       <div style={{ flex: 1, minWidth: 0, overflow: 'auto', padding: 'var(--space-8)' }}>
         <div style={{ maxWidth: 900, margin: '0 auto' }}>
           <div
@@ -194,7 +218,7 @@ export function MembersPage() {
           <div ref={formRef}>
             {editing.mode === 'add' && (
               <MemberForm
-                parents={all}
+                parents={unfiltered}
                 isSaving={createMember.isPending}
                 onSubmit={handleCreate}
                 onCancel={close}
@@ -204,7 +228,7 @@ export function MembersPage() {
             {editing.mode === 'edit' && (
               <MemberForm
                 member={editing.member}
-                parents={all.filter((candidate) => candidate.id !== editing.member.id)}
+                parents={unfiltered.filter((candidate) => candidate.id !== editing.member.id)}
                 isSaving={updateMember.isPending}
                 onSubmit={(name, _parentId, life, contact) =>
                   handleUpdate(editing.member, name, life, contact)
@@ -212,6 +236,15 @@ export function MembersPage() {
                 onCancel={close}
               />
             )}
+          </div>
+
+          <div style={{ marginBottom: 'var(--space-5)' }}>
+            <FilterControls
+              filters={filters}
+              activeCount={activeCount}
+              onChange={setFilter}
+              onReset={reset}
+            />
           </div>
 
           {isLoading ? (
@@ -227,7 +260,30 @@ export function MembersPage() {
                 borderRadius: 'var(--r-lg)',
               }}
             >
-              {t('members.empty')}
+              {/* "No members yet" over a filtered-to-zero list tells the user something false.
+                  The two empty states are different facts and read differently. */}
+              {isFiltered ? t('filters.emptyFiltered') : t('members.empty')}
+              {isFiltered && (
+                <div style={{ marginTop: 'var(--space-4)' }}>
+                  <button
+                    type="button"
+                    onClick={reset}
+                    style={{
+                      height: 'var(--control-h-md)',
+                      padding: '0 16px',
+                      border: '1px solid var(--border-strong)',
+                      borderRadius: 'var(--r-md)',
+                      background: 'var(--surface)',
+                      color: 'var(--text-1)',
+                      fontFamily: 'inherit',
+                      fontSize: 13,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {t('filters.reset')}
+                  </button>
+                </div>
+              )}
             </div>
           ) : (
             <div
@@ -243,6 +299,8 @@ export function MembersPage() {
                   <tr>
                     <th style={headCellStyle}>{t('members.name')}</th>
                     <th style={headCellStyle}>{t('members.parent')}</th>
+                    <th style={headCellStyle}>{t('filters.country')}</th>
+                    <th style={headCellStyle}>{t('filters.branch')}</th>
                     <th style={headCellStyle} />
                   </tr>
                 </thead>
@@ -284,6 +342,14 @@ export function MembersPage() {
                         {current.parentId === null
                           ? t('members.noParent')
                           : (byId.get(current.parentId)?.name ?? '—')}
+                      </td>
+                      <td style={{ ...cellStyle, color: 'var(--text-3)', whiteSpace: 'nowrap' }}>
+                        {countryCell(current)}
+                      </td>
+                      <td style={{ ...cellStyle, color: 'var(--text-3)' }}>
+                        {/* The root belongs to no branch; specification §21 renders that as
+                            "Root" rather than as a blank cell. */}
+                        {current.branchName ?? t('filters.branchRoot')}
                       </td>
                       <td style={{ ...cellStyle, whiteSpace: 'nowrap' }}>
                         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
