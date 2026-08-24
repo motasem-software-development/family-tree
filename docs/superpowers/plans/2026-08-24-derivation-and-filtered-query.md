@@ -119,7 +119,7 @@ bound record cannot refuse to bind.
   `MemberFilter.TryCreate(MemberFilterRequest, out MemberFilter)` and `bool IsEmpty`. Used by
   Tasks 3, 4, 5, 6, 7, 8 and by Plan 4's export endpoint.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `tests/FamilyTree.Application.Tests/FamilyMembers/MemberFilterTests.cs` asserts:
 
@@ -136,7 +136,7 @@ bound record cannot refuse to bind.
 A negative or unknown `generation` is deliberately **not** an error: it is a filter nothing
 matches, and it returns an empty list. Do not invent a code the spec does not have.
 
-- [ ] **Step 2: Write `MemberFilterRequest`**
+- [x] **Step 2: Write `MemberFilterRequest`**
 
 ```csharp
 namespace FamilyTree.Contracts.FamilyMembers;
@@ -164,7 +164,7 @@ public sealed record MemberFilterRequest(
     Guid? RootId);
 ```
 
-- [ ] **Step 3: Write `MemberFilter`**
+- [x] **Step 3: Write `MemberFilter`**
 
 In `src/FamilyTree.Application/FamilyMembers/MemberFilter.cs`: the `MemberStatusFilter` enum and
 the validated record.
@@ -198,8 +198,8 @@ public sealed record MemberFilter(
 `TryCreate` trims `Search` and folds blank to null; maps `null` and `""` to `All` and otherwise
 matches `alive` / `deceased` / `all` with `StringComparison.OrdinalIgnoreCase`.
 
-- [ ] **Step 4: Run the tests** — `dotnet test tests/FamilyTree.Application.Tests` passes.
-- [ ] **Step 5: Commit** — `feat: add the shared member filter shape`
+- [x] **Step 4: Run the tests** — `dotnet test tests/FamilyTree.Application.Tests` passes.
+- [x] **Step 5: Commit** — `feat: add the shared member filter shape`
 
 ---
 
@@ -218,7 +218,7 @@ already holds every member in process (spec §4.2), so it derives rather than re
   `MemberDerivation.Derive(IReadOnlyList<FamilyMember> members, Guid? rootId) -> IReadOnlyDictionary<Guid, MemberPlacement>`.
   Used by Tasks 3 and 6.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Reproduce the worked-example tree above as a fixture, then assert it as a literal table —
 `[InlineData("محمود", "سليمان", 3)]` and so on for all seven members — rather than as prose. Also
@@ -235,7 +235,7 @@ assert:
   Cycles are impossible through the move command, and this is what keeps a corrupt import from
   becoming a hung request rather than an error.
 
-- [ ] **Step 2: Implement `Derive`**
+- [x] **Step 2: Implement `Derive`**
 
 Iterative breadth-first from the anchor set, mirroring the CTE exactly:
 
@@ -250,8 +250,8 @@ Anchors are the member with `rootId` when supplied, otherwise every member with 
 `ParentId`; each anchor gets `(null, 0)`. Children come from one `GroupBy(ParentId)` pass, so the
 whole derivation is linear in the input. A `visited` set guards the cycle case.
 
-- [ ] **Step 3: Run the tests** — `dotnet test tests/FamilyTree.Application.Tests` passes.
-- [ ] **Step 4: Commit** — `feat: derive a member's branch and generation from the parent chain`
+- [x] **Step 3: Run the tests** — `dotnet test tests/FamilyTree.Application.Tests` passes.
+- [x] **Step 4: Commit** — `feat: derive a member's branch and generation from the parent chain`
 
 ---
 
