@@ -87,6 +87,26 @@ describe('joinPhone', () => {
   it('returns null when no dial code is chosen', () => {
     expect(joinPhone('', '599123456')).toBeNull()
   })
+
+  it('keeps a number typed in full international form as it stands', () => {
+    // Pasting the whole number into the digits box is how most people enter one. Composing it
+    // with the picker's code gave '+970+970599850444', which the server rejected.
+    expect(joinPhone('+970', '+970599850444')).toBe('+970599850444')
+    expect(joinPhone('+20', '+970599850444')).toBe('+970599850444')
+    expect(joinPhone('', '+970599850444')).toBe('+970599850444')
+  })
+
+  it('strips separators from a full international number too', () => {
+    expect(joinPhone('+970', '+970 599 850-444')).toBe('+970599850444')
+  })
+
+  it("reads the '00' dialing prefix as a leading +", () => {
+    expect(joinPhone('+970', '00970599850444')).toBe('+970599850444')
+  })
+
+  it('keeps a lone + so the rest of the number can still be typed after it', () => {
+    expect(joinPhone('+970', '+')).toBe('+')
+  })
 })
 
 describe('isValidNationalId', () => {
