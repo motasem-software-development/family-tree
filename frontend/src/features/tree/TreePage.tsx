@@ -5,6 +5,7 @@ import { AppShell, type SearchResult } from '../../app/AppShell'
 import { useDirection } from '../../i18n/useDirection'
 import { ApiError } from '../../services/apiClient'
 import { useAuth } from '../auth/AuthContext'
+import { EMPTY_CONTACT_DETAILS, contactDetailsOf, type ContactDetails } from '../members/contactDetails'
 import {
   EMPTY_LIFE_DETAILS,
   lifeDetailsOf,
@@ -125,7 +126,13 @@ export const TreePage = () => {
   const detailById = useMemo(() => {
     const map = new Map<
       string,
-      { version: number; createdAt: string; updatedAt: string; life: LifeDetails }
+      {
+        version: number
+        createdAt: string
+        updatedAt: string
+        life: LifeDetails
+        contact: ContactDetails
+      }
     >()
     ;(members ?? []).forEach((m) =>
       map.set(m.id, {
@@ -133,6 +140,7 @@ export const TreePage = () => {
         createdAt: m.createdAt,
         updatedAt: m.updatedAt,
         life: lifeDetailsOf(m),
+        contact: contactDetailsOf(m),
       }),
     )
     return map
@@ -246,7 +254,7 @@ export const TreePage = () => {
       setErrorCode(null)
       const parentId = selectedId
       createMember.mutate(
-        { name: nameValue, parentId, life: lifeValue },
+        { name: nameValue, parentId, life: lifeValue, contact: EMPTY_CONTACT_DETAILS },
         {
           onSuccess: (created) => {
             if (parentId !== null) setExpanded((current) => ({ ...current, [parentId]: true }))
@@ -269,7 +277,16 @@ export const TreePage = () => {
       }
       setErrorCode(null)
       updateMember.mutate(
-        { id: selected.id, name: nameValue, version: detail.version, life: lifeValue },
+        {
+          id: selected.id,
+          name: nameValue,
+          version: detail.version,
+          life: lifeValue,
+          // Preserve the contact details already on file: this rename dialog has no contact
+          // fields of its own, and sending nulls under the server's replace semantics would
+          // wipe out a phone number or national ID no one meant to touch.
+          contact: detail.contact,
+        },
         {
           onSuccess: () => {
             closeModal()

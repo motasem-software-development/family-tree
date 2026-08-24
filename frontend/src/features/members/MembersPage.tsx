@@ -4,6 +4,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { AppShell } from '../../app/AppShell'
 import { useAuth } from '../auth/AuthContext'
 import { ApiError } from '../../services/apiClient'
+import type { ContactDetails } from './contactDetails'
 import { fullName, indexById, lineageName } from './fullName'
 import { lifeDetailsOf, lifeYears, type LifeDetails } from './lifeDetails'
 import { LifeStatusDot } from './LifeStatusDot'
@@ -66,18 +67,28 @@ export function MembersPage() {
 
   const close = () => setEditing({ mode: 'none' })
 
-  const handleCreate = (name: string, parentId: string | null, life: LifeDetails) => {
+  const handleCreate = (
+    name: string,
+    parentId: string | null,
+    life: LifeDetails,
+    contact: ContactDetails,
+  ) => {
     setErrorCode(null)
     createMember.mutate(
-      { name, parentId, life },
+      { name, parentId, life, contact },
       { onSuccess: close, onError: (error) => setErrorCode(codeOf(error)) },
     )
   }
 
-  const handleUpdate = (target: FamilyMember, name: string, life: LifeDetails) => {
+  const handleUpdate = (
+    target: FamilyMember,
+    name: string,
+    life: LifeDetails,
+    contact: ContactDetails,
+  ) => {
     setErrorCode(null)
     updateMember.mutate(
-      { id: target.id, name, version: target.version, life },
+      { id: target.id, name, version: target.version, life, contact },
       {
         onSuccess: close,
         onError: (error) => {
@@ -179,7 +190,9 @@ export function MembersPage() {
               member={editing.member}
               parents={all.filter((candidate) => candidate.id !== editing.member.id)}
               isSaving={updateMember.isPending}
-              onSubmit={(name, _parentId, life) => handleUpdate(editing.member, name, life)}
+              onSubmit={(name, _parentId, life, contact) =>
+                handleUpdate(editing.member, name, life, contact)
+              }
               onCancel={close}
             />
           )}

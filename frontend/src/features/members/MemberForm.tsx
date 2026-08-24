@@ -1,5 +1,8 @@
 import { useState, type CSSProperties, type FormEvent } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useCountriesQuery } from '../countries/useCountries'
+import { ContactFields } from './ContactFields'
+import { EMPTY_CONTACT_DETAILS, contactDetailsOf, type ContactDetails } from './contactDetails'
 import { LifeDetailsFields } from './LifeDetailsFields'
 import { EMPTY_LIFE_DETAILS, lifeDetailsOf, type LifeDetails } from './lifeDetails'
 import type { FamilyMember } from './types'
@@ -10,7 +13,12 @@ interface MemberFormProps {
   /** Candidate parents — excludes the member being edited. */
   parents: FamilyMember[]
   isSaving: boolean
-  onSubmit: (name: string, parentId: string | null, life: LifeDetails) => void
+  onSubmit: (
+    name: string,
+    parentId: string | null,
+    life: LifeDetails,
+    contact: ContactDetails,
+  ) => void
   onCancel: () => void
 }
 
@@ -55,10 +63,14 @@ export function MemberForm({ member, parents, isSaving, onSubmit, onCancel }: Me
   const [life, setLife] = useState<LifeDetails>(
     member === undefined ? EMPTY_LIFE_DETAILS : lifeDetailsOf(member),
   )
+  const { data: countries } = useCountriesQuery()
+  const [contact, setContact] = useState<ContactDetails>(
+    member === undefined ? EMPTY_CONTACT_DETAILS : contactDetailsOf(member),
+  )
 
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault()
-    onSubmit(name, parentId === '' ? null : parentId, life)
+    onSubmit(name, parentId === '' ? null : parentId, life, contact)
   }
 
   return (
@@ -115,6 +127,15 @@ export function MemberForm({ member, parents, isSaving, onSubmit, onCancel }: Me
         idPrefix="member"
         value={life}
         onChange={setLife}
+        labelStyle={labelStyle}
+        controlStyle={controlStyle}
+      />
+
+      <ContactFields
+        idPrefix="member"
+        value={contact}
+        countries={countries ?? []}
+        onChange={setContact}
         labelStyle={labelStyle}
         controlStyle={controlStyle}
       />

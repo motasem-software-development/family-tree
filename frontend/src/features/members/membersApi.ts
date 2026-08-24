@@ -1,4 +1,5 @@
 import { apiFetch } from '../../services/apiClient'
+import type { ContactDetails } from './contactDetails'
 import type { LifeDetails } from './lifeDetails'
 import type {
   FamilyMember,
@@ -22,10 +23,15 @@ const treePath = (params?: TreeQueryParams): string => {
 export const membersApi = {
   list: (): Promise<FamilyMember[]> => apiFetch<FamilyMember[]>(MEMBERS),
 
-  create: (name: string, parentId: string | null, life: LifeDetails): Promise<FamilyMember> =>
+  create: (
+    name: string,
+    parentId: string | null,
+    life: LifeDetails,
+    contact: ContactDetails,
+  ): Promise<FamilyMember> =>
     apiFetch<FamilyMember>(MEMBERS, {
       method: 'POST',
-      body: JSON.stringify({ name, parentId, ...life }),
+      body: JSON.stringify({ name, parentId, ...life, ...contact }),
     }),
 
   /**
@@ -34,12 +40,19 @@ export const membersApi = {
    *
    * The life details are replace-semantics on the server, so they are always sent in full —
    * omitting a cleared date would leave the old value in place and make an unmarked death
-   * record impossible to correct.
+   * record impossible to correct. The contact details are replace-semantics for the same
+   * reason — omitting a cleared phone number would leave the old one in place.
    */
-  update: (id: string, name: string, version: number, life: LifeDetails): Promise<FamilyMember> =>
+  update: (
+    id: string,
+    name: string,
+    version: number,
+    life: LifeDetails,
+    contact: ContactDetails,
+  ): Promise<FamilyMember> =>
     apiFetch<FamilyMember>(`${MEMBERS}/${id}`, {
       method: 'PUT',
-      body: JSON.stringify({ name, version, ...life }),
+      body: JSON.stringify({ name, version, ...life, ...contact }),
     }),
 
   /**

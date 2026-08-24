@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { membersApi } from './membersApi'
+import { EMPTY_CONTACT_DETAILS } from './contactDetails'
 import { EMPTY_LIFE_DETAILS } from './lifeDetails'
 import { tokenStorage } from '../../services/tokenStorage'
 import { ApiError } from '../../services/apiClient'
@@ -35,7 +36,7 @@ describe('membersApi', () => {
     )
     vi.stubGlobal('fetch', fetchMock)
 
-    await membersApi.create('سليمان', null, EMPTY_LIFE_DETAILS)
+    await membersApi.create('سليمان', null, EMPTY_LIFE_DETAILS, EMPTY_CONTACT_DETAILS)
 
     const [, init] = fetchMock.mock.calls[0]
     expect(init.method).toBe('POST')
@@ -45,6 +46,10 @@ describe('membersApi', () => {
       dateOfBirth: null,
       dateOfDeath: null,
       isDeceased: false,
+      nationalId: null,
+      mobileNumber: null,
+      whatsAppNumber: null,
+      countryId: null,
     })
   })
 
@@ -54,7 +59,7 @@ describe('membersApi', () => {
     )
     vi.stubGlobal('fetch', fetchMock)
 
-    await membersApi.update('a', 'فارس أحمد', 1, EMPTY_LIFE_DETAILS)
+    await membersApi.update('a', 'فارس أحمد', 1, EMPTY_LIFE_DETAILS, EMPTY_CONTACT_DETAILS)
 
     const [url, init] = fetchMock.mock.calls[0]
     expect(url).toBe('/api/v1/family-members/a')
@@ -65,6 +70,10 @@ describe('membersApi', () => {
       dateOfBirth: null,
       dateOfDeath: null,
       isDeceased: false,
+      nationalId: null,
+      mobileNumber: null,
+      whatsAppNumber: null,
+      countryId: null,
     })
   })
 
@@ -72,7 +81,7 @@ describe('membersApi', () => {
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ id: 'a', version: 2 }))
     vi.stubGlobal('fetch', fetchMock)
 
-    await membersApi.update('a', 'فارس', 1, EMPTY_LIFE_DETAILS)
+    await membersApi.update('a', 'فارس', 1, EMPTY_LIFE_DETAILS, EMPTY_CONTACT_DETAILS)
 
     const body = JSON.parse(fetchMock.mock.calls[0][1].body as string)
     expect(body).not.toHaveProperty('parentId')

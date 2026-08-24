@@ -5,6 +5,7 @@ import { I18nextProvider } from 'react-i18next'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import i18n from '../../i18n'
+import { EMPTY_CONTACT_DETAILS } from '../members/contactDetails'
 import { EMPTY_LIFE_DETAILS } from '../members/lifeDetails'
 import { ApiError } from '../../services/apiClient'
 import { membersApi } from '../members/membersApi'
@@ -43,6 +44,11 @@ const stamp = {
   dateOfBirth: null,
   dateOfDeath: null,
   isDeceased: false,
+  nationalId: null,
+  mobileNumber: null,
+  whatsAppNumber: null,
+  countryId: null,
+  countryCode: null,
 }
 
 const FLAT: FamilyMember[] = [
@@ -157,7 +163,13 @@ describe('TreePage', () => {
     // Version 3 comes from the flat list — the tree DTO carries no version at all. The life
     // details ride the same join, so an edit that touches only the name still round-trips them.
     await waitFor(() =>
-      expect(membersApi.update).toHaveBeenCalledWith('f1', 'فارس أحمد', 3, EMPTY_LIFE_DETAILS),
+      expect(membersApi.update).toHaveBeenCalledWith(
+        'f1',
+        'فارس أحمد',
+        3,
+        EMPTY_LIFE_DETAILS,
+        EMPTY_CONTACT_DETAILS,
+      ),
     )
   })
 

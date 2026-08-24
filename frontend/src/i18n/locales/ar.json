@@ -168,7 +168,18 @@
     "markDeceased": "متوفّى",
     "markDeceasedHint": "علّم هذا الخيار إذا كانت الوفاة مؤكدة ولو كان تاريخها مجهولاً.",
     "living": "على قيد الحياة",
-    "deceased": "متوفّى"
+    "deceased": "متوفّى",
+    "contactSection": "بيانات الاتصال",
+    "nationalId": "رقم الهوية",
+    "nationalIdHint": "تسعة أرقام بالضبط.",
+    "nationalIdInvalid": "يجب أن يتكوّن رقم الهوية من تسعة أرقام بالضبط.",
+    "country": "بلد الإقامة",
+    "noCountry": "غير مسجّل",
+    "mobileNumber": "رقم الجوال",
+    "whatsAppNumber": "رقم واتساب",
+    "sameAsMobile": "نفس رقم الجوال",
+    "localNumber": "الرقم",
+    "dialCode": "رمز الاتصال"
   },
   "users": {
     "title": "المستخدمون",
@@ -365,6 +376,14 @@
     "ROLE_IN_USE": "لا يمكن حذف هذا الدور لأنه معيّن لمستخدمين.",
     "PERMISSION_NOT_FOUND": "صلاحية غير معروفة. أعد التحميل وحاول مجددًا.",
     "MEMBER_DEATH_BEFORE_BIRTH": "لا يمكن أن يسبق تاريخ الوفاة تاريخ الميلاد.",
-    "MEMBER_DATE_IN_FUTURE": "لا يمكن أن يكون تاريخ الميلاد أو الوفاة في المستقبل."
+    "MEMBER_DATE_IN_FUTURE": "لا يمكن أن يكون تاريخ الميلاد أو الوفاة في المستقبل.",
+    "MEMBER_NATIONAL_ID_INVALID": "يجب أن يتكوّن رقم الهوية من تسعة أرقام بالضبط.",
+    "MEMBER_NATIONAL_ID_DUPLICATE": "رقم الهوية هذا مسجّل لفرد آخر.",
+    "MEMBER_PHONE_INVALID": "أدخل الرقم بالصيغة الدولية، مثال: +970599123456.",
+    "MEMBER_COUNTRY_NOT_FOUND": "هذا البلد لم يعد متاحاً. أعد التحميل وحاول مرة أخرى.",
+    "COUNTRY_CODE_INVALID": "رمز البلد غير صالح.",
+    "COUNTRY_NAME_REQUIRED": "اسم البلد مطلوب.",
+    "COUNTRY_NAME_TOO_LONG": "اسم البلد طويل جداً (100 حرف كحد أقصى).",
+    "COUNTRY_DIAL_CODE_INVALID": "رمز الاتصال غير صالح."
   }
 }

@@ -5,6 +5,7 @@ import { I18nextProvider } from 'react-i18next'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import i18n from '../../i18n'
+import { EMPTY_CONTACT_DETAILS } from './contactDetails'
 import { EMPTY_LIFE_DETAILS } from './lifeDetails'
 import { MembersPage } from './MembersPage'
 import { membersApi } from './membersApi'
@@ -35,6 +36,11 @@ const member = (over: Partial<FamilyMember> = {}): FamilyMember => ({
   dateOfBirth: null,
   dateOfDeath: null,
   isDeceased: false,
+  nationalId: null,
+  mobileNumber: null,
+  whatsAppNumber: null,
+  countryId: null,
+  countryCode: null,
   ...over,
 })
 
@@ -109,7 +115,13 @@ describe('MembersPage', () => {
     await user.type(screen.getByLabelText(i18n.t('members.name')), 'عمر')
     await user.click(screen.getByRole('button', { name: i18n.t('members.save') }))
 
-    await waitFor(() => expect(membersApi.create).toHaveBeenCalledWith('عمر', null, EMPTY_LIFE_DETAILS),
+    await waitFor(() =>
+      expect(membersApi.create).toHaveBeenCalledWith(
+        'عمر',
+        null,
+        EMPTY_LIFE_DETAILS,
+        EMPTY_CONTACT_DETAILS,
+      ),
     )
   })
 
@@ -123,7 +135,13 @@ describe('MembersPage', () => {
     await user.selectOptions(screen.getByLabelText(i18n.t('members.parent')), 'a')
     await user.click(screen.getByRole('button', { name: i18n.t('members.save') }))
 
-    await waitFor(() => expect(membersApi.create).toHaveBeenCalledWith('فارس', 'a', EMPTY_LIFE_DETAILS),
+    await waitFor(() =>
+      expect(membersApi.create).toHaveBeenCalledWith(
+        'فارس',
+        'a',
+        EMPTY_LIFE_DETAILS,
+        EMPTY_CONTACT_DETAILS,
+      ),
     )
   })
 
@@ -138,7 +156,14 @@ describe('MembersPage', () => {
     await user.type(nameField, 'سليمان أحمد')
     await user.click(screen.getByRole('button', { name: i18n.t('members.save') }))
 
-    await waitFor(() => expect(membersApi.update).toHaveBeenCalledWith('a', 'سليمان أحمد', 1, EMPTY_LIFE_DETAILS),
+    await waitFor(() =>
+      expect(membersApi.update).toHaveBeenCalledWith(
+        'a',
+        'سليمان أحمد',
+        1,
+        EMPTY_LIFE_DETAILS,
+        EMPTY_CONTACT_DETAILS,
+      ),
     )
   })
 

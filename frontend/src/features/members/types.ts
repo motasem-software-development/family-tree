@@ -12,6 +12,15 @@ export interface FamilyMember {
   dateOfDeath: string | null
   /** Explicit, not derived from `dateOfDeath`: "died, date unknown" is a real record. */
   isDeceased: boolean
+  /** Exactly 9 digits, or null when not recorded. Text, so a leading zero survives. */
+  nationalId: string | null
+  /** Normalized E.164, dialing code included. Null when not recorded. */
+  mobileNumber: string | null
+  /** Normalized E.164. Independent of `mobileNumber` — they are often different numbers. */
+  whatsAppNumber: string | null
+  countryId: number | null
+  /** ISO alpha-2 for `countryId`, so a row can render a flag without loading the country list. */
+  countryCode: string | null
 }
 
 export interface FamilyTreeNode {

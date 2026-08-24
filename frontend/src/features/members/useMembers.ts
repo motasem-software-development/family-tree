@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import type { ContactDetails } from './contactDetails'
 import type { LifeDetails } from './lifeDetails'
 import { membersApi } from './membersApi'
 import type { FamilyMember, FamilyTreeView, TreeQueryParams } from './types'
@@ -39,11 +40,13 @@ export const useCreateMember = () => {
       name,
       parentId,
       life,
+      contact,
     }: {
       name: string
       parentId: string | null
       life: LifeDetails
-    }) => membersApi.create(name, parentId, life),
+      contact: ContactDetails
+    }) => membersApi.create(name, parentId, life, contact),
     onSuccess: invalidate,
   })
 }
@@ -56,12 +59,14 @@ export const useUpdateMember = () => {
       name,
       version,
       life,
+      contact,
     }: {
       id: string
       name: string
       version: number
       life: LifeDetails
-    }) => membersApi.update(id, name, version, life),
+      contact: ContactDetails
+    }) => membersApi.update(id, name, version, life, contact),
     onSuccess: invalidate,
   })
 }
