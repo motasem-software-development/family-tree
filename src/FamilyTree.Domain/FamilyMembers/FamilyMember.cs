@@ -237,8 +237,10 @@ public sealed partial class FamilyMember : Entity, ITenantOwned
 
         // Spaces, dashes and parentheses are how people write phone numbers and how a pasted
         // number arrives; E.164 has no room for them. Stripping before validating accepts the
-        // human form and stores the canonical one.
-        var normalized = PhoneSeparators().Replace(phone.Trim(), string.Empty);
+        // human form and stores the canonical one. The stripping itself lives on ContactDetails
+        // so this aggregate and FamilyMemberService's dial-code check share one definition of
+        // "separator" instead of drifting apart.
+        var normalized = ContactDetails.NormalizePhone(phone)!;
 
         if (!E164Pattern().IsMatch(normalized))
             throw new DomainException(
@@ -253,7 +255,4 @@ public sealed partial class FamilyMember : Entity, ITenantOwned
 
     [GeneratedRegex(@"^\+[1-9]\d{7,14}$")]
     private static partial Regex E164Pattern();
-
-    [GeneratedRegex(@"[\s\-()]")]
-    private static partial Regex PhoneSeparators();
 }

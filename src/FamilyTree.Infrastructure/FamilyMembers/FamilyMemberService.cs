@@ -315,17 +315,14 @@ public sealed class FamilyMemberService(
     /// <summary>
     /// Separators are stripped here as well as in the aggregate, because this check runs first
     /// and a number written "+970 599 123 456" must compare against the same canonical form the
-    /// aggregate will eventually store.
+    /// aggregate will eventually store. <see cref="ContactDetails.NormalizePhone"/> is the single
+    /// shared definition of "separator" so the two checks cannot drift apart.
     /// </summary>
     private static void EnsureDialCodeAgrees(string? phone, string dialCode)
     {
         // Blank is "not supplied"; the aggregate normalizes it to null.
-        if (string.IsNullOrWhiteSpace(phone)) return;
-
-        var normalized = phone.Replace(" ", string.Empty)
-                              .Replace("-", string.Empty)
-                              .Replace("(", string.Empty)
-                              .Replace(")", string.Empty);
+        var normalized = ContactDetails.NormalizePhone(phone);
+        if (normalized is null) return;
 
         if (!normalized.StartsWith(dialCode, StringComparison.Ordinal))
             throw new DomainException(
