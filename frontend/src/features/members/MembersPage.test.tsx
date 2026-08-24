@@ -9,7 +9,7 @@ import { EMPTY_CONTACT_DETAILS } from './contactDetails'
 import { EMPTY_LIFE_DETAILS } from './lifeDetails'
 import { MembersPage } from './MembersPage'
 import { membersApi } from './membersApi'
-import type { FamilyMember } from './types'
+import type { FamilyMemberListItem } from './types'
 import { ApiError } from '../../services/apiClient'
 
 vi.mock('./membersApi')
@@ -26,7 +26,9 @@ vi.mock('../auth/AuthContext', () => ({
   }),
 }))
 
-const member = (over: Partial<FamilyMember> = {}): FamilyMember => ({
+// Built as the list shape, which is a superset of the single-member one, so the same helper
+// serves list, create, and update.
+const member = (over: Partial<FamilyMemberListItem> = {}): FamilyMemberListItem => ({
   id: 'a',
   name: 'سليمان',
   parentId: null,
@@ -41,6 +43,9 @@ const member = (over: Partial<FamilyMember> = {}): FamilyMember => ({
   whatsAppNumber: null,
   countryId: null,
   countryCode: null,
+  branchId: null,
+  branchName: null,
+  generation: 0,
   ...over,
 })
 

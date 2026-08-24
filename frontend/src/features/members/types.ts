@@ -23,14 +23,38 @@ export interface FamilyMember {
   countryCode: string | null
 }
 
+/**
+ * One row of the filtered members list. Superset of `FamilyMember`: the single-member endpoints
+ * have no selected root to measure from, so they return the narrower shape.
+ */
+export interface FamilyMemberListItem extends FamilyMember {
+  /** Null for the root member, which specification §21 renders as "Root". */
+  branchId: string | null
+  branchName: string | null
+  /** Root-relative — the selected root reads 0 (design spec §1.2). */
+  generation: number
+}
+
 export interface FamilyTreeNode {
   id: string
   name: string
   parentId: string | null
+  /** Absolute and 1-based, even under a root-relative generation filter (design spec §1.2). */
   generation: number
   /** True when children exist but were not returned because of a depth limit. */
   hasMoreChildren: boolean
+  /**
+   * False when this member is present only to hold up a matching descendant: they are rendered
+   * dimmed and non-selectable. Always true with no filter applied (design spec §4.2).
+   */
+  matches: boolean
   children: FamilyTreeNode[]
+}
+
+/** One direct child of the selected root — a value the branch filter can take. */
+export interface Branch {
+  id: string
+  name: string
 }
 
 export interface FamilyTreeView {
@@ -45,8 +69,11 @@ export interface FamilyTreeSummary {
   memberCount: number
 }
 
+/**
+ * `maxDepth` is a transport concern — how much of the tree to ship — and stays outside the
+ * filter set it travels beside (design spec §5.1).
+ */
 export interface TreeQueryParams {
-  rootId?: string
   maxDepth?: number
 }
 

@@ -628,7 +628,7 @@ column and the tree gains no dimming here.
   `membersApi.generations(rootId)`; `useBranchesQuery`, `useGenerationsQuery`. Used by Plans 3
   and 4.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `filterParams.test.ts` is the round-trip test spec §6.1 calls for — this module is the seam where
 client and server could disagree about what `status=alive` means:
@@ -641,14 +641,14 @@ client and server could disagree about what `status=alive` means:
 - A malformed `generation=abc` reads back as undefined rather than `NaN`. `NaN` reaches the
   server as the string `NaN` and comes back a 400 the user cannot act on.
 
-- [ ] **Step 2: Write `filterParams.ts`** — pure, no React, no fetch.
-- [ ] **Step 3: Extend the types**
+- [x] **Step 2: Write `filterParams.ts`** — pure, no React, no fetch.
+- [x] **Step 3: Extend the types**
 
 `FamilyMemberListItem extends FamilyMember` with `branchId: string | null`,
 `branchName: string | null`, `generation: number`. `FamilyTreeNode` gains `matches: boolean`.
 `Branch { id: string; name: string }`.
 
-- [ ] **Step 4: Extend the API and the hooks**
+- [x] **Step 4: Extend the API and the hooks**
 
 `membersApi.list` takes optional filters and appends `toFilterParams`. `treePath` merges the
 filter params with `maxDepth`. Add `branches` and `generations`. Add `useBranchesQuery` and
@@ -656,8 +656,8 @@ filter params with `maxDepth`. Add `branches` and `generations`. Add `useBranche
 `'members'` so the existing blanket invalidation refreshes them when a move changes the tree's
 shape.
 
-- [ ] **Step 5: Run the checks** — `npm test && npm run lint && npm run build` in `frontend/`.
-- [ ] **Step 6: Commit** — `feat: carry the member filters through the client API`
+- [x] **Step 5: Run the checks** — `npm test && npm run lint && npm run build` in `frontend/`.
+- [x] **Step 6: Commit** — `feat: carry the member filters through the client API`
 
 ---
 

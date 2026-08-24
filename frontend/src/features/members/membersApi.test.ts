@@ -124,15 +124,60 @@ describe('membersApi', () => {
     expect(fetchMock.mock.calls[0][0]).toBe('/api/v1/family-tree/view')
   })
 
-  it('passes rootId and maxDepth through as query parameters', async () => {
+  it('passes the filter set and maxDepth through as query parameters', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       jsonResponse({ id: 't', name: 'عائلة السقا', rootMembers: [] }),
     )
     vi.stubGlobal('fetch', fetchMock)
 
-    await membersApi.tree({ rootId: 'abc', maxDepth: 2 })
+    // maxDepth rides beside the filter set rather than inside it: it is a transport concern —
+    // how much of the tree to ship — not a filter (design spec §5.1).
+    await membersApi.tree({ rootId: 'abc', status: 'alive' }, { maxDepth: 2 })
 
-    expect(fetchMock.mock.calls[0][0]).toBe('/api/v1/family-tree/view?rootId=abc&maxDepth=2')
+    expect(fetchMock.mock.calls[0][0]).toBe(
+      '/api/v1/family-tree/view?status=alive&rootId=abc&maxDepth=2',
+    )
+  })
+
+  it('sends no query string for an unfiltered list', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse([]))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await membersApi.list({})
+
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/v1/family-members')
+  })
+
+  it('serialises the filter set onto the members list', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse([]))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await membersApi.list({ status: 'deceased', generation: 2, countryId: 165 })
+
+    expect(fetchMock.mock.calls[0][0]).toBe(
+      '/api/v1/family-members?status=deceased&generation=2&countryId=165',
+    )
+  })
+
+  it('asks for the branches and generations of a root', async () => {
+    // A fresh Response per call: a body can only be read once.
+    const fetchMock = vi.fn().mockImplementation(() => Promise.resolve(jsonResponse([])))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await membersApi.branches('abc')
+    await membersApi.generations('abc')
+
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/v1/family-tree/branches?rootId=abc')
+    expect(fetchMock.mock.calls[1][0]).toBe('/api/v1/family-tree/generations?rootId=abc')
+  })
+
+  it('asks for the whole tree branches when no root is given', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse([]))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await membersApi.branches()
+
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/v1/family-tree/branches')
   })
 
   it('sends the query and limit as search parameters', async () => {

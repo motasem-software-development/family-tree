@@ -10,7 +10,7 @@ import { EMPTY_LIFE_DETAILS } from '../members/lifeDetails'
 import { ApiError } from '../../services/apiClient'
 import { countriesApi } from '../countries/countriesApi'
 import { membersApi } from '../members/membersApi'
-import type { FamilyMember, FamilyTreeNode, FamilyTreeView } from '../members/types'
+import type { FamilyMemberListItem, FamilyTreeNode, FamilyTreeView } from '../members/types'
 import { TreePage } from './TreePage'
 
 vi.mock('../members/membersApi')
@@ -32,7 +32,7 @@ const node = (
   generation: number,
   children: FamilyTreeNode[] = [],
   parentId: string | null = null,
-): FamilyTreeNode => ({ id, name, parentId, generation, hasMoreChildren: false, children })
+): FamilyTreeNode => ({ id, name, parentId, generation, hasMoreChildren: false, matches: true, children })
 
 const VIEW: FamilyTreeView = {
   id: 't1',
@@ -51,6 +51,10 @@ const stamp = {
   whatsAppNumber: null,
   countryId: null,
   countryCode: null,
+  // The list endpoint derives these; the page does not read them yet (Plan 3 adds the columns).
+  branchId: null,
+  branchName: null,
+  generation: 0,
 }
 
 const COUNTRIES = [
@@ -58,7 +62,7 @@ const COUNTRIES = [
   { id: 2, code: 'EG', nameAr: 'مصر', nameEn: 'Egypt', dialCode: '+20' },
 ]
 
-const FLAT: FamilyMember[] = [
+const FLAT: FamilyMemberListItem[] = [
   { id: 's1', name: 'سليمان', parentId: null, version: 1, ...stamp },
   { id: 'f1', name: 'فارس', parentId: 's1', version: 3, ...stamp },
   { id: 's2', name: 'عمر', parentId: null, version: 1, ...stamp },

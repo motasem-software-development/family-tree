@@ -8,7 +8,7 @@ const node = (
   generation: number,
   children: FamilyTreeNode[] = [],
   parentId: string | null = null,
-): FamilyTreeNode => ({ id, name, parentId, generation, hasMoreChildren: false, children })
+): FamilyTreeNode => ({ id, name, parentId, generation, hasMoreChildren: false, matches: true, children })
 
 /** سليمان → فارس → محمود, plus a second first-generation member عمر. */
 const tree = (): FamilyTreeNode[] => [

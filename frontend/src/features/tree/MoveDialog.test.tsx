@@ -16,7 +16,7 @@ const node = (
   generation: number,
   children: FamilyTreeNode[] = [],
   parentId: string | null = null,
-): FamilyTreeNode => ({ id, name, parentId, generation, hasMoreChildren: false, children })
+): FamilyTreeNode => ({ id, name, parentId, generation, hasMoreChildren: false, matches: true, children })
 
 const SUBJECT = node('s1', 'سليمان', 1, [node('f1', 'فارس', 2, [], 's1')])
 
