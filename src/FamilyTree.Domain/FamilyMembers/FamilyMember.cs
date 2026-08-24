@@ -208,8 +208,9 @@ public sealed partial class FamilyMember : Entity, ITenantOwned
     ///
     /// Dial-code agreement is NOT checked here. It needs the country's dial code, which lives
     /// in the countries table, and this aggregate cannot read the database —
-    /// FamilyMemberService applies that check and raises the same MEMBER_PHONE_INVALID code
-    /// (design §5.4, refined).
+    /// FamilyMemberService applies that check to the mobile number and raises the same
+    /// MEMBER_PHONE_INVALID code (design §5.4, refined). The WhatsApp number is exempt from it
+    /// and reaches the database on shape alone.
     /// </summary>
     private static ContactDetails ValidateContactDetails(ContactDetails contact) => new(
         ValidateNationalId(contact.NationalId),

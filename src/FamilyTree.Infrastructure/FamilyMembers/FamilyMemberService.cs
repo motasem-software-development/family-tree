@@ -279,11 +279,17 @@ public sealed class FamilyMemberService(
 
     /// <summary>
     /// Resolves the contact details against the country list: the country must exist, and a
-    /// supplied phone number must start with that country's dialing code.
+    /// supplied mobile number must start with that country's dialing code.
     ///
     /// The dial-code check lives here rather than in the aggregate because it needs a row the
     /// aggregate cannot read (design §5.4, refined). It raises the same MEMBER_PHONE_INVALID
     /// code the aggregate's shape check does, so the split is invisible to clients.
+    ///
+    /// The WhatsApp number is deliberately exempt. Country here is where the member lives, and
+    /// WhatsApp travels with the account rather than the residence — a member who moved to Egypt
+    /// keeps the Palestinian number the rest of the family already has saved. Holding it to the
+    /// residence's dial code rejected a perfectly reachable number. It is still checked for
+    /// E.164 shape by the aggregate.
     ///
     /// With no country selected there is nothing to check against, and the number is accepted on
     /// shape alone — a member living abroad may well keep a number from somewhere else.
@@ -302,7 +308,6 @@ public sealed class FamilyMemberService(
                 "MEMBER_COUNTRY_NOT_FOUND", "The specified country does not exist.");
 
         EnsureDialCodeAgrees(mobile, dialCode);
-        EnsureDialCodeAgrees(whatsApp, dialCode);
 
         return new ContactDetails(nationalId, mobile, whatsApp, id);
     }
