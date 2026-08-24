@@ -30,6 +30,11 @@ interface SearchableSelectProps {
   disabled?: boolean
   /** Shown in place of the list when the query matches nothing. */
   noResultsLabel: string
+  /**
+   * Forces a writing direction on the field and its list, for content that has one of its own
+   * regardless of the interface language. Inherits when omitted.
+   */
+  dir?: 'ltr' | 'rtl'
   onChange: (value: string) => void
   controlStyle: CSSProperties
 }
@@ -54,6 +59,7 @@ export function SearchableSelect({
   placeholder,
   disabled = false,
   noResultsLabel,
+  dir,
   onChange,
   controlStyle,
 }: SearchableSelectProps) {
@@ -186,6 +192,7 @@ export function SearchableSelect({
           open && filtered[active] !== undefined ? `${id}-option-${active}` : undefined
         }
         autoComplete="off"
+        dir={dir}
         disabled={disabled}
         placeholder={query !== null && selectedLabel !== '' ? selectedLabel : placeholder}
         value={query ?? selectedLabel}
@@ -208,6 +215,9 @@ export function SearchableSelect({
             ref={listRef}
             role="listbox"
             aria-label={ariaLabel}
+            // The list mounts on <body> through the portal, outside the field's own subtree,
+            // so it does not inherit a dir set on an ancestor of the input.
+            dir={dir}
             // The input's blur fires before a click resolves, which would close the list out
             // from under the pointer. Holding focus on mousedown lets the click land.
             onMouseDown={(event) => event.preventDefault()}

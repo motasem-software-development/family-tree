@@ -98,7 +98,14 @@ export function PhoneInput({
       <label htmlFor={`${id}-local`} style={labelStyle}>
         {label}
       </label>
-      <div style={{ display: 'flex', gap: 8 }}>
+      {/*
+        A phone number reads left to right everywhere, dialing code first, whatever language
+        surrounds it — "+20 1018124080", never the mirror image. Left to inherit the page's
+        RTL, the row puts the code on the right of the digits and drops the caret on the wrong
+        end of the number. The label above stays with the interface direction; only the number
+        itself is pinned.
+      */}
+      <div dir="ltr" style={{ display: 'flex', gap: 8 }}>
         <SearchableSelect
           id={`${id}-dial`}
           ariaLabel={t('members.dialCode')}
@@ -107,6 +114,7 @@ export function PhoneInput({
           emptyLabel="—"
           placeholder={t('members.searchPlaceholder')}
           noResultsLabel={t('members.noMatches')}
+          dir="ltr"
           disabled={disabled}
           onChange={(code) => {
             setPendingDial(code)
@@ -118,6 +126,7 @@ export function PhoneInput({
           id={`${id}-local`}
           aria-label={t('members.localNumber')}
           value={local}
+          dir="ltr"
           disabled={disabled}
           inputMode="tel"
           autoComplete="tel-national"

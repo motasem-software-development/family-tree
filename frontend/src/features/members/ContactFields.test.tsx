@@ -114,6 +114,33 @@ describe('ContactFields', () => {
     expect(whatsAppNumberInput).toBeDisabled()
   })
 
+  it('lays the phone controls out left to right, whatever the interface language', async () => {
+    // The app renders RTL in Arabic, but a phone number does not: it is written dialing code
+    // first, left to right, everywhere in the world.
+    renderFields()
+
+    const [dial] = screen.getAllByRole('combobox', { name: i18n.t('members.dialCode') })
+    const [localInput] = screen.getAllByLabelText(i18n.t('members.localNumber'))
+
+    expect(dial).toHaveAttribute('dir', 'ltr')
+    expect(localInput).toHaveAttribute('dir', 'ltr')
+    // The row itself, so the code sits to the LEFT of the digits rather than mirrored.
+    expect(localInput.closest('[dir="ltr"]')).not.toBeNull()
+  })
+
+  it('keeps the dialing code list left to right too', async () => {
+    renderFields()
+
+    const [dial] = screen.getAllByRole('combobox', { name: i18n.t('members.dialCode') })
+    await userEvent.click(dial)
+
+    // The list is portalled onto <body>, so it cannot inherit the row's direction.
+    expect(screen.getByRole('listbox', { name: i18n.t('members.dialCode') })).toHaveAttribute(
+      'dir',
+      'ltr',
+    )
+  })
+
   it('keeps a dialing code chosen before the number is typed', async () => {
     // The natural order is to pick the code and then type. Composing an empty local number
     // yields null, so nothing in the saved value remembers the choice — the picker has to.
