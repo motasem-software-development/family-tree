@@ -17,8 +17,18 @@ public static class FamilyMemberEndpoints
         // arrives here.
         const int defaultSearchLimit = 20;
 
-        group.MapGet("/", async (IFamilyMemberService members, CancellationToken ct) =>
-            Results.Ok(await members.ListAsync(MemberFilter.None, ct)))
+        // [AsParameters] binds the whole filter set off the query string. Sharing the record
+        // with the tree view and the export is what keeps specification §15's combinability
+        // structural: a filter added to it reaches all three at once (design spec §5.1).
+        group.MapGet("/", async Task<IResult> (
+            [AsParameters] MemberFilterRequest request,
+            IFamilyMemberService members,
+            CancellationToken ct) =>
+        {
+            if (!MemberFilterBinding.TryBind(request, out var filter, out var error)) return error;
+
+            return Results.Ok(await members.ListAsync(filter, ct));
+        })
             .RequirePermission(Permissions.Member.View);
 
         // Declared before "/{id:guid}" for readability only — the guid route constraint makes

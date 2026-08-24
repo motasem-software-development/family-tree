@@ -582,7 +582,7 @@ field, and a `GenerationResponse` holding an `int` called `Generation` is ceremo
 - Consumes: `MemberFilterRequest`, `MemberFilter`.
 - Produces: filtered `GET /api/v1/family-members` and `GET /api/v1/family-tree/view`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 - `GET /api/v1/family-members` with no parameters returns every member — the unfiltered contract
   is unchanged.
@@ -595,16 +595,16 @@ field, and a `GenerationResponse` holding an `int` called `Generation` is ceremo
 - An unknown `branchId` or `countryId` returns an empty list, not an error. They are filters, and
   a filter matching nothing is a legitimate answer.
 
-- [ ] **Step 2: Bind and validate**
+- [x] **Step 2: Bind and validate**
 
 Both endpoints take `[AsParameters] MemberFilterRequest filter`, call `MemberFilter.TryCreate`,
 and return `ProblemResults.Coded(400, "FILTER_INVALID_STATUS", ...)` on failure. Extract the
 shared few lines into one small helper rather than writing them twice — Plan 4's export endpoint
 is the third caller.
 
-- [ ] **Step 3: Add the locale entries** — `errors.FILTER_INVALID_STATUS` in both files.
-- [ ] **Step 4: Run the tests** — backend suite and `npm test` (for `locales.test.ts`) pass.
-- [ ] **Step 5: Commit** — `feat: accept the filter set on the members list and the tree view`
+- [x] **Step 3: Add the locale entries** — `errors.FILTER_INVALID_STATUS` in both files.
+- [x] **Step 4: Run the tests** — backend suite and `npm test` (for `locales.test.ts`) pass.
+- [x] **Step 5: Commit** — `feat: accept the filter set on the members list and the tree view`
 
 ---
 

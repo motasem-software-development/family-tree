@@ -388,6 +388,7 @@
     "COUNTRY_CODE_INVALID": "رمز البلد غير صالح.",
     "COUNTRY_NAME_REQUIRED": "اسم البلد مطلوب.",
     "COUNTRY_NAME_TOO_LONG": "اسم البلد طويل جداً (100 حرف كحد أقصى).",
-    "COUNTRY_DIAL_CODE_INVALID": "رمز الاتصال غير صالح."
+    "COUNTRY_DIAL_CODE_INVALID": "رمز الاتصال غير صالح.",
+    "FILTER_INVALID_STATUS": "قيمة تصفية الحالة غير معروفة. استخدم الكل أو على قيد الحياة أو متوفى."
   }
 }

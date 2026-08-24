@@ -1,7 +1,8 @@
 using FamilyTree.Api.Authorization;
+using FamilyTree.Api.Endpoints.FamilyMembers;
 using FamilyTree.Api.Errors;
 using FamilyTree.Application.Export;
-using FamilyTree.Application.FamilyMembers;
+using FamilyTree.Contracts.FamilyMembers;
 using FamilyTree.Application.FamilyTrees;
 using FamilyTree.Contracts.FamilyTrees;
 using FamilyTree.Domain.Authorization;
@@ -23,9 +24,19 @@ public static class FamilyTreeEndpoints
             Results.Ok(await trees.RenameAsync(request, ct)))
             .RequirePermission(Permissions.FamilyTree.Edit);
 
-        group.MapGet("/view", async (
-            Guid? rootId, int? maxDepth, IFamilyTreeService trees, CancellationToken ct) =>
-            Results.Ok(await trees.GetViewAsync(MemberFilter.None with { RootId = rootId }, maxDepth, ct)))
+        // The same filter set as the members list, and the same 400 for the same bad status —
+        // one code, both endpoints. maxDepth stays outside it: it is a transport concern (how
+        // much of the tree to ship), not a filter (design spec §5.1).
+        group.MapGet("/view", async Task<IResult> (
+            [AsParameters] MemberFilterRequest request,
+            int? maxDepth,
+            IFamilyTreeService trees,
+            CancellationToken ct) =>
+        {
+            if (!MemberFilterBinding.TryBind(request, out var filter, out var error)) return error;
+
+            return Results.Ok(await trees.GetViewAsync(filter, maxDepth, ct));
+        })
             .RequirePermission(Permissions.FamilyTree.View);
 
         // Reference data for the filter controls (design spec §5.1). Both take only rootId:

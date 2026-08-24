@@ -352,6 +352,7 @@
     "COUNTRY_CODE_INVALID": "That country code is not valid.",
     "COUNTRY_NAME_REQUIRED": "A country name is required.",
     "COUNTRY_NAME_TOO_LONG": "That country name is too long (100 characters maximum).",
-    "COUNTRY_DIAL_CODE_INVALID": "That dialing code is not valid."
+    "COUNTRY_DIAL_CODE_INVALID": "That dialing code is not valid.",
+    "FILTER_INVALID_STATUS": "Unknown status filter. Use all, alive, or deceased."
   }
 }
