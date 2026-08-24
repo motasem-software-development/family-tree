@@ -26,6 +26,65 @@ Section references of the form §N point at the design spec above, or — where 
 
 ---
 
+## STATUS: COMPLETE (2026-08-24)
+
+All six tasks are done and verified. Do **not** re-run them — check `git log main..HEAD` before
+assuming otherwise; the commits are the authority, this heading is a summary.
+
+**This completes all four plans of the spec's §9 decomposition.**
+
+**Verified end to end:** backend 744 tests pass (Domain 96, Import 43, Application 295,
+Integration 310), frontend 386 pass across three consecutive runs, lint and build clean, en/ar
+key parity clean. Against the running stack, with both containers rebuilt and the served bundle
+hash confirmed to match `frontend/dist/assets/`, the produced workbooks were unzipped and their
+cell XML inspected directly:
+
+- Unfiltered, Arabic: 351 data rows, Arabic headers, `rightToLeft="1"`.
+- `?status=deceased&generation=2`, English: 9 data rows, English headers, `rightToLeft` absent,
+  every Status cell reading "Deceased".
+- A member with national ID `012345678`: the cell is a shared string and the leading zero
+  survives; `+970599123456` is a shared string with no `<f>` element, so Excel will not read it
+  as a formula; Generation carries no `t` attribute, so it is a numeric cell.
+- `?generation=0`: one row, Branch reading "Root".
+- `Content-Disposition` carries `filename*=UTF-8''%D8%B9...`, decoding to `عائلة السقا.xlsx`.
+
+### A real bug the tests caught
+
+The first implementation composed the **Full Name** column's lineage from the *filtered* rows.
+A filtered export therefore dropped any father the filter excluded, handing the user a different
+name than the same row showed on screen — for potentially every row. `MemberExportRows.Build`
+now takes an explicit `lineage` map covering the whole family, which `ClosedXmlMemberExporter`
+loads separately. This is the same trap Plan 3 hit on `MembersPage` and solved the same way, with
+its own unfiltered query. Pinned by `The_full_name_composes_through_a_father_the_filter_dropped`
+(Application) and `The_full_name_walks_the_parent_chain` (integration), which failed before the
+fix.
+
+### Other decisions taken while implementing
+
+- **`Trim()` on each name part**, which `nameParts` does not do. The aggregate's `ValidateName`
+  already trims on write, so this guards only the bulk-import path — and it is what makes
+  specification §20's no-double-spaces rule true of the output rather than merely likely.
+- **The export's failure message is `errors.MEMBERS_EXPORT_FAILED`**, not `members.exportFailed`:
+  the page renders every error through ``t(`errors.${code}`)``, and a second mechanism for one
+  message would be a second thing to maintain.
+- **The filter integration test creates its own deceased members.** The imported family predates
+  the life-details migration, so every seeded member is alive on a freshly migrated database and
+  a `status=deceased` filter would narrow to nothing — the test would have passed vacuously.
+
+### Refinements the spec needed
+
+Both are recorded in full below: §7.3 named a server-side twin of `nameParts` that did not exist
+(Task 2 writes it), and its instruction to append the family/tree name is **not** followed,
+because `fullName.ts` does not and the exported name must match the page.
+
+### One flake seen, not chased
+
+`TreePage.test.tsx > renders the root family and its first generation` failed once in a full-suite
+run and passed in isolation and in three subsequent full runs. It is a pre-existing test in a
+heavy suite (windowing, stubbed `ResizeObserver`) and nothing in this plan touches it.
+
+---
+
 ## Global Constraints
 
 - Target framework `net10.0`; `Nullable` enable; `TreatWarningsAsErrors` true (Directory.Build.props) — a warning fails the build.
