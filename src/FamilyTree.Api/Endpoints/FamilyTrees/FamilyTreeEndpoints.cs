@@ -46,15 +46,20 @@ public static class FamilyTreeEndpoints
         // A rootId naming nothing returns an empty list rather than a 404 — "this subtree has no
         // branches" and "no such subtree" are the same answer to a dropdown, and design spec
         // §4.4's uniform 404 is about reads of members, not reference lists.
+        // Either permission, not just FamilyTree.View: the same filter bar renders on the Members
+        // page, which is guarded by Member.View. Roles are user-definable, so a Member.View-only
+        // role would otherwise get a 403 here and see empty Branch and Generation dropdowns with
+        // nothing to explain them. Both lists expose only names that caller already sees in its
+        // own list response.
         group.MapGet("/branches", async (
             Guid? rootId, IFamilyTreeService trees, CancellationToken ct) =>
             Results.Ok(await trees.ListBranchesAsync(rootId, ct)))
-            .RequirePermission(Permissions.FamilyTree.View);
+            .RequireAnyPermission(Permissions.FamilyTree.View, Permissions.Member.View);
 
         group.MapGet("/generations", async (
             Guid? rootId, IFamilyTreeService trees, CancellationToken ct) =>
             Results.Ok(await trees.ListGenerationsAsync(rootId, ct)))
-            .RequirePermission(Permissions.FamilyTree.View);
+            .RequireAnyPermission(Permissions.FamilyTree.View, Permissions.Member.View);
 
         // Guarded by FamilyTree.View, not a new permission: the export reveals exactly the data
         // /view already returns, so a separate code would add a lockout surface the

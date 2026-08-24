@@ -70,6 +70,24 @@ public class MemberFilterPredicateTests
         Matches(member, Filter(search: "599123456")).Should().BeFalse();
     }
 
+    [Fact]
+    public void Search_matches_ordinally_so_it_agrees_with_the_sql_side()
+    {
+        // A linguistic comparison gives tatweel (U+0640) zero weight, so "محمد" would match
+        // "محمـد" here while the CTE's ILIKE would not — the tree and the members list would
+        // then answer differently for one term.
+        Matches(Member("محمـد"), Filter(search: "محمد")).Should().BeFalse();
+        Matches(Member("محمـد"), Filter(search: "محمـد")).Should().BeTrue();
+    }
+
+    [Fact]
+    public void A_zero_width_term_does_not_match_everything()
+    {
+        // Under a linguistic comparison a term made only of zero-weight characters matches every
+        // name, which would empty the tree of meaning while the list returned almost nothing.
+        Matches(Member("فارس"), Filter(search: "ـ")).Should().BeFalse();
+    }
+
     [Theory]
     [InlineData(MemberStatusFilter.Alive, false, true)]
     [InlineData(MemberStatusFilter.Alive, true, false)]

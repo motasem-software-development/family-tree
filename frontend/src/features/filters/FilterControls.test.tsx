@@ -101,6 +101,16 @@ describe('FilterControls', () => {
       ).toHaveTextContent('2')
     })
 
+    it('does not steal focus on mount', async () => {
+      // The effect that restores focus to the trigger on close must not fire for the initial
+      // closed state: loading either page on a narrow screen would move focus — and the scroll
+      // position — away from wherever the user was.
+      renderControls()
+
+      expect(openButton()).not.toHaveFocus()
+      expect(document.body).toHaveFocus()
+    })
+
     it('opens the sheet', async () => {
       const user = userEvent.setup()
       renderControls()

@@ -1,4 +1,4 @@
-import { useEffect, useState, type CSSProperties } from 'react'
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { useTranslation } from 'react-i18next'
 import { SearchableSelect, type SelectOption } from '../../components/SearchableSelect'
 import { countryName, flagEmoji } from '../countries/flagEmoji'
@@ -73,18 +73,31 @@ export function FilterBar({
   const [draft, setDraft] = useState(filters.search ?? '')
   const settled = useDebouncedValue(draft, SEARCH_DEBOUNCE_MS)
 
+  // What this component last pushed up, so its own echo coming back through the URL can be told
+  // apart from a change made anywhere else. Without it the effect below could not distinguish
+  // the two, and a character typed in the one render between the debounce firing and the URL
+  // landing was overwritten by the value that had just been sent. Same device PhoneInput uses.
+  const emitted = useRef<string | null>(filters.search ?? null)
+
   useEffect(() => {
-    setDraft(filters.search ?? '')
+    const current = filters.search ?? null
+    if (current === emitted.current) return
+
+    // Reset, or a link arriving with a term already in it — not our own echo.
+    emitted.current = current
+    setDraft(current ?? '')
   }, [filters.search])
 
   // Keyed on the settled value alone. The guard is what makes that safe: a re-render for any
-  // other reason finds settled already equal to the filter and does nothing, so this cannot
-  // loop against the effect above.
+  // other reason finds settled already equal to what was last emitted and does nothing, so this
+  // cannot loop against the effect above.
   useEffect(() => {
-    const current = filters.search ?? ''
-    if (settled === current) return
-    onChange('search', settled === '' ? undefined : settled)
-  }, [settled, filters.search, onChange])
+    const next = settled === '' ? null : settled
+    if (next === emitted.current) return
+
+    emitted.current = next
+    onChange('search', next ?? undefined)
+  }, [settled, onChange])
 
   // Both names and the ISO code ride along as keywords, so an Arabic reader can find a country
   // by typing "japan" and an English one by typing "JP" — the same treatment ContactFields gives

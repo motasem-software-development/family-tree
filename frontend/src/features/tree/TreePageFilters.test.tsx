@@ -46,18 +46,21 @@ const FILTERED_VIEW: FamilyTreeView = {
   rootMembers: [node('s1', 'سليمان', 1, [node('f1', 'فارس', 2, [], 's1')], null, false)],
 }
 
-const renderPage = () => {
+const renderPage = (path = '/tree') => {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
     <I18nextProvider i18n={i18n}>
       <QueryClientProvider client={queryClient}>
-        <MemoryRouter>
+        <MemoryRouter initialEntries={[path]}>
           <TreePage />
         </MemoryRouter>
       </QueryClientProvider>
     </I18nextProvider>,
   )
 }
+
+/** A filter in the URL, matching what the page holds once the user has actually filtered. */
+const FILTERED_PATH = '/tree?status=alive'
 
 /**
  * The outline node button for a member, which is what a click selects.
@@ -113,16 +116,37 @@ describe('TreePage filters', () => {
   it('keeps a non-matching ancestor visible', async () => {
     // Dropping them would detach the subtree and render the outline as garbage.
     vi.mocked(membersApi.tree).mockResolvedValue(FILTERED_VIEW)
-    renderPage()
+    renderPage(FILTERED_PATH)
 
     expect(await screen.findByText('سليمان')).toBeInTheDocument()
+  })
+
+  it('opens the kept branches so a filter shows its matches', async () => {
+    // The outline starts collapsed, and nothing else expands it. Without this the user applies a
+    // filter and sees one dimmed, unclickable root row — the filter looks broken, and reaching
+    // the matches means hand-expanding generation by generation.
+    vi.mocked(membersApi.tree).mockResolvedValue(FILTERED_VIEW)
+
+    renderPage(FILTERED_PATH)
+
+    // No click on the expander: the match is visible as soon as the filtered tree arrives.
+    expect(await screen.findByText('فارس')).toBeInTheDocument()
+  })
+
+  it('leaves the outline collapsed when nothing is filtered', async () => {
+    // The unfiltered tree is 351 members; opening all of it would bury the user.
+    renderPage()
+
+    await screen.findByText('سليمان')
+
+    expect(screen.queryByText('فارس')).not.toBeInTheDocument()
   })
 
   it('does not select a dimmed row', async () => {
     // A detail panel for a member who is not in the result is a dead end the user has to close.
     vi.mocked(membersApi.tree).mockResolvedValue(FILTERED_VIEW)
     const user = userEvent.setup()
-    renderPage()
+    renderPage(FILTERED_PATH)
     await screen.findByText('سليمان')
 
     await user.click(nodeButton('سليمان'))
@@ -135,11 +159,10 @@ describe('TreePage filters', () => {
   it('still selects a matching row', async () => {
     vi.mocked(membersApi.tree).mockResolvedValue(FILTERED_VIEW)
     const user = userEvent.setup()
-    renderPage()
+    renderPage(FILTERED_PATH)
     await screen.findByText('سليمان')
 
-    // فارس sits under سليمان, which the outline opens on demand.
-    await user.click(screen.getByRole('button', { name: i18n.t('tree.expand') }))
+    // The filtered tree arrives already open, so فارس is on screen without expanding.
     await user.click(nodeButton('فارس'))
 
     expect(await screen.findByRole('complementary', { name: /فارس/ })).toBeInTheDocument()
@@ -187,16 +210,18 @@ describe('TreePage filters', () => {
     expect(await screen.findByText(`${i18n.t('tree.gen')} 0`)).toBeInTheDocument()
   })
 
-  it('still expands a dimmed row', async () => {
-    // It is there only to hold up a matching descendant; disabling its expander would hide the
-    // match it exists to carry.
+  it('lets a dimmed row be collapsed and reopened', async () => {
+    // It is there only to hold up a matching descendant, so its expander has to keep working —
+    // disabling it would strand the match it exists to carry.
     vi.mocked(membersApi.tree).mockResolvedValue(FILTERED_VIEW)
     const user = userEvent.setup()
-    renderPage()
-    await screen.findByText('سليمان')
+    renderPage(FILTERED_PATH)
+    await screen.findByText('فارس')
+
+    await user.click(screen.getByRole('button', { name: i18n.t('tree.collapse') }))
+    expect(screen.queryByText('فارس')).not.toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: i18n.t('tree.expand') }))
-
     expect(await screen.findByText('فارس')).toBeInTheDocument()
   })
 })

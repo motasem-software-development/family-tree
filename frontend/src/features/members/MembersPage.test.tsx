@@ -71,6 +71,10 @@ describe('MembersPage', () => {
     vi.mocked(membersApi.create).mockResolvedValue(member({ id: 'b', name: 'فارس' }))
     vi.mocked(membersApi.update).mockResolvedValue(member({ name: 'سليمان أحمد', version: 2 }))
     vi.mocked(membersApi.remove).mockResolvedValue(undefined)
+    // Same reason as TreePage.test.tsx: the filter bar's reference queries reject when left
+    // auto-mocked, and the noise turned into intermittent timeouts elsewhere in the suite.
+    vi.mocked(membersApi.branches).mockResolvedValue([])
+    vi.mocked(membersApi.generations).mockResolvedValue([1])
   })
 
   it('lists the members returned by the API', async () => {
@@ -288,6 +292,54 @@ describe('MembersPage', () => {
 
     expect(await screen.findByText(i18n.t('errors.MEMBER_NAME_TOO_LONG'))).toBeInTheDocument()
     expect(screen.getByLabelText(i18n.t('members.name'))).toBeInTheDocument()
+  })
+
+  it('reloads the form when Edit is clicked on a second member', async () => {
+    // The row Edit buttons stay live while the form is open. Without a key the same MemberForm
+    // instance is reused, its useState initialisers do not re-run, and Save writes the FIRST
+    // member's name, dates and contact details onto the SECOND — Update is replace-semantics,
+    // so the second member's own details are wiped.
+    vi.mocked(membersApi.list).mockResolvedValue([
+      member({ id: 'a', name: 'سليمان', nationalId: '111111111' }),
+      member({ id: 'b', name: 'فارس', nationalId: '222222222' }),
+    ])
+
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText('سليمان')
+
+    const [editA, editB] = screen.getAllByRole('button', { name: i18n.t('members.edit') })
+    await user.click(editA)
+    expect(screen.getByLabelText(i18n.t('members.name'))).toHaveValue('سليمان')
+
+    await user.click(editB)
+
+    expect(screen.getByLabelText(i18n.t('members.name'))).toHaveValue('فارس')
+    expect(screen.getByLabelText(i18n.t('members.nationalId'))).toHaveValue('222222222')
+  })
+
+  it('saves the second member own details after switching editors', async () => {
+    vi.mocked(membersApi.list).mockResolvedValue([
+      member({ id: 'a', name: 'سليمان', nationalId: '111111111' }),
+      member({ id: 'b', name: 'فارس', nationalId: '222222222' }),
+    ])
+
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText('سليمان')
+
+    const [editA, editB] = screen.getAllByRole('button', { name: i18n.t('members.edit') })
+    await user.click(editA)
+    await user.click(editB)
+    await user.click(screen.getByRole('button', { name: i18n.t('members.save') }))
+
+    expect(membersApi.update).toHaveBeenCalledWith(
+      'b',
+      'فارس',
+      expect.anything(),
+      expect.anything(),
+      expect.objectContaining({ nationalId: '222222222' }),
+    )
   })
 
   it('hides add, edit, and delete controls without permission', async () => {

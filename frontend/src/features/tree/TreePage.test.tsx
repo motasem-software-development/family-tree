@@ -93,6 +93,12 @@ describe('TreePage', () => {
     vi.mocked(membersApi.remove).mockResolvedValue(undefined)
     vi.mocked(membersApi.move).mockResolvedValue({ ...FLAT[1], parentId: 's2', version: 4 })
     vi.mocked(membersApi.search).mockResolvedValue({ total: 0, items: [] })
+    // The filter bar mounts on this page too. Left auto-mocked these resolve to undefined, which
+    // TanStack Query rejects — every render then paid for an error path and flooded the run with
+    // "Query data cannot be undefined", which is how a slow render became an intermittent
+    // findBy timeout in tests that have nothing to do with filtering.
+    vi.mocked(membersApi.branches).mockResolvedValue([])
+    vi.mocked(membersApi.generations).mockResolvedValue([1, 2])
     vi.mocked(countriesApi.list).mockResolvedValue(COUNTRIES)
   })
 

@@ -45,11 +45,20 @@ export function FilterControls({ filters, activeCount, onChange, onReset }: Filt
     return () => document.removeEventListener('keydown', onKey)
   }, [open])
 
+  // Whether the sheet has ever been opened. Without it the effect below fires on mount with
+  // open=false and pulls focus (and the scroll position) onto the Filters button, so simply
+  // loading either page on a narrow screen moved the user away from wherever they were.
+  const hasOpened = useRef(false)
+
   // Focus follows the sheet in and back out again, so a keyboard user is not left on a control
   // that has just been covered over.
   useEffect(() => {
-    if (open) sheetRef.current?.focus()
-    else triggerRef.current?.focus()
+    if (open) {
+      hasOpened.current = true
+      sheetRef.current?.focus()
+      return
+    }
+    if (hasOpened.current) triggerRef.current?.focus()
   }, [open])
 
   if (!isCompact) {

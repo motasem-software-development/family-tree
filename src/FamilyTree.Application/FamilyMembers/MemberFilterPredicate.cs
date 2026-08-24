@@ -1,4 +1,3 @@
-using System.Globalization;
 using FamilyTree.Domain.FamilyMembers;
 
 namespace FamilyTree.Application.FamilyMembers;
@@ -25,13 +24,14 @@ public static class MemberFilterPredicate
     /// they are contact details, and searching them silently would disclose more than the user
     /// asked for.
     ///
-    /// Culture-insensitive, case-insensitive substring — the closest match in .NET to the
-    /// <c>ILIKE '%term%'</c> the SQL side uses, which is what lets the two agree on the Arabic
-    /// corpus.
+    /// <b>Ordinal</b>, not linguistic. <c>InvariantCulture.CompareInfo.IndexOf</c> is still a
+    /// culture-sensitive comparison: it gives zero weight to characters like tatweel (U+0640),
+    /// ZWJ/ZWNJ and soft hyphen, so "محمد" would match "محمـد" here while <c>ILIKE '%term%'</c>
+    /// on the SQL side would not — the tree and the members list would then disagree about the
+    /// same term. <c>OrdinalIgnoreCase</c> is the actual counterpart to ILIKE.
     /// </summary>
     private static bool MatchesSearch(string name, string? search) =>
-        search is null
-        || CultureInfo.InvariantCulture.CompareInfo.IndexOf(name, search, CompareOptions.IgnoreCase) >= 0;
+        search is null || name.Contains(search, StringComparison.OrdinalIgnoreCase);
 
     private static bool MatchesStatus(bool isDeceased, MemberStatusFilter status) => status switch
     {

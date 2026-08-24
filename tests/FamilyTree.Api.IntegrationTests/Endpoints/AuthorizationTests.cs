@@ -109,17 +109,56 @@ public sealed class AuthorizationTests(PostgresFixture fixture) : IAsyncLifetime
     [Theory]
     [InlineData("/api/v1/family-tree/branches")]
     [InlineData("/api/v1/family-tree/generations")]
-    public async Task The_filter_reference_lists_return_403_for_a_caller_lacking_family_tree_view(
+    public async Task The_filter_reference_lists_return_403_without_either_view_permission(
         string path)
     {
-        // Guarded by the permission the group already carries — no new permission is introduced
-        // for filtering (design spec §5.2).
+        _client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", TokenWith(Permissions.Member.Edit));
+
+        var response = await _client.GetAsync(path);
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Theory]
+    [InlineData("/api/v1/family-tree/branches")]
+    [InlineData("/api/v1/family-tree/generations")]
+    public async Task The_filter_reference_lists_accept_member_view_alone(string path)
+    {
+        // The same filter bar renders on the Members page, which is guarded by Member.View. A
+        // custom Member.View-only role must not be left with permanently empty Branch and
+        // Generation dropdowns and no error to explain them.
         _client.DefaultRequestHeaders.Authorization =
             new AuthenticationHeaderValue("Bearer", TokenWith(Permissions.Member.View));
 
         var response = await _client.GetAsync(path);
 
-        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        response.StatusCode.Should().NotBe(HttpStatusCode.Forbidden);
+    }
+
+    [Theory]
+    [InlineData("/api/v1/family-tree/branches")]
+    [InlineData("/api/v1/family-tree/generations")]
+    public async Task The_filter_reference_lists_accept_family_tree_view_alone(string path)
+    {
+        _client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", TokenWith(Permissions.FamilyTree.View));
+
+        var response = await _client.GetAsync(path);
+
+        response.StatusCode.Should().NotBe(HttpStatusCode.Forbidden);
+    }
+
+    [Theory]
+    [InlineData("/api/v1/family-tree/branches")]
+    [InlineData("/api/v1/family-tree/generations")]
+    public async Task The_filter_reference_lists_require_authentication(string path)
+    {
+        _client.DefaultRequestHeaders.Authorization = null;
+
+        var response = await _client.GetAsync(path);
+
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
     [Fact]

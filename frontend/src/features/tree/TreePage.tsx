@@ -124,9 +124,26 @@ export const TreePage = () => {
     () => new Map((members ?? []).map((m) => [m.id, lifeDetailsOf(m)])),
     [members],
   )
+  /**
+   * A filtered tree arrives already pruned to the matches and the ancestors holding them up, so
+   * every branch still in it is one the user asked to see — it is opened for them.
+   *
+   * Without this a filter looked broken: the outline starts collapsed and nothing else expands
+   * it, so applying one left a single dimmed, unclickable root row and the matches had to be
+   * hand-expanded generation by generation. The unfiltered tree stays collapsed, because opening
+   * all 351 members would bury the user.
+   */
+  const effectiveExpanded = useMemo<ExpandedMap>(
+    () =>
+      activeCount === 0
+        ? expanded
+        : Object.fromEntries(allNodes(roots).map((node) => [node.id, expanded[node.id] !== false])),
+    [activeCount, roots, expanded],
+  )
+
   const rows = useMemo(
-    () => (rootOpen ? flattenTree(roots, expanded, query, lifeById) : []),
-    [roots, expanded, query, rootOpen, lifeById],
+    () => (rootOpen ? flattenTree(roots, effectiveExpanded, query, lifeById) : []),
+    [roots, effectiveExpanded, query, rootOpen, lifeById],
   )
   const stats = useMemo(() => treeStats(roots), [roots])
   // The offset both display sites measure against (design spec §1.2). Derived from the view, so
@@ -190,8 +207,13 @@ export const TreePage = () => {
   const familyName = view?.name ?? ''
   const statLine = `${t('tree.membersCount', { count: stats.members })} · ${t('tree.generationsCount', { count: stats.generations })}`
 
-  const toggle = (id: string) =>
-    setExpanded((current) => ({ ...current, [id]: current[id] !== true }))
+  const toggle = (id: string) => {
+    // Against what the row is actually showing, not the raw map: under a filter a row with no
+    // entry of its own renders open, so flipping the raw `undefined` would write `true` and the
+    // first click on its Collapse button would do nothing.
+    const isOpen = effectiveExpanded[id] === true
+    setExpanded((current) => ({ ...current, [id]: !isOpen }))
+  }
 
   const select = (id: string) => {
     setSelectedId(id)

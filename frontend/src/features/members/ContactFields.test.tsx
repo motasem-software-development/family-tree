@@ -32,8 +32,8 @@ const renderFields = (value: ContactDetails = EMPTY_CONTACT_DETAILS) => {
  * Needed for anything that spans more than one interaction, because the fields are controlled
  * and a spy parent throws every keystroke away.
  */
-const ControlledFields = () => {
-  const [value, setValue] = useState<ContactDetails>(EMPTY_CONTACT_DETAILS)
+const ControlledFields = ({ initial = EMPTY_CONTACT_DETAILS }: { initial?: ContactDetails }) => {
+  const [value, setValue] = useState<ContactDetails>(initial)
   return (
     <>
       <ContactFields
@@ -153,6 +153,38 @@ describe('ContactFields', () => {
 
     // The picker shows the option's own label, flag and country name included.
     expect((dial as HTMLInputElement).value).toContain('+20')
+  })
+
+  it('keeps the dialing code when the saved digits are cleared', async () => {
+    // joinPhone returns null without a local part, so clearing the digits of a saved number
+    // round-trips the whole value through null and the code has nowhere left to live. Losing it
+    // leaves the field unusable: every further keystroke composes against an empty code, yields
+    // null again, and the input silently swallows what the user types.
+    render(
+      <ControlledFields
+        initial={{ ...EMPTY_CONTACT_DETAILS, mobileNumber: '+970599123456' }}
+      />,
+    )
+
+    const [localInput] = screen.getAllByLabelText(i18n.t('members.localNumber'))
+    await userEvent.clear(localInput)
+
+    const [dial] = screen.getAllByRole('combobox', { name: i18n.t('members.dialCode') })
+    expect((dial as HTMLInputElement).value).toContain('+970')
+  })
+
+  it('recomposes after the saved digits are cleared and new ones typed', async () => {
+    render(
+      <ControlledFields
+        initial={{ ...EMPTY_CONTACT_DETAILS, mobileNumber: '+970599123456' }}
+      />,
+    )
+
+    const [localInput] = screen.getAllByLabelText(i18n.t('members.localNumber'))
+    await userEvent.clear(localInput)
+    await userEvent.type(localInput, '598888888')
+
+    expect(screen.getByTestId('mobile')).toHaveTextContent('+970598888888')
   })
 
   it('composes a number typed after the dialing code was chosen', async () => {

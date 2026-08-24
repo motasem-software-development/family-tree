@@ -274,6 +274,13 @@ export function MembersPage() {
 
             {editing.mode === 'edit' && (
               <MemberForm
+                // Keyed by member, so switching editors remounts the form. MemberForm seeds its
+                // name, life and contact state from useState initialisers, which do not re-run
+                // on a re-render: without this, clicking Edit on a second row while the first is
+                // open kept the first member's values in the fields while onSubmit closed over
+                // the second — and Update is replace-semantics, so Save overwrote the second
+                // member's details with the first member's.
+                key={editing.member.id}
                 member={editing.member}
                 parents={unfiltered.filter((candidate) => candidate.id !== editing.member.id)}
                 isSaving={updateMember.isPending}

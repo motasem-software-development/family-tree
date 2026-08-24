@@ -131,7 +131,16 @@ export function PhoneInput({
           inputMode="tel"
           autoComplete="tel-national"
           maxLength={15}
-          onChange={(event) => emit(joinPhone(dialCode, event.target.value))}
+          onChange={(event) => {
+            const next = joinPhone(dialCode, event.target.value)
+            // Clearing the digits empties the whole value — joinPhone cannot compose a number
+            // out of a code alone — so the code has to move somewhere the value cannot reach.
+            // Without this it is simply lost, the picker snaps back to "—", and every further
+            // keystroke composes against an empty code and yields null again: the field stops
+            // accepting input until the user re-picks a code they never changed.
+            if (next === null && dialCode !== '') setPendingDial(dialCode)
+            emit(next)
+          }}
           style={{ ...controlStyle, flex: 1 }}
         />
       </div>
