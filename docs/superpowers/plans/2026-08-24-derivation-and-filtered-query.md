@@ -32,6 +32,41 @@ Section references of the form §N point at the design spec above, or — where 
 
 ---
 
+## STATUS: COMPLETE (2026-08-24)
+
+All nine tasks are done and verified. Do **not** re-run them — check `git log main..HEAD`
+before assuming otherwise; the commits are the authority, this heading is a summary.
+
+**Verified end to end:** backend 701 tests pass (Domain 96, Import 43, Application 267,
+Integration 295), frontend 302 pass, lint and build clean, en/ar key parity clean. Every item
+under "Verification" below was exercised against the running API on the seeded 351-member
+family: the root reads branch `null` / generation 0, `?status=dead` returns 400
+`FILTER_INVALID_STATUS`, `/branches` returns داوود's four children, `/generations` returns
+`[0..9]`, and searching the tree for a deep name kept 57 nodes of 351 — 18 matches plus their
+ancestor chains, every ancestor marked `matches: false`.
+
+### Two decisions taken while implementing
+
+- **`FamilyTreeNodeResponse.Matches` defaults to `true`.** That is what "no filter applied"
+  means, and the safe failure for a construction site that forgets it is a visible member rather
+  than an invisible one. It also spared twenty-odd export test fixtures that build nodes
+  positionally a mechanical edit carrying no signal. The assembler always passes it explicitly.
+- **The cross-tenant test had to be strengthened.** The first version grafted a stowaway from
+  another tenant onto the host's tree and asserted it was absent — and it passed with the
+  `tenant_id` predicate removed from the recursive term, because the outer join's own predicate
+  caught it. It now hangs a **host** member off that stowaway: reachable only by walking through
+  another tenant's row, and caught by nothing else. Both cross-tenant tests were confirmed to
+  fail with the predicate removed and pass with it restored.
+
+### What is NOT done
+
+Plans 3 and 4 from spec §9. No UI ships here: no filter bar, no sheet, no active-count badge,
+no Country or Branch column, no dimming in the tree, and no Excel export. `filterParams.ts`,
+`useBranchesQuery`, `useGenerationsQuery` and `FamilyMemberListItem` exist for Plan 3 to build
+against; nothing renders them yet.
+
+---
+
 ## Global Constraints
 
 - Target framework `net10.0`; `Nullable` enable; `TreatWarningsAsErrors` true (Directory.Build.props) — a warning fails the build.
