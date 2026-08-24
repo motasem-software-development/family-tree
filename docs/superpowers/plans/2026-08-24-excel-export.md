@@ -98,11 +98,11 @@ Its own task and its own commit, so a reviewer sees the dependency arrive on its
 **Files:**
 - Modify: `src/FamilyTree.Infrastructure/FamilyTree.Infrastructure.csproj`
 
-- [ ] **Step 1: Add the reference** — `ClosedXML` version `0.105.1`, in Infrastructure only.
-- [ ] **Step 2: Verify** — `dotnet build` is clean, and `dotnet list package --include-transitive`
+- [x] **Step 1: Add the reference** — `ClosedXML` version `0.105.1`, in Infrastructure only.
+- [x] **Step 2: Verify** — `dotnet build` is clean, and `dotnet list package --include-transitive`
   shows no native-asset package arriving with it. If one does, stop: spec §7.1's "the Docker
   image is unaffected" claim is the reason this package was chosen over the alternatives.
-- [ ] **Step 3: Commit** — `build: add ClosedXML for the members export`
+- [x] **Step 3: Commit** — `build: add ClosedXML for the members export`
 
 ---
 
