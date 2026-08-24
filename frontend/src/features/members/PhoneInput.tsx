@@ -130,7 +130,11 @@ export function PhoneInput({
           disabled={disabled}
           inputMode="tel"
           autoComplete="tel-national"
-          maxLength={15}
+          // E.164 allows 15 digits, and what arrives here may also carry a '+' and the spaces
+          // and dashes a pasted number is written with. Capped tight enough to keep the field
+          // from becoming a text box, loose enough that a pasted number is never silently
+          // clipped into a different number.
+          maxLength={24}
           onChange={(event) => {
             const next = joinPhone(dialCode, event.target.value)
             // Clearing the digits empties the whole value — joinPhone cannot compose a number

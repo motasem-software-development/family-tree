@@ -73,9 +73,22 @@ export const splitPhone = (
  *
  * The leading trunk zero is dropped: people write their number the way they dial it at home,
  * and '+9700599123456' is not a number anyone can reach.
+ *
+ * A number that already carries its own country code — '+970599850444', or the '00970…' form
+ * people dial from abroad — is taken as the whole value and the picker's code is ignored.
+ * Typing or pasting a full international number into the digits box is how most people enter
+ * one; composing it with the code beside it produced '+970+970599850444', which the server
+ * rejects as malformed. `splitPhone` puts the picker back in step on the next render.
  */
 export const joinPhone = (dialCode: string, local: string): string | null => {
-  const digits = local.replace(SEPARATORS, '').replace(/^0+/, '')
+  const cleaned = local.replace(SEPARATORS, '')
+
+  if (cleaned.startsWith('+')) return cleaned
+  // Returned even when nothing follows the '00' yet: the '+' has to survive in the field, or
+  // the user cannot type the rest of the number after it.
+  if (cleaned.startsWith('00')) return `+${cleaned.slice(2)}`
+
+  const digits = cleaned.replace(/^0+/, '')
   if (digits === '' || dialCode === '') return null
 
   return `${dialCode}${digits}`

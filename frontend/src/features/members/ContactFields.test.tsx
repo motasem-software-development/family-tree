@@ -201,6 +201,31 @@ describe('ContactFields', () => {
     expect(screen.getByTestId('mobile')).toHaveTextContent('+201001234567')
   })
 
+  it('takes a full international number pasted into the digits box as it stands', async () => {
+    // The reported bug: '+970599850444' pasted into the digits box composed to
+    // '+970+970599850444' and the save came back rejected as not international format.
+    render(<ControlledFields />)
+
+    const [localInput] = screen.getAllByLabelText(i18n.t('members.localNumber'))
+    await userEvent.click(localInput)
+    await userEvent.paste('+970 599 850 444')
+
+    expect(screen.getByTestId('mobile')).toHaveTextContent('+970599850444')
+    // And the two controls settle back into their halves of the number.
+    expect(localInput).toHaveValue('599850444')
+    const [dial] = screen.getAllByRole('combobox', { name: i18n.t('members.dialCode') })
+    expect((dial as HTMLInputElement).value).toContain('+970')
+  })
+
+  it('takes a full international number typed a character at a time', async () => {
+    render(<ControlledFields />)
+
+    const [localInput] = screen.getAllByLabelText(i18n.t('members.localNumber'))
+    await userEvent.type(localInput, '+970599850444')
+
+    expect(screen.getByTestId('mobile')).toHaveTextContent('+970599850444')
+  })
+
   it('finds a country by its English name while the app is in Arabic', async () => {
     const onChange = renderFields()
 
