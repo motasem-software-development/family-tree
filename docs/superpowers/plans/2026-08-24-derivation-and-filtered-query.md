@@ -310,7 +310,7 @@ the same class shape, the same parameter helper, the same tenant argument in a c
 - Produces: `internal static` `FamilyMemberQuery.ListAsync(...)`, `ListBranchesAsync(...)`,
   `ListGenerationsAsync(...)`. Used by Tasks 5 and 7, and by Plan 4's exporter.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 In `FamilyMemberQueryTests`, against real PostgreSQL via the existing `DatabaseTestBase`:
 
@@ -332,7 +332,7 @@ In `FamilyMemberQueryTests`, against real PostgreSQL via the existing `DatabaseT
   filter by, so narrowing them by the current filter would make a dropdown that erases its own
   options as soon as you use one.
 
-- [ ] **Step 2: Write the SQL**
+- [x] **Step 2: Write the SQL**
 
 The CTE is spec §3's, verbatim, with the projection and predicates around it:
 
@@ -393,14 +393,14 @@ SELECT DISTINCT generation FROM tree ORDER BY generation;
 Keep the CTE in one `private const string` and concatenate the tails, so there is literally one
 copy of the walk to review.
 
-- [ ] **Step 3: Write the reader**
+- [x] **Step 3: Write the reader**
 
 `AddParameter` copied from `FamilyMemberSearchQuery`, plus a nullable overload that binds
 `DBNull.Value` for an absent filter value. Open and close the connection around the whole call,
 as that class does. Map rows into `FamilyMemberListItem`.
 
-- [ ] **Step 4: Run the tests** — `dotnet test tests/FamilyTree.Api.IntegrationTests --filter FamilyMemberQueryTests` passes. Docker must be running.
-- [ ] **Step 5: Commit** — `feat: derive branch and generation in one tenant-safe walk`
+- [x] **Step 4: Run the tests** — `dotnet test tests/FamilyTree.Api.IntegrationTests --filter FamilyMemberQueryTests` passes. Docker must be running.
+- [x] **Step 5: Commit** — `feat: derive branch and generation in one tenant-safe walk`
 
 ---
 
