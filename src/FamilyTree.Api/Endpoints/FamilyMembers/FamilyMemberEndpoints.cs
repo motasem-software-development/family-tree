@@ -18,7 +18,7 @@ public static class FamilyMemberEndpoints
         const int defaultSearchLimit = 20;
 
         group.MapGet("/", async (IFamilyMemberService members, CancellationToken ct) =>
-            Results.Ok(await members.ListAsync(ct)))
+            Results.Ok(await members.ListAsync(MemberFilter.None, ct)))
             .RequirePermission(Permissions.Member.View);
 
         // Declared before "/{id:guid}" for readability only — the guid route constraint makes

@@ -89,23 +89,18 @@ public sealed class FamilyMemberService(
         return member is null ? null : await MapWithCountryAsync(member, ct);
     }
 
-    public async Task<IReadOnlyList<FamilyMemberResponse>> ListAsync(CancellationToken ct = default)
-    {
-        var rows = await context.FamilyMembers
-            .AsNoTracking()
-            .OrderBy(m => m.Name)
-            .Select(m => new
-            {
-                Member = m,
-                CountryCode = context.Countries
-                    .Where(c => c.Id == m.CountryId)
-                    .Select(c => c.Code)
-                    .FirstOrDefault()
-            })
-            .ToListAsync(ct);
-
-        return rows.Select(row => Map(row.Member, row.CountryCode)).ToList();
-    }
+    public Task<IReadOnlyList<FamilyMemberListItem>> ListAsync(
+        MemberFilter filter, CancellationToken ct = default) =>
+        // Like SearchAsync, this read does NOT go through the tenant query filter, because it is
+        // raw SQL. FamilyMemberQuery re-establishes the guarantee with an explicit predicate on
+        // every family_members reference, the recursive term included — see the class comment
+        // there, and the cross-tenant test that fails without it.
+        //
+        // Unpaginated (design spec §5.3): 349 filtered members is a small payload and the page
+        // renders every row. The limit and offset exist so that adding pagination later changes
+        // FamilyMemberQuery rather than this contract.
+        FamilyMemberQuery.ListAsync(
+            context, tenant.TenantId, filter, FamilyMemberQuery.NoLimit, 0, ct);
 
     public Task<FamilyMemberSearchResponse> SearchAsync(
         string query, int limit, int offset, CancellationToken ct = default) =>

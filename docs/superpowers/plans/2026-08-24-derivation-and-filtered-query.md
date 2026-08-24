@@ -422,19 +422,19 @@ root to measure from, and a nullable `Generation` that means "not applicable her
 - Produces: `FamilyMemberListItem`; `IFamilyMemberService.ListAsync(MemberFilter, CancellationToken)`.
   Used by Tasks 8, 9 and Plan 4.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Extend `FamilyMemberServiceTests`: an unfiltered list still returns every member ordered by name
 (the existing guarantee must not regress); a status filter narrows it; every row carries a branch
 name, or null for the root; the root's generation is 0.
 
-- [ ] **Step 2: Write `FamilyMemberListItem`**
+- [x] **Step 2: Write `FamilyMemberListItem`**
 
 Every field of `FamilyMemberResponse` plus `Guid? BranchId`, `string? BranchName`,
 `int Generation`. Flat rather than nested — the client renders one table row per item, and a
 nested `Member` object would buy nothing but a level of indirection.
 
-- [ ] **Step 3: Change `ListAsync`**
+- [x] **Step 3: Change `ListAsync`**
 
 Signature becomes
 `Task<IReadOnlyList<FamilyMemberListItem>> ListAsync(MemberFilter filter, CancellationToken ct = default)`.
@@ -446,8 +446,8 @@ No back-compat overload. The one-argument `ListAsync` is deleted and every calle
 1's Task 6 already settled that question the same way ("remove Update back-compat overload per
 coordinator ruling").
 
-- [ ] **Step 4: Run the tests** — the backend suite builds and passes.
-- [ ] **Step 5: Commit** — `feat: filter the members list and return branch and generation`
+- [x] **Step 4: Run the tests** — the backend suite builds and passes.
+- [x] **Step 5: Commit** — `feat: filter the members list and return branch and generation`
 
 ---
 
