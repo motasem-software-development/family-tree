@@ -177,6 +177,26 @@ describe('MembersPage', () => {
     expect(screen.queryByLabelText(i18n.t('members.parent'))).not.toBeInTheDocument()
   })
 
+  it('brings the edit form into view, since it opens above a list the user has scrolled past', async () => {
+    // jsdom has no layout, so scrollIntoView is not implemented and has to be supplied. Removed
+    // again afterwards: leaving it defined would hide the component's own guard from every
+    // other test in this file.
+    const scrollIntoView = vi.fn()
+    Element.prototype.scrollIntoView = scrollIntoView
+
+    try {
+      const user = userEvent.setup()
+      renderPage()
+      await screen.findByText('سليمان')
+
+      await user.click(screen.getByRole('button', { name: i18n.t('members.edit') }))
+
+      expect(scrollIntoView).toHaveBeenCalled()
+    } finally {
+      delete (Element.prototype as Partial<Element>).scrollIntoView
+    }
+  })
+
   it('shows the ancestry beside the name field, since editing hides the parent selector', async () => {
     vi.mocked(membersApi.list).mockResolvedValue([
       member(),

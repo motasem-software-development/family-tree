@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -24,6 +25,28 @@ const renderFields = (value: ContactDetails = EMPTY_CONTACT_DETAILS) => {
     />,
   )
   return onChange
+}
+
+/**
+ * A real parent, unlike `renderFields`' spy: it feeds each change back in as the next value.
+ * Needed for anything that spans more than one interaction, because the fields are controlled
+ * and a spy parent throws every keystroke away.
+ */
+const ControlledFields = () => {
+  const [value, setValue] = useState<ContactDetails>(EMPTY_CONTACT_DETAILS)
+  return (
+    <>
+      <ContactFields
+        idPrefix="member"
+        value={value}
+        countries={countries}
+        onChange={setValue}
+        labelStyle={{}}
+        controlStyle={{}}
+      />
+      <output data-testid="mobile">{value.mobileNumber ?? 'null'}</output>
+    </>
+  )
 }
 
 // The app's default language is Arabic (see src/i18n/index.ts), so assertions go through
@@ -89,6 +112,34 @@ describe('ContactFields', () => {
 
     const [, whatsAppNumberInput] = screen.getAllByLabelText(i18n.t('members.localNumber'))
     expect(whatsAppNumberInput).toBeDisabled()
+  })
+
+  it('keeps a dialing code chosen before the number is typed', async () => {
+    // The natural order is to pick the code and then type. Composing an empty local number
+    // yields null, so nothing in the saved value remembers the choice — the picker has to.
+    render(<ControlledFields />)
+
+    const [dial] = screen.getAllByRole('combobox', { name: i18n.t('members.dialCode') })
+    await userEvent.click(dial)
+    await userEvent.type(dial, 'egypt')
+    await userEvent.click(screen.getByRole('option', { name: /\+20/ }))
+
+    // The picker shows the option's own label, flag and country name included.
+    expect((dial as HTMLInputElement).value).toContain('+20')
+  })
+
+  it('composes a number typed after the dialing code was chosen', async () => {
+    render(<ControlledFields />)
+
+    const [dial] = screen.getAllByRole('combobox', { name: i18n.t('members.dialCode') })
+    await userEvent.click(dial)
+    await userEvent.type(dial, 'egypt')
+    await userEvent.click(screen.getByRole('option', { name: /\+20/ }))
+
+    const [localInput] = screen.getAllByLabelText(i18n.t('members.localNumber'))
+    await userEvent.type(localInput, '1001234567')
+
+    expect(screen.getByTestId('mobile')).toHaveTextContent('+201001234567')
   })
 
   it('finds a country by its English name while the app is in Arabic', async () => {

@@ -1,4 +1,4 @@
-import { useState, type CSSProperties } from 'react'
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useQueryClient } from '@tanstack/react-query'
 import { AppShell } from '../../app/AppShell'
@@ -64,6 +64,21 @@ export function MembersPage() {
   const [editing, setEditing] = useState<Editing>({ mode: 'none' })
   const [pendingDelete, setPendingDelete] = useState<FamilyMember | null>(null)
   const [errorCode, setErrorCode] = useState<string | null>(null)
+
+  /**
+   * The form renders above the list, inside the page's own scroll container. Editing a member
+   * from a row far down the list would otherwise open a form the user cannot see — nothing
+   * appears to happen, and the row's Edit button looks broken.
+   */
+  const formRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (editing.mode === 'none') return
+    const form = formRef.current
+    // jsdom has no layout and so no scrollIntoView; the form still opens without it.
+    if (form !== null && typeof form.scrollIntoView === 'function')
+      form.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [editing])
 
   const close = () => setEditing({ mode: 'none' })
 
@@ -176,26 +191,28 @@ export function MembersPage() {
             </p>
           )}
 
-          {editing.mode === 'add' && (
-            <MemberForm
-              parents={all}
-              isSaving={createMember.isPending}
-              onSubmit={handleCreate}
-              onCancel={close}
-            />
-          )}
+          <div ref={formRef}>
+            {editing.mode === 'add' && (
+              <MemberForm
+                parents={all}
+                isSaving={createMember.isPending}
+                onSubmit={handleCreate}
+                onCancel={close}
+              />
+            )}
 
-          {editing.mode === 'edit' && (
-            <MemberForm
-              member={editing.member}
-              parents={all.filter((candidate) => candidate.id !== editing.member.id)}
-              isSaving={updateMember.isPending}
-              onSubmit={(name, _parentId, life, contact) =>
-                handleUpdate(editing.member, name, life, contact)
-              }
-              onCancel={close}
-            />
-          )}
+            {editing.mode === 'edit' && (
+              <MemberForm
+                member={editing.member}
+                parents={all.filter((candidate) => candidate.id !== editing.member.id)}
+                isSaving={updateMember.isPending}
+                onSubmit={(name, _parentId, life, contact) =>
+                  handleUpdate(editing.member, name, life, contact)
+                }
+                onCancel={close}
+              />
+            )}
+          </div>
 
           {isLoading ? (
             <p style={{ color: 'var(--text-3)' }}>{t('members.loading')}</p>

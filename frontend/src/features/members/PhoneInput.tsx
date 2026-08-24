@@ -1,4 +1,4 @@
-import type { CSSProperties } from 'react'
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { useTranslation } from 'react-i18next'
 import { SearchableSelect } from '../../components/SearchableSelect'
 import { countryName, flagEmoji } from '../countries/flagEmoji'
@@ -22,9 +22,10 @@ interface PhoneInputProps {
  * detail — the value that leaves here is always one composed E.164 string, because §5.1 is
  * explicit that the dialing code is not stored separately.
  *
- * The split is recomputed from the value on every render rather than held as state: a parent
- * that replaces the value (loading a different member into the same form) must not leave a
- * stale dial code behind.
+ * The split is recomputed from the value on every render rather than held as state, so that a
+ * parent replacing the value cannot leave a stale dial code behind. The one exception is a
+ * code chosen before any digits exist, which the value provably cannot represent — see
+ * `pendingDial` below, including how it is discarded when a different member loads.
  */
 export function PhoneInput({
   id,
@@ -37,7 +38,35 @@ export function PhoneInput({
   controlStyle,
 }: PhoneInputProps) {
   const { t, i18n } = useTranslation()
-  const { dialCode, local } = splitPhone(value, countries)
+  const stored = splitPhone(value, countries)
+
+  /**
+   * A dial code the user picked that the stored value cannot hold yet. `joinPhone` returns
+   * null until there is a local number to compose with, so choosing the code first — the order
+   * everyone actually uses — would round-trip through null and snap the picker back to "—",
+   * making the code impossible to set before the digits.
+   */
+  const [pendingDial, setPendingDial] = useState('')
+  // What we last handed the parent, so a value arriving from anywhere else can be told apart
+  // from our own echo.
+  const emitted = useRef<string | null>(value)
+
+  useEffect(() => {
+    // A value we did not produce means the form loaded a different member. Their number brings
+    // its own dial code, and holding on to the previous member's would be a lie.
+    if (value !== emitted.current) {
+      emitted.current = value
+      setPendingDial('')
+    }
+  }, [value])
+
+  const emit = (next: string | null) => {
+    emitted.current = next
+    onChange(next)
+  }
+
+  const dialCode = stored.dialCode !== '' ? stored.dialCode : pendingDial
+  const local = stored.local
 
   // Deduplicated: +1 is both US and CA, and two identical options in a select is a bug the user
   // can see. Sorted numerically so the list reads the same in both languages.
@@ -79,7 +108,10 @@ export function PhoneInput({
           placeholder={t('members.searchPlaceholder')}
           noResultsLabel={t('members.noMatches')}
           disabled={disabled}
-          onChange={(code) => onChange(joinPhone(code, local))}
+          onChange={(code) => {
+            setPendingDial(code)
+            emit(joinPhone(code, local))
+          }}
           controlStyle={{ ...controlStyle, width: 'auto', flex: '0 0 auto', minWidth: 170 }}
         />
         <input
@@ -90,7 +122,7 @@ export function PhoneInput({
           inputMode="tel"
           autoComplete="tel-national"
           maxLength={15}
-          onChange={(event) => onChange(joinPhone(dialCode, event.target.value))}
+          onChange={(event) => emit(joinPhone(dialCode, event.target.value))}
           style={{ ...controlStyle, flex: 1 }}
         />
       </div>
