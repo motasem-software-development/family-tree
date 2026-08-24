@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { FilterBar } from './FilterBar'
 import type { MemberFilters } from './filterParams'
-import { useIsCompact } from './useIsCompact'
+import { useIsCompact } from '../../app/useIsCompact'
 
 interface FilterControlsProps {
   filters: MemberFilters
