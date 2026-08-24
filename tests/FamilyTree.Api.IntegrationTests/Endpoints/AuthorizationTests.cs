@@ -93,6 +93,22 @@ public sealed class AuthorizationTests(PostgresFixture fixture) : IAsyncLifetime
         response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
+    [Theory]
+    [InlineData("/api/v1/family-tree/branches")]
+    [InlineData("/api/v1/family-tree/generations")]
+    public async Task The_filter_reference_lists_return_403_for_a_caller_lacking_family_tree_view(
+        string path)
+    {
+        // Guarded by the permission the group already carries — no new permission is introduced
+        // for filtering (design spec §5.2).
+        _client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", TokenWith(Permissions.Member.View));
+
+        var response = await _client.GetAsync(path);
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
     [Fact]
     public async Task Me_is_authentication_only_and_never_answers_403()
     {

@@ -28,6 +28,23 @@ public static class FamilyTreeEndpoints
             Results.Ok(await trees.GetViewAsync(MemberFilter.None with { RootId = rootId }, maxDepth, ct)))
             .RequirePermission(Permissions.FamilyTree.View);
 
+        // Reference data for the filter controls (design spec §5.1). Both take only rootId:
+        // they answer "what is available to filter by", so narrowing them by the rest of the
+        // filter would build a dropdown that erases its own options as soon as one is used.
+        //
+        // A rootId naming nothing returns an empty list rather than a 404 — "this subtree has no
+        // branches" and "no such subtree" are the same answer to a dropdown, and design spec
+        // §4.4's uniform 404 is about reads of members, not reference lists.
+        group.MapGet("/branches", async (
+            Guid? rootId, IFamilyTreeService trees, CancellationToken ct) =>
+            Results.Ok(await trees.ListBranchesAsync(rootId, ct)))
+            .RequirePermission(Permissions.FamilyTree.View);
+
+        group.MapGet("/generations", async (
+            Guid? rootId, IFamilyTreeService trees, CancellationToken ct) =>
+            Results.Ok(await trees.ListGenerationsAsync(rootId, ct)))
+            .RequirePermission(Permissions.FamilyTree.View);
+
         // Guarded by FamilyTree.View, not a new permission: the export reveals exactly the data
         // /view already returns, so a separate code would add a lockout surface the
         // last-administrator guard has to reason about, without adding protection (design §5.1).

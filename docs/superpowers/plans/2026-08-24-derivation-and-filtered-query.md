@@ -549,7 +549,7 @@ can be filtered by", which must not itself be filtered.
   `GET /api/v1/family-tree/branches` and `GET /api/v1/family-tree/generations`. Used by Task 9
   and Plan 3.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Both endpoints return 200 for a `FamilyTree.View` holder and 403 without it —
 `AuthorizationTests` is the house pattern for the second half. Branches come back name-ordered;
@@ -558,15 +558,15 @@ not a 404: "this subtree has no branches" and "no such subtree" are the same ans
 dropdown, and the uniform-404 argument in design spec §4.4 is about reads of members, not
 reference lists.
 
-- [ ] **Step 2: Write the contract, the service methods, and the endpoints**
+- [x] **Step 2: Write the contract, the service methods, and the endpoints**
 
 Guarded by `Permissions.FamilyTree.View`, alongside `/view` and `/export.pdf`.
 
 Generations return `IReadOnlyList<int>` — a bare ascending array. No wrapper record: there is one
 field, and a `GenerationResponse` holding an `int` called `Generation` is ceremony.
 
-- [ ] **Step 3: Run the tests** — passes.
-- [ ] **Step 4: Commit** — `feat: list the branches and generations available to filter by`
+- [x] **Step 3: Run the tests** — passes.
+- [x] **Step 4: Commit** — `feat: list the branches and generations available to filter by`
 
 ---
 
