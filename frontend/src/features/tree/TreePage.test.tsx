@@ -8,11 +8,13 @@ import i18n from '../../i18n'
 import { EMPTY_CONTACT_DETAILS } from '../members/contactDetails'
 import { EMPTY_LIFE_DETAILS } from '../members/lifeDetails'
 import { ApiError } from '../../services/apiClient'
+import { countriesApi } from '../countries/countriesApi'
 import { membersApi } from '../members/membersApi'
 import type { FamilyMember, FamilyTreeNode, FamilyTreeView } from '../members/types'
 import { TreePage } from './TreePage'
 
 vi.mock('../members/membersApi')
+vi.mock('../countries/countriesApi')
 
 let permissions = ['Member.View', 'Member.Create', 'Member.Edit', 'Member.Delete', 'Member.Move']
 
@@ -51,6 +53,11 @@ const stamp = {
   countryCode: null,
 }
 
+const COUNTRIES = [
+  { id: 1, code: 'PS', nameAr: 'فلسطين', nameEn: 'Palestine', dialCode: '+970' },
+  { id: 2, code: 'EG', nameAr: 'مصر', nameEn: 'Egypt', dialCode: '+20' },
+]
+
 const FLAT: FamilyMember[] = [
   { id: 's1', name: 'سليمان', parentId: null, version: 1, ...stamp },
   { id: 'f1', name: 'فارس', parentId: 's1', version: 3, ...stamp },
@@ -82,6 +89,7 @@ describe('TreePage', () => {
     vi.mocked(membersApi.remove).mockResolvedValue(undefined)
     vi.mocked(membersApi.move).mockResolvedValue({ ...FLAT[1], parentId: 's2', version: 4 })
     vi.mocked(membersApi.search).mockResolvedValue({ total: 0, items: [] })
+    vi.mocked(countriesApi.list).mockResolvedValue(COUNTRIES)
   })
 
   afterEach(() => vi.restoreAllMocks())
@@ -169,6 +177,88 @@ describe('TreePage', () => {
         3,
         EMPTY_LIFE_DETAILS,
         EMPTY_CONTACT_DETAILS,
+      ),
+    )
+  })
+
+  /** Opens the editor on فارس, whose father سليمان makes him the one member with a lineage. */
+  const openEditorOnFares = async (user: ReturnType<typeof userEvent.setup>) => {
+    renderPage()
+    await screen.findByText('سليمان')
+    const treeitem = screen.getByRole('treeitem', { name: /سليمان/ })
+    await user.click(within(treeitem).getByRole('button', { name: i18n.t('tree.expand') }))
+    await user.click(await screen.findByText('فارس'))
+
+    const panel = await screen.findByRole('complementary', { name: 'فارس سليمان' })
+    await user.click(within(panel).getByRole('button', { name: i18n.t('tree.edit') }))
+    return screen.findByLabelText(i18n.t('modal.nameLabel'))
+  }
+
+  it('shows the ancestry beside the editable name, and does not let it be edited', async () => {
+    const user = userEvent.setup()
+    await openEditorOnFares(user)
+
+    const lineage = screen.getByLabelText(i18n.t('modal.lineageLabel'))
+    expect(lineage).toHaveValue('سليمان')
+    expect(lineage).toBeDisabled()
+  })
+
+  it('carries the contact details already on file through a rename', async () => {
+    // The bug this pins: the panel's Edit button used to seed only the name, so Update — which
+    // replaces rather than merges — cleared whatever else the member had.
+    vi.mocked(membersApi.list).mockResolvedValue([
+      FLAT[0],
+      {
+        ...FLAT[1],
+        nationalId: '123456789',
+        mobileNumber: '+970599123456',
+        countryId: 1,
+        countryCode: 'PS',
+      },
+      FLAT[2],
+    ])
+
+    const user = userEvent.setup()
+    const field = await openEditorOnFares(user)
+    await user.clear(field)
+    await user.type(field, 'فارس أحمد')
+    await user.click(screen.getByRole('button', { name: i18n.t('modal.save') }))
+
+    await waitFor(() =>
+      expect(membersApi.update).toHaveBeenCalledWith(
+        'f1',
+        'فارس أحمد',
+        3,
+        EMPTY_LIFE_DETAILS,
+        expect.objectContaining({
+          nationalId: '123456789',
+          mobileNumber: '+970599123456',
+          countryId: 1,
+        }),
+      ),
+    )
+  })
+
+  it('saves contact details entered in the tree editor', async () => {
+    const user = userEvent.setup()
+    await openEditorOnFares(user)
+
+    await user.type(screen.getByLabelText(i18n.t('members.nationalId')), '987654321')
+
+    const country = screen.getByRole('combobox', { name: i18n.t('members.country') })
+    await user.click(country)
+    await user.type(country, 'palest')
+    await user.click(await screen.findByRole('option', { name: /فلسطين/ }))
+
+    await user.click(screen.getByRole('button', { name: i18n.t('modal.save') }))
+
+    await waitFor(() =>
+      expect(membersApi.update).toHaveBeenCalledWith(
+        'f1',
+        'فارس',
+        3,
+        EMPTY_LIFE_DETAILS,
+        expect.objectContaining({ nationalId: '987654321', countryId: 1 }),
       ),
     )
   })

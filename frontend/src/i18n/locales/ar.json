@@ -130,7 +130,8 @@
     "namePlaceholder": "اكتب الاسم",
     "parentLabel": "الأب",
     "save": "حفظ",
-    "saving": "جارٍ الحفظ…"
+    "saving": "جارٍ الحفظ…",
+    "lineageLabel": "النسب"
   },
   "move": {
     "title": "نقل فرد",
@@ -181,7 +182,8 @@
     "localNumber": "الرقم",
     "dialCode": "رمز الاتصال",
     "noMatches": "لا توجد دولة مطابقة",
-    "searchPlaceholder": "بحث…"
+    "searchPlaceholder": "بحث…",
+    "lineage": "النسب"
   },
   "users": {
     "title": "المستخدمون",

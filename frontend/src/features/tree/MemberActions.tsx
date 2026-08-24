@@ -1,5 +1,8 @@
 import { useEffect, useRef, type CSSProperties, type FormEvent, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
+import type { Country } from '../countries/types'
+import { ContactFields } from '../members/ContactFields'
+import type { ContactDetails } from '../members/contactDetails'
 import { LifeDetailsFields } from '../members/LifeDetailsFields'
 import type { LifeDetails } from '../members/lifeDetails'
 import type { MemberPermissions } from './MemberPanel'
@@ -152,11 +155,19 @@ interface MemberModalProps {
   parentName: string
   childNames: readonly string[]
   nameValue: string
+  /**
+   * Father, grandfather, great-grandfather — the rest of the name, which the record does not
+   * store because the tree already knows it. Empty for a first-generation member.
+   */
+  lineage: string
   lifeValue: LifeDetails
+  contactValue: ContactDetails
+  countries: readonly Country[]
   errorCode: string | null
   isSaving: boolean
   onNameChange: (value: string) => void
   onLifeChange: (value: LifeDetails) => void
+  onContactChange: (value: ContactDetails) => void
   onCancel: () => void
   onConfirm: () => void
 }
@@ -186,11 +197,15 @@ export const MemberModal = ({
   parentName,
   childNames,
   nameValue,
+  lineage,
   lifeValue,
+  contactValue,
+  countries,
   errorCode,
   isSaving,
   onNameChange,
   onLifeChange,
+  onContactChange,
   onCancel,
   onConfirm,
 }: MemberModalProps) => {
@@ -259,6 +274,11 @@ export const MemberModal = ({
         style={{
           width: '100%',
           maxWidth: 440,
+          // Contact details made this dialog taller than a laptop viewport. The body scrolls
+          // and the buttons stay put, so Save never drifts off the bottom of the screen.
+          maxHeight: 'calc(100vh - 48px)',
+          display: 'flex',
+          flexDirection: 'column',
           background: 'var(--surface)',
           borderRadius: 'var(--r-lg)',
           boxShadow: 'var(--shadow-high)',
@@ -266,7 +286,7 @@ export const MemberModal = ({
           animation: 'fadeUp var(--motion-base) var(--ease-standard)',
         }}
       >
-        <div style={{ padding: '22px 24px 0' }}>
+        <div style={{ padding: '22px 24px 0', overflowY: 'auto', flex: '1 1 auto' }}>
           <div style={{ display: 'flex', gap: 13, alignItems: 'flex-start' }}>
             <div
               style={{
@@ -310,28 +330,62 @@ export const MemberModal = ({
               >
                 {t('modal.nameLabel')}
               </label>
-              <input
-                id="member-name"
-                ref={inputRef}
-                value={nameValue}
-                onChange={(event) => onNameChange(event.target.value)}
-                placeholder={t('modal.namePlaceholder')}
-                maxLength={200}
-                aria-invalid={errorCode !== null}
-                aria-describedby="member-name-error"
-                style={{
-                  width: '100%',
-                  height: 40,
-                  border: `1px solid ${errorCode !== null ? 'var(--error)' : 'var(--border-strong)'}`,
-                  borderRadius: 'var(--r-md)',
-                  padding: '0 12px',
-                  fontFamily: 'inherit',
-                  fontSize: 14,
-                  outline: 'none',
-                  background: 'var(--surface)',
-                  color: 'var(--text-1)',
-                }}
-              />
+              {/*
+                A member record stores one given name; the lineage beside it is the tree's,
+                not the record's. Showing it inert next to the editable field is what tells
+                the user WHICH محمد they opened — 39 of them share that name — without
+                implying the ancestry is something this dialog can rewrite.
+              */}
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input
+                  id="member-name"
+                  ref={inputRef}
+                  value={nameValue}
+                  onChange={(event) => onNameChange(event.target.value)}
+                  placeholder={t('modal.namePlaceholder')}
+                  maxLength={200}
+                  aria-invalid={errorCode !== null}
+                  aria-describedby="member-name-error"
+                  style={{
+                    flex: lineage === '' ? '1 1 100%' : '1 1 38%',
+                    minWidth: 0,
+                    height: 40,
+                    border: `1px solid ${errorCode !== null ? 'var(--error)' : 'var(--border-strong)'}`,
+                    borderRadius: 'var(--r-md)',
+                    padding: '0 12px',
+                    fontFamily: 'inherit',
+                    fontSize: 14,
+                    outline: 'none',
+                    background: 'var(--surface)',
+                    color: 'var(--text-1)',
+                  }}
+                />
+                {lineage !== '' && (
+                  <input
+                    id="member-lineage"
+                    aria-label={t('modal.lineageLabel')}
+                    value={lineage}
+                    readOnly
+                    disabled
+                    // The chain can outrun the box on a deep branch; the tooltip keeps the
+                    // part that gets clipped reachable.
+                    title={lineage}
+                    style={{
+                      flex: '1 1 62%',
+                      minWidth: 0,
+                      height: 40,
+                      border: '1px solid var(--border)',
+                      borderRadius: 'var(--r-md)',
+                      padding: '0 12px',
+                      fontFamily: 'inherit',
+                      fontSize: 14,
+                      background: 'var(--sunken)',
+                      color: 'var(--text-2)',
+                      textOverflow: 'ellipsis',
+                    }}
+                  />
+                )}
+              </div>
               <div
                 id="member-name-error"
                 role={errorCode !== null ? 'alert' : undefined}
@@ -339,6 +393,17 @@ export const MemberModal = ({
               >
                 {errorCode !== null ? t(`errors.${errorCode}`, t('errors.UNKNOWN')) : ''}
               </div>
+              <div style={{ marginTop: 14 }}>
+                <ContactFields
+                  idPrefix="modal-member"
+                  value={contactValue}
+                  countries={countries}
+                  onChange={onContactChange}
+                  labelStyle={MODAL_LABEL_STYLE}
+                  controlStyle={MODAL_CONTROL_STYLE}
+                />
+              </div>
+
               <div style={{ marginTop: 14 }}>
                 <LifeDetailsFields
                   // Distinct from the members-page form's prefix so the two never collide on
@@ -398,7 +463,15 @@ export const MemberModal = ({
           )}
         </div>
 
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, padding: '22px 24px' }}>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'flex-end',
+            gap: 8,
+            padding: '22px 24px',
+            flex: '0 0 auto',
+          }}
+        >
           <button
             type="button"
             onClick={onCancel}

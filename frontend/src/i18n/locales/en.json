@@ -114,7 +114,8 @@
     "confirmDelete": "Delete member",
     "saving": "Saving…",
     "blockedBody_one": "Can't delete {{name}} because they have {{count}} child. Move or delete that child first.",
-    "blockedBody_other": "Can't delete {{name}} because they have {{count}} children. Move or delete those children first."
+    "blockedBody_other": "Can't delete {{name}} because they have {{count}} children. Move or delete those children first.",
+    "lineageLabel": "Lineage"
   },
   "move": {
     "title": "Move member",
@@ -165,7 +166,8 @@
     "localNumber": "Number",
     "dialCode": "Dialing code",
     "noMatches": "No matching country",
-    "searchPlaceholder": "Search…"
+    "searchPlaceholder": "Search…",
+    "lineage": "Lineage"
   },
   "users": {
     "title": "Users",

@@ -2,6 +2,7 @@ import { useState, type CSSProperties, type FormEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useCountriesQuery } from '../countries/useCountries'
 import { ContactFields } from './ContactFields'
+import { indexById, lineageName } from './fullName'
 import { EMPTY_CONTACT_DETAILS, contactDetailsOf, type ContactDetails } from './contactDetails'
 import { LifeDetailsFields } from './LifeDetailsFields'
 import { EMPTY_LIFE_DETAILS, lifeDetailsOf, type LifeDetails } from './lifeDetails'
@@ -64,6 +65,10 @@ export function MemberForm({ member, parents, isSaving, onSubmit, onCancel }: Me
     member === undefined ? EMPTY_LIFE_DETAILS : lifeDetailsOf(member),
   )
   const { data: countries } = useCountriesQuery()
+  // `parents` is every other member, so a member's own ancestors are all in there — only the
+  // member being edited is missing, and the walk starts from them rather than looking them up.
+  const lineage =
+    member === undefined ? '' : lineageName(member, indexById([member, ...parents]))
   const [contact, setContact] = useState<ContactDetails>(
     member === undefined ? EMPTY_CONTACT_DETAILS : contactDetailsOf(member),
   )
@@ -90,14 +95,37 @@ export function MemberForm({ member, parents, isSaving, onSubmit, onCancel }: Me
         <label htmlFor="member-name" style={labelStyle}>
           {t('members.name')}
         </label>
-        <input
-          id="member-name"
-          value={name}
-          onChange={(event) => setName(event.target.value)}
-          maxLength={200}
-          required
-          style={controlStyle}
-        />
+        {/* Editing hides the parent select — the server rejects a parent change on update — so
+            the ancestry would otherwise vanish exactly where it is most needed to confirm which
+            member is open. Inert, because this form cannot rewrite it. */}
+        <div style={{ display: 'flex', gap: 8 }}>
+          <input
+            id="member-name"
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            maxLength={200}
+            required
+            style={{ ...controlStyle, flex: lineage === '' ? '1 1 100%' : '1 1 38%', minWidth: 0 }}
+          />
+          {lineage !== '' && (
+            <input
+              id="member-lineage"
+              aria-label={t('members.lineage')}
+              value={lineage}
+              readOnly
+              disabled
+              title={lineage}
+              style={{
+                ...controlStyle,
+                flex: '1 1 62%',
+                minWidth: 0,
+                background: 'var(--sunken)',
+                color: 'var(--text-2)',
+                textOverflow: 'ellipsis',
+              }}
+            />
+          )}
+        </div>
       </div>
 
       {/* Parent is fixed at creation: the server rejects a parent change on update; re-parenting

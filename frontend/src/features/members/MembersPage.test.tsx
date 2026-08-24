@@ -177,6 +177,24 @@ describe('MembersPage', () => {
     expect(screen.queryByLabelText(i18n.t('members.parent'))).not.toBeInTheDocument()
   })
 
+  it('shows the ancestry beside the name field, since editing hides the parent selector', async () => {
+    vi.mocked(membersApi.list).mockResolvedValue([
+      member(),
+      member({ id: 'b', name: 'فارس', parentId: 'a', version: 2 }),
+    ])
+
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText('فارس')
+
+    const [, editFares] = screen.getAllByRole('button', { name: i18n.t('members.edit') })
+    await user.click(editFares)
+
+    const lineage = screen.getByLabelText(i18n.t('members.lineage'))
+    expect(lineage).toHaveValue('سليمان')
+    expect(lineage).toBeDisabled()
+  })
+
   it('deletes a member once the in-app dialog is confirmed', async () => {
     const user = userEvent.setup()
     renderPage()

@@ -5,13 +5,14 @@ import { AppShell, type SearchResult } from '../../app/AppShell'
 import { useDirection } from '../../i18n/useDirection'
 import { ApiError } from '../../services/apiClient'
 import { useAuth } from '../auth/AuthContext'
+import { useCountriesQuery } from '../countries/useCountries'
 import { EMPTY_CONTACT_DETAILS, contactDetailsOf, type ContactDetails } from '../members/contactDetails'
 import {
   EMPTY_LIFE_DETAILS,
   lifeDetailsOf,
   type LifeDetails,
 } from '../members/lifeDetails'
-import { fullName, indexById, lineageName } from '../members/fullName'
+import { NAME_PART_COUNT, fullName, indexById, lineageName, nameParts } from '../members/fullName'
 import type { FamilyTreeNode } from '../members/types'
 import {
   useCreateMember,
@@ -60,6 +61,7 @@ export const TreePage = () => {
   // The tree endpoint returns structure only. The flat list carries `version` (needed for every
   // rename) plus createdAt/updatedAt for the detail panel, so both load and join by id.
   const { data: members } = useMembersQuery()
+  const { data: countries } = useCountriesQuery()
 
   const [expanded, setExpanded] = useState<ExpandedMap>({})
   const [rootOpen, setRootOpen] = useState(true)
@@ -82,6 +84,7 @@ export const TreePage = () => {
   const [modal, setModal] = useState<ModalKind | null>(null)
   const [nameValue, setNameValue] = useState('')
   const [lifeValue, setLifeValue] = useState<LifeDetails>(EMPTY_LIFE_DETAILS)
+  const [contactValue, setContactValue] = useState<ContactDetails>(EMPTY_CONTACT_DETAILS)
   const [errorCode, setErrorCode] = useState<string | null>(null)
   const [toast, setToast] = useState('')
   const [exportOpen, setExportOpen] = useState(false)
@@ -230,12 +233,34 @@ export const TreePage = () => {
     revealMember(id)
   }, [view, roots, revealMember])
 
-  const openModal = (kind: ModalKind, initialName = '', initialLife = EMPTY_LIFE_DETAILS) => {
+  const openModal = (
+    kind: ModalKind,
+    initialName = '',
+    initialLife = EMPTY_LIFE_DETAILS,
+    initialContact = EMPTY_CONTACT_DETAILS,
+  ) => {
     setModal(kind)
     setNameValue(initialName)
     setLifeValue(initialLife)
+    setContactValue(initialContact)
     setErrorCode(null)
     setMenu(null)
+  }
+
+  /**
+   * Opening the editor must show what is already on file. Update replaces rather than merges,
+   * so a field left blank here is a field cleared on save — the panel's Edit button used to
+   * seed only the name, which quietly wiped a member's dates the moment anyone renamed them
+   * from the detail panel.
+   */
+  const openEdit = () => {
+    const detail = selectedId === null ? undefined : detailById.get(selectedId)
+    openModal(
+      'edit',
+      selected?.name ?? '',
+      detail?.life ?? EMPTY_LIFE_DETAILS,
+      detail?.contact ?? EMPTY_CONTACT_DETAILS,
+    )
   }
 
   const openDelete = (node: FamilyTreeNode) => {
@@ -254,7 +279,7 @@ export const TreePage = () => {
       setErrorCode(null)
       const parentId = selectedId
       createMember.mutate(
-        { name: nameValue, parentId, life: lifeValue, contact: EMPTY_CONTACT_DETAILS },
+        { name: nameValue, parentId, life: lifeValue, contact: contactValue },
         {
           onSuccess: (created) => {
             if (parentId !== null) setExpanded((current) => ({ ...current, [parentId]: true }))
@@ -282,10 +307,7 @@ export const TreePage = () => {
           name: nameValue,
           version: detail.version,
           life: lifeValue,
-          // Preserve the contact details already on file: this rename dialog has no contact
-          // fields of its own, and sending nulls under the server's replace semantics would
-          // wipe out a phone number or national ID no one meant to touch.
-          contact: detail.contact,
+          contact: contactValue,
         },
         {
           onSuccess: () => {
@@ -406,7 +428,7 @@ export const TreePage = () => {
             setSelectedId(null)
           }}
           onAdd={() => openModal('add')}
-          onEdit={() => openModal('edit', selected.name)}
+          onEdit={openEdit}
           onMove={() => setMoveOpen(true)}
           onDelete={() => openDelete(selected)}
         />
@@ -422,17 +444,7 @@ export const TreePage = () => {
             setMenu(null)
           }}
           onAdd={() => openModal('add')}
-          onEdit={() =>
-            openModal(
-              'edit',
-              selected?.name ?? '',
-              // Seeded from the flat list, the same join the panel reads: opening the editor
-              // must show the dates already on file, not blank fields that would clear them.
-              selectedId === null
-                ? EMPTY_LIFE_DETAILS
-                : (detailById.get(selectedId)?.life ?? EMPTY_LIFE_DETAILS),
-            )
-          }
+          onEdit={openEdit}
           onMove={() => {
             setMenu(null)
             setMoveOpen(true)
@@ -450,11 +462,25 @@ export const TreePage = () => {
           parentName={modal === 'add' ? (selected?.name ?? familyName) : parentNameOf(selected)}
           childNames={selected?.children.map((child) => child.name) ?? []}
           nameValue={nameValue}
+          // Editing shows the member's own ancestry; adding shows the ancestry the new member
+          // is about to inherit, which is the selected node's own name followed by theirs.
+          lineage={
+            modal === 'add'
+              ? selected === undefined
+                ? ''
+                : nameParts(selected, byId).slice(0, NAME_PART_COUNT - 1).join(' ')
+              : selected === undefined
+                ? ''
+                : lineageName(selected, byId)
+          }
           lifeValue={lifeValue}
+          contactValue={contactValue}
+          countries={countries ?? []}
           errorCode={errorCode}
           isSaving={createMember.isPending || updateMember.isPending || deleteMember.isPending}
           onNameChange={setNameValue}
           onLifeChange={setLifeValue}
+          onContactChange={setContactValue}
           onCancel={closeModal}
           onConfirm={confirm}
         />
