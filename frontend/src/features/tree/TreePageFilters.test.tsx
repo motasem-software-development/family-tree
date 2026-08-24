@@ -145,6 +145,48 @@ describe('TreePage filters', () => {
     expect(await screen.findByRole('complementary', { name: /فارس/ })).toBeInTheDocument()
   })
 
+  it('numbers the root generation zero in the detail panel', async () => {
+    // Design spec §1.2: the panel follows the generation filter, which counts from the selected
+    // root. سليمان is the root of this view, so they read 0 rather than the absolute 1.
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText('سليمان')
+
+    await user.click(nodeButton('سليمان'))
+
+    const panel = await screen.findByRole('complementary', { name: /سليمان/ })
+    expect(within(panel).getByText(`${i18n.t('tree.gen')} 0`)).toBeInTheDocument()
+  })
+
+  it('numbers a child one below the root in the detail panel', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText('سليمان')
+
+    await user.click(screen.getByRole('button', { name: i18n.t('tree.expand') }))
+    await user.click(nodeButton('فارس'))
+
+    const panel = await screen.findByRole('complementary', { name: /فارس/ })
+    expect(within(panel).getByText(`${i18n.t('tree.gen')} 1`)).toBeInTheDocument()
+  })
+
+  it('numbers a search hit from the same root as the panel', async () => {
+    // Two captions on one page must not disagree. The search endpoint's generation is absolute
+    // 1-based, so a root member arrives as 1 and must read 0.
+    vi.mocked(membersApi.search).mockResolvedValue({
+      total: 1,
+      items: [{ id: 's1', name: 'سليمان', generation: 1, ancestors: [] }],
+    })
+
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText('سليمان')
+
+    await user.type(await screen.findByLabelText(i18n.t('tree.searchPlaceholder')), 'سليمان')
+
+    expect(await screen.findByText(`${i18n.t('tree.gen')} 0`)).toBeInTheDocument()
+  })
+
   it('still expands a dimmed row', async () => {
     // It is there only to hold up a matching descendant; disabling its expander would hide the
     // match it exists to carry.

@@ -25,6 +25,7 @@ import {
   useUpdateMember,
 } from '../members/useMembers'
 import { ExportDialog } from './ExportDialog'
+import { rootGenerationOf, rootRelative } from './generation'
 import {
   allNodes,
   ancestorIds,
@@ -128,6 +129,9 @@ export const TreePage = () => {
     [roots, expanded, query, rootOpen, lifeById],
   )
   const stats = useMemo(() => treeStats(roots), [roots])
+  // The offset both display sites measure against (design spec §1.2). Derived from the view, so
+  // it stays right if a root is ever selected — subtracting one would not.
+  const rootGeneration = rootGenerationOf(roots)
   const selected = selectedId === null ? undefined : findNode(roots, selectedId)
   // Every ancestor of a selectable node is loaded by construction — a row can only be clicked
   // once its branch is expanded — so the chain composes off the tree without a second fetch.
@@ -169,9 +173,11 @@ export const TreePage = () => {
         meta:
           hit.ancestors.length > 0
             ? hit.ancestors.map((ancestor) => ancestor.name).join(' ‹ ')
-            : `${t('tree.gen')} ${hit.generation}`,
+            : // Root-relative, like the panel and the filter: the search endpoint's generation
+              // is absolute 1-based, and two captions on one page must not disagree.
+              `${t('tree.gen')} ${rootRelative(hit.generation, rootGeneration)}`,
       })),
-    [searchPage, t],
+    [searchPage, t, rootGeneration],
   )
 
   const permissions = {
@@ -445,6 +451,7 @@ export const TreePage = () => {
           member={selected}
           parentName={parentNameOf(selected)}
           lineage={lineageName(selected, byId)}
+          rootGeneration={rootGeneration}
           createdAt={detail?.createdAt}
           updatedAt={detail?.updatedAt}
           life={detail?.life}
