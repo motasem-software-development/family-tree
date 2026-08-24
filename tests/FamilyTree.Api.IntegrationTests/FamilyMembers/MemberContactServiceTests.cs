@@ -123,7 +123,7 @@ public sealed class MemberContactServiceTests(PostgresFixture fixture) : Databas
     }
 
     [Fact]
-    public async Task A_phone_number_that_contradicts_the_selected_country_is_rejected()
+    public async Task A_mobile_number_that_contradicts_the_selected_country_is_rejected()
     {
         await SeedCountriesAsync();
         var tenantId = await ATenantWithATreeAsync("svc-dial");
@@ -138,6 +138,28 @@ public sealed class MemberContactServiceTests(PostgresFixture fixture) : Databas
 
         var thrown = await act.Should().ThrowAsync<DomainException>();
         thrown.Which.Code.Should().Be("MEMBER_PHONE_INVALID");
+    }
+
+    [Fact]
+    public async Task A_WhatsApp_number_from_another_country_is_accepted()
+    {
+        await SeedCountriesAsync();
+        var tenantId = await ATenantWithATreeAsync("svc-wa-dial");
+        await using var context = ContextFor(tenantId);
+        var service = ServiceFor(context, tenantId);
+        var egypt = await context.Countries.FirstAsync(c => c.Code == "EG");
+        var member = await service.CreateAsync(new CreateFamilyMemberRequest("سليمان", null));
+
+        // A member who moved to Egypt keeps the Palestinian WhatsApp number the rest of the
+        // family already has saved. Only the mobile is held to the residence's dial code.
+        var updated = await service.UpdateAsync(member.Id, new UpdateFamilyMemberRequest(
+            "سليمان", member.Version,
+            MobileNumber: "+201018124080",
+            WhatsAppNumber: "+970599850444",
+            CountryId: egypt.Id));
+
+        updated.MobileNumber.Should().Be("+201018124080");
+        updated.WhatsAppNumber.Should().Be("+970599850444");
     }
 
     [Fact]

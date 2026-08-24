@@ -235,7 +235,7 @@ pagination later changes one file rather than the contract.
 |---|---|---|
 | National ID `^[0-9]{9}$` | Domain + DB check constraint | `MEMBER_NATIONAL_ID_INVALID` → 400 |
 | National ID unique per tenant | DB filtered unique index | `MEMBER_NATIONAL_ID_DUPLICATE` → **409** |
-| Phone is E.164 and agrees with the country dial code | Domain | `MEMBER_PHONE_INVALID` → 400 |
+| Phone is E.164; the **mobile** also agrees with the country dial code | Domain (shape) + Service (dial code) | `MEMBER_PHONE_INVALID` → 400 |
 | `countryId` exists | Service, before the aggregate call | `MEMBER_COUNTRY_NOT_FOUND` → 400 |
 
 Duplicate national ID raises `ConflictException` (409), not a plain `DomainException` (400): it
@@ -249,6 +249,11 @@ The client sends dial code and local number separately, per §5.2's picker. The 
 concatenates, strips separators, and stores one E.164 string — §5.1's "shall not store the
 dialing code separately". Validation is format-level only: leading `+`, 8–15 digits, dial-code
 prefix agreement. §28 puts carrier verification out of scope, so no `libphonenumber` dependency.
+
+> **Amended 2026-08-24.** Dial-code agreement applies to the **mobile number only**. It was
+> originally checked on the WhatsApp number too, which rejected the ordinary case of a member
+> living in one country and keeping a WhatsApp account registered in another. The WhatsApp
+> number is still validated for E.164 shape.
 
 ---
 
