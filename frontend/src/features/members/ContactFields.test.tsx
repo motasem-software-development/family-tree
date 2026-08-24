@@ -90,4 +90,38 @@ describe('ContactFields', () => {
     const [, whatsAppNumberInput] = screen.getAllByLabelText(i18n.t('members.localNumber'))
     expect(whatsAppNumberInput).toBeDisabled()
   })
+
+  it('finds a country by its English name while the app is in Arabic', async () => {
+    const onChange = renderFields()
+
+    const country = screen.getByRole('combobox', { name: i18n.t('members.country') })
+    await userEvent.click(country)
+    await userEvent.type(country, 'palest')
+    await userEvent.click(screen.getByRole('option', { name: /فلسطين/ }))
+
+    expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ countryId: 1 }))
+  })
+
+  it('clears the country through the empty row', async () => {
+    const onChange = renderFields({ ...EMPTY_CONTACT_DETAILS, countryId: 1 })
+
+    await userEvent.click(screen.getByRole('combobox', { name: i18n.t('members.country') }))
+    await userEvent.click(screen.getByRole('option', { name: i18n.t('members.noCountry') }))
+
+    expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ countryId: null }))
+  })
+
+  it('finds a dialing code by the country name and applies it to the number', async () => {
+    const onChange = renderFields({ ...EMPTY_CONTACT_DETAILS, mobileNumber: '+970599123456' })
+
+    const [dial] = screen.getAllByRole('combobox', { name: i18n.t('members.dialCode') })
+    await userEvent.click(dial)
+    await userEvent.type(dial, 'egypt')
+    await userEvent.click(screen.getByRole('option', { name: /\+20/ }))
+
+    // The local number survives the switch; only the code in front of it changes.
+    expect(onChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({ mobileNumber: '+20599123456' }),
+    )
+  })
 })

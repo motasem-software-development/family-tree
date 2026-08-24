@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react'
 import { useTranslation } from 'react-i18next'
+import { SearchableSelect } from '../../components/SearchableSelect'
 import { countryName, flagEmoji } from '../countries/flagEmoji'
 import type { Country } from '../countries/types'
 import { joinPhone, splitPhone } from './contactDetails'
@@ -44,13 +45,24 @@ export function PhoneInput({
     (a, b) => Number(a.slice(1)) - Number(b.slice(1)),
   )
 
-  const labelFor = (code: string): string => {
+  const dialOptions = dialCodes.map((code) => {
     const owners = countries.filter((country) => country.dialCode === code)
-    const flags = owners.map((country) => flagEmoji(country.code)).join('')
-    // One owner: show its name. Several: the flags alone, or the row becomes a paragraph.
-    const name = owners.length === 1 ? ` ${countryName(owners[0], i18n.language)}` : ''
-    return `${flags} ${code}${name}`
-  }
+    // One owner: show its name. Several: the code alone, or the row becomes a paragraph —
+    // +1 is shared by twenty countries and +44 by four.
+    const single = owners.length === 1 ? owners[0] : undefined
+    const label =
+      single === undefined
+        ? code
+        : `${flagEmoji(single.code)} ${code} ${countryName(single, i18n.language)}`
+
+    return {
+      value: code,
+      label,
+      // Every owner's names and ISO code, so "jersey" or "JE" still finds the +44 row even
+      // though the row cannot afford to spell them all out.
+      keywords: owners.flatMap((country) => [country.code, country.nameAr, country.nameEn]),
+    }
+  })
 
   return (
     <div style={{ marginBottom: 'var(--space-4)' }}>
@@ -58,21 +70,18 @@ export function PhoneInput({
         {label}
       </label>
       <div style={{ display: 'flex', gap: 8 }}>
-        <select
+        <SearchableSelect
           id={`${id}-dial`}
-          aria-label={t('members.dialCode')}
+          ariaLabel={t('members.dialCode')}
           value={dialCode}
+          options={dialOptions}
+          emptyLabel="—"
+          placeholder={t('members.searchPlaceholder')}
+          noResultsLabel={t('members.noMatches')}
           disabled={disabled}
-          onChange={(event) => onChange(joinPhone(event.target.value, local))}
-          style={{ ...controlStyle, width: 'auto', flex: '0 0 auto', minWidth: 150 }}
-        >
-          <option value="">—</option>
-          {dialCodes.map((code) => (
-            <option key={code} value={code}>
-              {labelFor(code)}
-            </option>
-          ))}
-        </select>
+          onChange={(code) => onChange(joinPhone(code, local))}
+          controlStyle={{ ...controlStyle, width: 'auto', flex: '0 0 auto', minWidth: 170 }}
+        />
         <input
           id={`${id}-local`}
           aria-label={t('members.localNumber')}

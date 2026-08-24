@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react'
 import { useTranslation } from 'react-i18next'
+import { SearchableSelect } from '../../components/SearchableSelect'
 import { countryName, flagEmoji } from '../countries/flagEmoji'
 import type { Country } from '../countries/types'
 import { isValidNationalId, type ContactDetails } from './contactDetails'
@@ -37,9 +38,18 @@ export function ContactFields({
   const sameAsMobile =
     value.mobileNumber !== null && value.whatsAppNumber === value.mobileNumber
 
-  const sorted = [...countries].sort((a, b) =>
-    countryName(a, i18n.language).localeCompare(countryName(b, i18n.language), i18n.language),
-  )
+  // Both names and the ISO code ride along as keywords, so an Arabic reader can find a country
+  // by typing "japan" and an English one by typing "JP" — neither has to guess which script
+  // the catalog happened to sort under.
+  const countryOptions = [...countries]
+    .sort((a, b) =>
+      countryName(a, i18n.language).localeCompare(countryName(b, i18n.language), i18n.language),
+    )
+    .map((country) => ({
+      value: String(country.id),
+      label: `${flagEmoji(country.code)} ${countryName(country, i18n.language)}`,
+      keywords: [country.code, country.nameAr, country.nameEn, country.dialCode],
+    }))
 
   return (
     <fieldset style={{ border: 'none', padding: 0, margin: '0 0 var(--space-4)' }}>
@@ -85,24 +95,19 @@ export function ContactFields({
         <label htmlFor={`${idPrefix}-country`} style={labelStyle}>
           {t('members.country')}
         </label>
-        <select
+        <SearchableSelect
           id={`${idPrefix}-country`}
-          value={value.countryId ?? ''}
-          onChange={(event) =>
-            onChange({
-              ...value,
-              countryId: event.target.value === '' ? null : Number(event.target.value),
-            })
+          ariaLabel={t('members.country')}
+          value={value.countryId === null ? '' : String(value.countryId)}
+          options={countryOptions}
+          emptyLabel={t('members.noCountry')}
+          placeholder={t('members.searchPlaceholder')}
+          noResultsLabel={t('members.noMatches')}
+          onChange={(next) =>
+            onChange({ ...value, countryId: next === '' ? null : Number(next) })
           }
-          style={controlStyle}
-        >
-          <option value="">{t('members.noCountry')}</option>
-          {sorted.map((country) => (
-            <option key={country.id} value={country.id}>
-              {flagEmoji(country.code)} {countryName(country, i18n.language)}
-            </option>
-          ))}
-        </select>
+          controlStyle={controlStyle}
+        />
       </div>
 
       <PhoneInput

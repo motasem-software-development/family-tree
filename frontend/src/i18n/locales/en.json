@@ -163,7 +163,9 @@
     "whatsAppNumber": "WhatsApp number",
     "sameAsMobile": "Same as mobile number",
     "localNumber": "Number",
-    "dialCode": "Dialing code"
+    "dialCode": "Dialing code",
+    "noMatches": "No matching country",
+    "searchPlaceholder": "Search…"
   },
   "users": {
     "title": "Users",
