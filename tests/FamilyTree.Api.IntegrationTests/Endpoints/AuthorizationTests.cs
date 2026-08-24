@@ -93,6 +93,19 @@ public sealed class AuthorizationTests(PostgresFixture fixture) : IAsyncLifetime
         response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
+    [Fact]
+    public async Task The_members_export_returns_403_for_a_caller_lacking_member_view()
+    {
+        // Guarded by the Members page's own permission — no new one is introduced for the export
+        // (design spec §1.4). Anyone who can see the list can export it, and nobody else.
+        _client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", TokenWith(Permissions.FamilyTree.View));
+
+        var response = await _client.GetAsync("/api/v1/family-members/export.xlsx");
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
     [Theory]
     [InlineData("/api/v1/family-tree/branches")]
     [InlineData("/api/v1/family-tree/generations")]

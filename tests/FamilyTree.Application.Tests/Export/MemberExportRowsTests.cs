@@ -1,4 +1,5 @@
 using FamilyTree.Application.Export;
+using FamilyTree.Application.FamilyMembers;
 using FamilyTree.Contracts.Countries;
 using FamilyTree.Contracts.FamilyMembers;
 using FluentAssertions;
@@ -26,6 +27,18 @@ public class MemberExportRowsTests
         bool isDeceased = false) =>
         new(id, name, parentId, 1, Now, Now, null, null, isDeceased,
             nationalId, mobile, whatsApp, countryId, null, branchId, branchName, generation);
+
+    /// <summary>
+    /// Builds with the lineage derived from the same list — the unfiltered case, where the rows
+    /// and the family are the same set. The filtered case has its own test below.
+    /// </summary>
+    private static IReadOnlyList<MemberExportRow> Build(
+        IReadOnlyList<FamilyMemberListItem> members, CaptionLanguage language) =>
+        MemberExportRows.Build(
+            members,
+            members.ToDictionary(m => m.Id, m => new NamedMember(m.Name, m.ParentId)),
+            Countries,
+            language);
 
     [Fact]
     public void The_headers_follow_specification_19s_order_in_english() =>
@@ -59,7 +72,7 @@ public class MemberExportRowsTests
             countryId: 165, branchId: branchId, branchName: "سليمان",
             generation: 2, isDeceased: true);
 
-        var row = MemberExportRows.Build([member], Countries, CaptionLanguage.En).Should()
+        var row = Build([member], CaptionLanguage.En).Should()
             .ContainSingle().Subject;
 
         row.Should().Be(new MemberExportRow(
@@ -78,7 +91,7 @@ public class MemberExportRowsTests
             Member(child, "سليمان", parentId: root, generation: 1)
         };
 
-        var rows = MemberExportRows.Build(members, Countries, CaptionLanguage.En);
+        var rows = Build(members, CaptionLanguage.En);
 
         rows[0].FullName.Should().Be("داوود");
         rows[1].FullName.Should().Be("سليمان داوود");
@@ -90,7 +103,7 @@ public class MemberExportRowsTests
         // Specification §21: the absence of a branch renders as "Root", not as an empty cell.
         var member = Member(Guid.CreateVersion7(), "داوود", generation: 0);
 
-        var row = MemberExportRows.Build([member], Countries, CaptionLanguage.En)[0];
+        var row = Build([member], CaptionLanguage.En)[0];
 
         row.Branch.Should().Be("Root");
         row.Generation.Should().Be(0);
@@ -101,7 +114,7 @@ public class MemberExportRowsTests
     {
         var member = Member(Guid.CreateVersion7(), "داوود", generation: 0);
 
-        MemberExportRows.Build([member], Countries, CaptionLanguage.Ar)[0].Branch
+        Build([member], CaptionLanguage.Ar)[0].Branch
             .Should().Be("الجذر");
     }
 
@@ -117,7 +130,7 @@ public class MemberExportRowsTests
         // (design spec §2.5) — IsDeceased is the whole fact.
         var member = Member(Guid.CreateVersion7(), "فارس", isDeceased: isDeceased);
 
-        MemberExportRows.Build([member], Countries, language)[0].Status.Should().Be(expected);
+        Build([member], language)[0].Status.Should().Be(expected);
     }
 
     [Fact]
@@ -126,7 +139,7 @@ public class MemberExportRowsTests
         // Empty, not the word "null" — a workbook cell reading "null" is worse than a blank one.
         var member = Member(Guid.CreateVersion7(), "فارس");
 
-        MemberExportRows.Build([member], Countries, CaptionLanguage.En)[0].Country
+        Build([member], CaptionLanguage.En)[0].Country
             .Should().BeEmpty();
     }
 
@@ -137,7 +150,7 @@ public class MemberExportRowsTests
     {
         var member = Member(Guid.CreateVersion7(), "فارس", countryId: 165);
 
-        MemberExportRows.Build([member], Countries, language)[0].Country.Should().Be(expected);
+        Build([member], language)[0].Country.Should().Be(expected);
     }
 
     [Fact]
@@ -147,7 +160,7 @@ public class MemberExportRowsTests
         // request. A missing name is a blank cell, not a failed export.
         var member = Member(Guid.CreateVersion7(), "فارس", countryId: 999);
 
-        MemberExportRows.Build([member], Countries, CaptionLanguage.En)[0].Country
+        Build([member], CaptionLanguage.En)[0].Country
             .Should().BeEmpty();
     }
 
@@ -159,7 +172,7 @@ public class MemberExportRowsTests
         var member = Member(
             Guid.CreateVersion7(), "فارس", nationalId: "012345678", mobile: "+970599123456");
 
-        var row = MemberExportRows.Build([member], Countries, CaptionLanguage.En)[0];
+        var row = Build([member], CaptionLanguage.En)[0];
 
         row.NationalId.Should().Be("012345678");
         row.MobileNumber.Should().Be("+970599123456");
@@ -170,7 +183,7 @@ public class MemberExportRowsTests
     {
         var member = Member(Guid.CreateVersion7(), "فارس");
 
-        var row = MemberExportRows.Build([member], Countries, CaptionLanguage.En)[0];
+        var row = Build([member], CaptionLanguage.En)[0];
 
         row.NationalId.Should().BeEmpty();
         row.MobileNumber.Should().BeEmpty();
@@ -179,17 +192,40 @@ public class MemberExportRowsTests
 
     [Fact]
     public void The_rows_keep_the_list_order() =>
-        MemberExportRows.Build(
-            [
+        Build([
                 Member(Guid.CreateVersion7(), "أحمد"),
                 Member(Guid.CreateVersion7(), "خالد"),
                 Member(Guid.CreateVersion7(), "زياد")
-            ],
-            Countries,
-            CaptionLanguage.En)
+            ], CaptionLanguage.En)
         .Select(r => r.FullName).Should().Equal("أحمد", "خالد", "زياد");
 
     [Fact]
+    public void The_full_name_composes_through_a_father_the_filter_dropped()
+    {
+        // The bug this pins: composing from the filtered rows drops a father the filter excluded,
+        // so a filtered export carries different names than the same rows on screen. The lineage
+        // map is the whole family, deliberately, exactly as MembersPage keeps an unfiltered query
+        // for its own lineage index.
+        var root = Guid.CreateVersion7();
+        var father = Guid.CreateVersion7();
+        var son = Guid.CreateVersion7();
+
+        var lineage = new Dictionary<Guid, NamedMember>
+        {
+            [root] = new("داوود", null),
+            [father] = new("سليمان", root),
+            [son] = new("فارس", father)
+        };
+
+        // Only the son survived the filter.
+        var filtered = new[] { Member(son, "فارس", parentId: father, generation: 2) };
+
+        var rows = MemberExportRows.Build(filtered, lineage, Countries, CaptionLanguage.En);
+
+        rows.Should().ContainSingle().Which.FullName.Should().Be("فارس سليمان داوود");
+    }
+
+    [Fact]
     public void An_empty_list_builds_no_rows() =>
-        MemberExportRows.Build([], Countries, CaptionLanguage.En).Should().BeEmpty();
+        Build([], CaptionLanguage.En).Should().BeEmpty();
 }

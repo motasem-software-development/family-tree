@@ -66,19 +66,24 @@ public static class MemberExportRows
     public static IReadOnlyList<string> Headers(CaptionLanguage language) =>
         language is CaptionLanguage.Ar ? HeadersAr : HeadersEn;
 
+    /// <param name="lineage">
+    /// Every member of the family, not only the exported ones. Load-bearing: a filtered list has
+    /// holes in it, and composing the name from it would drop a father the filter excluded — so
+    /// a filtered export would carry different names than the same rows on screen. This mirrors
+    /// what MembersPage does with its unfiltered query, for the same reason.
+    /// </param>
     public static IReadOnlyList<MemberExportRow> Build(
         IReadOnlyList<FamilyMemberListItem> members,
+        IReadOnlyDictionary<Guid, NamedMember> lineage,
         IReadOnlyList<CountryResponse> countries,
         CaptionLanguage language)
     {
-        // Indexed once: every row composes its own name by walking the parent chain, and every
-        // row with a country looks one up.
-        var byId = members.ToDictionary(m => m.Id, m => new NamedMember(m.Name, m.ParentId));
+        // Indexed once: every row with a country looks one up.
         var countryById = countries.ToDictionary(c => c.Id);
 
         return members.Select(member => new MemberExportRow(
             member.NationalId ?? string.Empty,
-            MemberNameComposer.Compose(member.Id, byId),
+            MemberNameComposer.Compose(member.Id, lineage),
             member.MobileNumber ?? string.Empty,
             member.WhatsAppNumber ?? string.Empty,
             CountryOf(member.CountryId, countryById, language),

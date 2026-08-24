@@ -204,7 +204,7 @@ The only file that touches ClosedXML.
 - Consumes: `FamilyMemberQuery`, `MemberExportRows`, `ICountryService`.
 - Produces: `ClosedXmlMemberExporter : IMemberExcelExporter`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Read the produced workbook back with ClosedXML and assert:
 
@@ -223,7 +223,7 @@ Read the produced workbook back with ClosedXML and assert:
 - An empty result still produces a workbook with its header row. A zero-byte file, or one with no
   headers, reads as a broken download rather than as an empty answer.
 
-- [ ] **Step 2: Implement**
+- [x] **Step 2: Implement**
 
 `XLWorkbook`, one worksheet, headers bolded, `SetDataType(XLDataType.Text)` on the three
 identifier columns before writing, `worksheet.RightToLeft = language is CaptionLanguage.Ar`,
@@ -234,8 +234,8 @@ tenant outgrow that, `TooLargeException` is the established way to say so — th
 `MemberCap` is the precedent, and it is deliberately **not** copied here, because a workbook of
 strings is nothing like a rendered document of the same size.
 
-- [ ] **Step 3: Run the tests** — passes. Docker must be running.
-- [ ] **Step 4: Commit** — `feat: write the members workbook`
+- [x] **Step 3: Run the tests** — passes. Docker must be running.
+- [x] **Step 4: Commit** — `feat: write the members workbook`
 
 ---
 
@@ -249,7 +249,7 @@ strings is nothing like a rendered document of the same size.
 - Consumes: `MemberFilterBinding`, `CaptionLanguageResolver`, `IMemberExcelExporter`.
 - Produces: the endpoint.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 - 200 with the `.xlsx` content type for a `Member.View` holder; **403 without it**, in
   `AuthorizationTests` alongside the existing export guard test.
@@ -260,14 +260,14 @@ strings is nothing like a rendered document of the same size.
   Arabic. Assert the raw `filename` is **not** the Arabic string: that is the bug the PDF
   endpoint's own test pins, and a second endpoint must not reintroduce it.
 
-- [ ] **Step 2: Implement**
+- [x] **Step 2: Implement**
 
 Binds `[AsParameters] MemberFilterRequest`, resolves the language through `CaptionLanguageResolver`
 — the same resolver the PDF uses, so one header controls both exports — and returns
 `Results.File(..., fileDownloadName: $"{familyTreeName}.xlsx")`.
 
-- [ ] **Step 3: Run the tests** — passes.
-- [ ] **Step 4: Commit** — `feat: add the members Excel export endpoint`
+- [x] **Step 3: Run the tests** — passes.
+- [x] **Step 4: Commit** — `feat: add the members Excel export endpoint`
 
 ---
 
