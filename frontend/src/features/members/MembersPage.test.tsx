@@ -5,10 +5,11 @@ import { I18nextProvider } from 'react-i18next'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import i18n from '../../i18n'
+import { EMPTY_CONTACT_DETAILS } from './contactDetails'
 import { EMPTY_LIFE_DETAILS } from './lifeDetails'
 import { MembersPage } from './MembersPage'
 import { membersApi } from './membersApi'
-import type { FamilyMember } from './types'
+import type { FamilyMemberListItem } from './types'
 import { ApiError } from '../../services/apiClient'
 
 vi.mock('./membersApi')
@@ -25,7 +26,9 @@ vi.mock('../auth/AuthContext', () => ({
   }),
 }))
 
-const member = (over: Partial<FamilyMember> = {}): FamilyMember => ({
+// Built as the list shape, which is a superset of the single-member one, so the same helper
+// serves list, create, and update.
+const member = (over: Partial<FamilyMemberListItem> = {}): FamilyMemberListItem => ({
   id: 'a',
   name: 'سليمان',
   parentId: null,
@@ -35,6 +38,14 @@ const member = (over: Partial<FamilyMember> = {}): FamilyMember => ({
   dateOfBirth: null,
   dateOfDeath: null,
   isDeceased: false,
+  nationalId: null,
+  mobileNumber: null,
+  whatsAppNumber: null,
+  countryId: null,
+  countryCode: null,
+  branchId: null,
+  branchName: null,
+  generation: 0,
   ...over,
 })
 
@@ -60,6 +71,10 @@ describe('MembersPage', () => {
     vi.mocked(membersApi.create).mockResolvedValue(member({ id: 'b', name: 'فارس' }))
     vi.mocked(membersApi.update).mockResolvedValue(member({ name: 'سليمان أحمد', version: 2 }))
     vi.mocked(membersApi.remove).mockResolvedValue(undefined)
+    // Same reason as TreePage.test.tsx: the filter bar's reference queries reject when left
+    // auto-mocked, and the noise turned into intermittent timeouts elsewhere in the suite.
+    vi.mocked(membersApi.branches).mockResolvedValue([])
+    vi.mocked(membersApi.generations).mockResolvedValue([1])
   })
 
   it('lists the members returned by the API', async () => {
@@ -109,7 +124,13 @@ describe('MembersPage', () => {
     await user.type(screen.getByLabelText(i18n.t('members.name')), 'عمر')
     await user.click(screen.getByRole('button', { name: i18n.t('members.save') }))
 
-    await waitFor(() => expect(membersApi.create).toHaveBeenCalledWith('عمر', null, EMPTY_LIFE_DETAILS),
+    await waitFor(() =>
+      expect(membersApi.create).toHaveBeenCalledWith(
+        'عمر',
+        null,
+        EMPTY_LIFE_DETAILS,
+        EMPTY_CONTACT_DETAILS,
+      ),
     )
   })
 
@@ -123,7 +144,13 @@ describe('MembersPage', () => {
     await user.selectOptions(screen.getByLabelText(i18n.t('members.parent')), 'a')
     await user.click(screen.getByRole('button', { name: i18n.t('members.save') }))
 
-    await waitFor(() => expect(membersApi.create).toHaveBeenCalledWith('فارس', 'a', EMPTY_LIFE_DETAILS),
+    await waitFor(() =>
+      expect(membersApi.create).toHaveBeenCalledWith(
+        'فارس',
+        'a',
+        EMPTY_LIFE_DETAILS,
+        EMPTY_CONTACT_DETAILS,
+      ),
     )
   })
 
@@ -138,7 +165,14 @@ describe('MembersPage', () => {
     await user.type(nameField, 'سليمان أحمد')
     await user.click(screen.getByRole('button', { name: i18n.t('members.save') }))
 
-    await waitFor(() => expect(membersApi.update).toHaveBeenCalledWith('a', 'سليمان أحمد', 1, EMPTY_LIFE_DETAILS),
+    await waitFor(() =>
+      expect(membersApi.update).toHaveBeenCalledWith(
+        'a',
+        'سليمان أحمد',
+        1,
+        EMPTY_LIFE_DETAILS,
+        EMPTY_CONTACT_DETAILS,
+      ),
     )
   })
 
@@ -150,6 +184,44 @@ describe('MembersPage', () => {
     await user.click(screen.getByRole('button', { name: i18n.t('members.edit') }))
 
     expect(screen.queryByLabelText(i18n.t('members.parent'))).not.toBeInTheDocument()
+  })
+
+  it('brings the edit form into view, since it opens above a list the user has scrolled past', async () => {
+    // jsdom has no layout, so scrollIntoView is not implemented and has to be supplied. Removed
+    // again afterwards: leaving it defined would hide the component's own guard from every
+    // other test in this file.
+    const scrollIntoView = vi.fn()
+    Element.prototype.scrollIntoView = scrollIntoView
+
+    try {
+      const user = userEvent.setup()
+      renderPage()
+      await screen.findByText('سليمان')
+
+      await user.click(screen.getByRole('button', { name: i18n.t('members.edit') }))
+
+      expect(scrollIntoView).toHaveBeenCalled()
+    } finally {
+      delete (Element.prototype as Partial<Element>).scrollIntoView
+    }
+  })
+
+  it('shows the ancestry beside the name field, since editing hides the parent selector', async () => {
+    vi.mocked(membersApi.list).mockResolvedValue([
+      member(),
+      member({ id: 'b', name: 'فارس', parentId: 'a', version: 2 }),
+    ])
+
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText('فارس')
+
+    const [, editFares] = screen.getAllByRole('button', { name: i18n.t('members.edit') })
+    await user.click(editFares)
+
+    const lineage = screen.getByLabelText(i18n.t('members.lineage'))
+    expect(lineage).toHaveValue('سليمان')
+    expect(lineage).toBeDisabled()
   })
 
   it('deletes a member once the in-app dialog is confirmed', async () => {
@@ -220,6 +292,54 @@ describe('MembersPage', () => {
 
     expect(await screen.findByText(i18n.t('errors.MEMBER_NAME_TOO_LONG'))).toBeInTheDocument()
     expect(screen.getByLabelText(i18n.t('members.name'))).toBeInTheDocument()
+  })
+
+  it('reloads the form when Edit is clicked on a second member', async () => {
+    // The row Edit buttons stay live while the form is open. Without a key the same MemberForm
+    // instance is reused, its useState initialisers do not re-run, and Save writes the FIRST
+    // member's name, dates and contact details onto the SECOND — Update is replace-semantics,
+    // so the second member's own details are wiped.
+    vi.mocked(membersApi.list).mockResolvedValue([
+      member({ id: 'a', name: 'سليمان', nationalId: '111111111' }),
+      member({ id: 'b', name: 'فارس', nationalId: '222222222' }),
+    ])
+
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText('سليمان')
+
+    const [editA, editB] = screen.getAllByRole('button', { name: i18n.t('members.edit') })
+    await user.click(editA)
+    expect(screen.getByLabelText(i18n.t('members.name'))).toHaveValue('سليمان')
+
+    await user.click(editB)
+
+    expect(screen.getByLabelText(i18n.t('members.name'))).toHaveValue('فارس')
+    expect(screen.getByLabelText(i18n.t('members.nationalId'))).toHaveValue('222222222')
+  })
+
+  it('saves the second member own details after switching editors', async () => {
+    vi.mocked(membersApi.list).mockResolvedValue([
+      member({ id: 'a', name: 'سليمان', nationalId: '111111111' }),
+      member({ id: 'b', name: 'فارس', nationalId: '222222222' }),
+    ])
+
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText('سليمان')
+
+    const [editA, editB] = screen.getAllByRole('button', { name: i18n.t('members.edit') })
+    await user.click(editA)
+    await user.click(editB)
+    await user.click(screen.getByRole('button', { name: i18n.t('members.save') }))
+
+    expect(membersApi.update).toHaveBeenCalledWith(
+      'b',
+      'فارس',
+      expect.anything(),
+      expect.anything(),
+      expect.objectContaining({ nationalId: '222222222' }),
+    )
   })
 
   it('hides add, edit, and delete controls without permission', async () => {

@@ -114,7 +114,8 @@
     "confirmDelete": "Delete member",
     "saving": "Saving…",
     "blockedBody_one": "Can't delete {{name}} because they have {{count}} child. Move or delete that child first.",
-    "blockedBody_other": "Can't delete {{name}} because they have {{count}} children. Move or delete those children first."
+    "blockedBody_other": "Can't delete {{name}} because they have {{count}} children. Move or delete those children first.",
+    "lineageLabel": "Lineage"
   },
   "move": {
     "title": "Move member",
@@ -152,7 +153,47 @@
     "markDeceased": "Deceased",
     "markDeceasedHint": "Tick this when the death is certain even if the date is unknown.",
     "living": "Living",
-    "deceased": "Deceased"
+    "deceased": "Deceased",
+    "contactSection": "Contact details",
+    "nationalId": "National ID",
+    "nationalIdHint": "Exactly 9 digits.",
+    "nationalIdInvalid": "A national ID must be exactly 9 digits.",
+    "country": "Country of residence",
+    "noCountry": "Not recorded",
+    "mobileNumber": "Mobile number",
+    "whatsAppNumber": "WhatsApp number",
+    "sameAsMobile": "Same as mobile number",
+    "localNumber": "Number",
+    "dialCode": "Dialing code",
+    "noMatches": "No matching country",
+    "searchPlaceholder": "Search…",
+    "lineage": "Lineage",
+    "export": "Export to Excel",
+    "exporting": "Exporting…"
+  },
+  "filters": {
+    "title": "Filters",
+    "search": "Name search",
+    "searchPlaceholder": "Search by name",
+    "status": "Status",
+    "statusAll": "All",
+    "statusAlive": "Living",
+    "statusDeceased": "Deceased",
+    "branch": "Branch",
+    "branchAll": "All branches",
+    "branchRoot": "Root",
+    "generation": "Generation",
+    "generationAll": "All generations",
+    "generationRoot": "Root (0)",
+    "country": "Country",
+    "countryAll": "All countries",
+    "reset": "Reset filters",
+    "open": "Filters",
+    "close": "Close filters",
+    "activeCount_one": "{{count}} filter active",
+    "activeCount_other": "{{count}} filters active",
+    "noResults": "No matches",
+    "emptyFiltered": "No members match these filters."
   },
   "users": {
     "title": "Users",
@@ -329,6 +370,16 @@
     "ROLE_IN_USE": "This role cannot be deleted because it is assigned to users.",
     "PERMISSION_NOT_FOUND": "Unknown permission. Reload and try again.",
     "MEMBER_DEATH_BEFORE_BIRTH": "A death date cannot be earlier than the birth date.",
-    "MEMBER_DATE_IN_FUTURE": "A birth or death date cannot be in the future."
+    "MEMBER_DATE_IN_FUTURE": "A birth or death date cannot be in the future.",
+    "MEMBER_NATIONAL_ID_INVALID": "A national ID must be exactly 9 digits.",
+    "MEMBER_NATIONAL_ID_DUPLICATE": "Another member already has this national ID.",
+    "MEMBER_PHONE_INVALID": "Enter the number in international format, e.g. +970599123456.",
+    "MEMBER_COUNTRY_NOT_FOUND": "That country is no longer available. Reload and try again.",
+    "COUNTRY_CODE_INVALID": "That country code is not valid.",
+    "COUNTRY_NAME_REQUIRED": "A country name is required.",
+    "COUNTRY_NAME_TOO_LONG": "That country name is too long (100 characters maximum).",
+    "COUNTRY_DIAL_CODE_INVALID": "That dialing code is not valid.",
+    "FILTER_INVALID_STATUS": "Unknown status filter. Use all, alive, or deceased.",
+    "MEMBERS_EXPORT_FAILED": "The export could not be produced. Please try again."
   }
 }

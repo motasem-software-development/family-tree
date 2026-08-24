@@ -163,10 +163,63 @@ public sealed class FamilyMemberServiceTests(PostgresFixture fixture) : Database
         await service.CreateAsync(new CreateFamilyMemberRequest("عمر", null), default);
         await service.CreateAsync(new CreateFamilyMemberRequest("أحمد", null), default);
 
-        var all = await service.ListAsync(default);
+        var all = await service.ListAsync(MemberFilter.None, default);
 
         all.Should().HaveCount(2);
         all.Select(m => m.Name).Should().NotContain("غريب");
+    }
+
+    [Fact]
+    public async Task ListAsync_carries_the_branch_and_the_generation()
+    {
+        var (tenantId, _) = await SeedTenantWithTreeAsync("svc-lambda");
+        await using var context = ContextFor(tenantId);
+        var service = ServiceFor(context, tenantId);
+        var root = await service.CreateAsync(new CreateFamilyMemberRequest("داوود", null), default);
+        var branch = await service.CreateAsync(new CreateFamilyMemberRequest("سليمان", root.Id), default);
+        var leaf = await service.CreateAsync(new CreateFamilyMemberRequest("فارس", branch.Id), default);
+
+        var all = await service.ListAsync(MemberFilter.None, default);
+
+        // The root reads generation 0 with no branch — "Root" per specification §21 — while
+        // everything below it inherits the branch of the direct child it descends from.
+        all.Single(m => m.Id == root.Id).Should().Match<FamilyMemberListItem>(
+            m => m.BranchId == null && m.BranchName == null && m.Generation == 0);
+        all.Single(m => m.Id == branch.Id).Should().Match<FamilyMemberListItem>(
+            m => m.BranchId == branch.Id && m.BranchName == "سليمان" && m.Generation == 1);
+        all.Single(m => m.Id == leaf.Id).Should().Match<FamilyMemberListItem>(
+            m => m.BranchId == branch.Id && m.BranchName == "سليمان" && m.Generation == 2);
+    }
+
+    [Fact]
+    public async Task ListAsync_narrows_to_the_filter()
+    {
+        var (tenantId, _) = await SeedTenantWithTreeAsync("svc-mu");
+        await using var context = ContextFor(tenantId);
+        var service = ServiceFor(context, tenantId);
+        var root = await service.CreateAsync(new CreateFamilyMemberRequest("داوود", null), default);
+        await service.CreateAsync(new CreateFamilyMemberRequest("سليمان", root.Id) { IsDeceased = true }, default);
+        await service.CreateAsync(new CreateFamilyMemberRequest("عمر", root.Id), default);
+
+        var deceased = await service.ListAsync(
+            MemberFilter.None with { Status = MemberStatusFilter.Deceased }, default);
+
+        deceased.Select(m => m.Name).Should().Equal("سليمان");
+    }
+
+    [Fact]
+    public async Task ListAsync_is_ordered_by_name()
+    {
+        var (tenantId, _) = await SeedTenantWithTreeAsync("svc-nu");
+        await using var context = ContextFor(tenantId);
+        var service = ServiceFor(context, tenantId);
+        var root = await service.CreateAsync(new CreateFamilyMemberRequest("داوود", null), default);
+        await service.CreateAsync(new CreateFamilyMemberRequest("عمر", root.Id), default);
+        await service.CreateAsync(new CreateFamilyMemberRequest("أحمد", root.Id), default);
+
+        var all = await service.ListAsync(MemberFilter.None, default);
+
+        all.Select(m => m.Name).Should().BeInAscendingOrder(StringComparer.Ordinal);
     }
 
     [Fact]
@@ -405,7 +458,7 @@ public sealed class FamilyMemberServiceTests(PostgresFixture fixture) : Database
         await service.DeleteAsync(child.Id, default);
         await service.DeleteAsync(parent.Id, default);
 
-        (await service.ListAsync(default)).Should().BeEmpty();
+        (await service.ListAsync(MemberFilter.None, default)).Should().BeEmpty();
     }
 
     [Fact]

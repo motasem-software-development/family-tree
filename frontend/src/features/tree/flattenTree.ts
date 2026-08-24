@@ -15,7 +15,12 @@ export interface TreeRow {
   isOpen: boolean
   /** Matches the active search term. */
   matched: boolean
-  /** Search is active and this row is not a match, so it renders faded rather than hidden. */
+  /**
+   * Rendered faded and non-selectable rather than hidden. Two independent reasons, ORed
+   * together: the outline's own text search is active and this row is not a hit, or the server's
+   * filter kept this member only to hold up a matching descendant (design spec §4.2). Either way
+   * the row is context, not an answer, and both look the same on screen.
+   */
   dimmed: boolean
   /**
    * Joined in from the flat members list, not the tree endpoint — the tree DTO carries
@@ -37,6 +42,7 @@ const normalize = (value: string): string => value.trim().toLowerCase()
  *
  * Search dims rather than filters: hiding non-matches would silently reshape the family, and a
  * parent whose own name does not match still has to be rendered for its matching child to hang off.
+ * The server's filter arrives already pruned and reaches the same dimming through `node.matches`.
  */
 export const flattenTree = (
   rootMembers: readonly FamilyTreeNode[],
@@ -64,7 +70,9 @@ export const flattenTree = (
         hasMoreChildren: node.hasMoreChildren,
         isOpen,
         matched,
-        dimmed: term.length > 0 && !matched,
+        // Either reason dims. ORed rather than overwritten: a row can fail the server's filter
+        // and the outline's search at once, and neither may cancel the other out.
+        dimmed: (term.length > 0 && !matched) || !node.matches,
         // The flat list can lag the tree by one fetch after a create. Defaulting to "living,
         // dates unknown" shows the new member plainly rather than blanking their row.
         life: lifeById.get(node.id) ?? EMPTY_LIFE_DETAILS,

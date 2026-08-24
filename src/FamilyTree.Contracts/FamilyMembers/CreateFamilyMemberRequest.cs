@@ -16,4 +16,8 @@ public sealed record CreateFamilyMemberRequest(
     Guid? ParentId,
     DateOnly? DateOfBirth = null,
     DateOnly? DateOfDeath = null,
-    bool IsDeceased = false);
+    bool IsDeceased = false,
+    string? NationalId = null,
+    string? MobileNumber = null,
+    string? WhatsAppNumber = null,
+    int? CountryId = null);

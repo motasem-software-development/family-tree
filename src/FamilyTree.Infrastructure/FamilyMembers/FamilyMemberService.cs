@@ -22,6 +22,12 @@ public sealed class FamilyMemberService(
     /// <summary>PostgreSQL SQLSTATE for a foreign key violation.</summary>
     private const string ForeignKeyViolation = "23503";
 
+    /// <summary>PostgreSQL SQLSTATE for a unique violation.</summary>
+    private const string UniqueViolation = "23505";
+
+    /// <summary>The filtered unique index behind the per-tenant national ID rule.</summary>
+    private const string NationalIdIndex = "ux_family_members_tenant_national_id";
+
     public async Task<FamilyMemberResponse> CreateAsync(
         CreateFamilyMemberRequest request, CancellationToken ct = default)
     {
@@ -38,15 +44,30 @@ public sealed class FamilyMemberService(
                 throw new DomainException("MEMBER_PARENT_NOT_FOUND", "The specified parent does not exist.");
         }
 
+        var contact = await ResolveContactAsync(
+            request.NationalId, request.MobileNumber, request.WhatsAppNumber, request.CountryId, ct);
+
         var member = FamilyMember.Create(
             tenant.TenantId, tree.Id, request.ParentId, request.Name, timeProvider.GetUtcNow(),
-            request.DateOfBirth, request.DateOfDeath, request.IsDeceased);
+            request.DateOfBirth, request.DateOfDeath, request.IsDeceased, contact);
 
         context.FamilyMembers.Add(member);
 
         try
         {
             await context.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException ex)
+            when (ex.InnerException is PostgresException { SqlState: UniqueViolation } pg
+                  && pg.ConstraintName == NationalIdIndex)
+        {
+            // Caught rather than pre-checked with a SELECT: check-then-insert races, and the
+            // index is the only thing that actually holds the invariant. A ConflictException
+            // (409) rather than a DomainException (400) because this depends on current state,
+            // not on the request being malformed.
+            throw new ConflictException(
+                "MEMBER_NATIONAL_ID_DUPLICATE",
+                "Another member already has this national ID.");
         }
         catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: ForeignKeyViolation })
         {
@@ -56,7 +77,7 @@ public sealed class FamilyMemberService(
             throw new DomainException("MEMBER_PARENT_NOT_FOUND", "The specified parent does not exist.");
         }
 
-        return Map(member);
+        return await MapWithCountryAsync(member, ct);
     }
 
     public async Task<FamilyMemberResponse?> GetAsync(Guid id, CancellationToken ct = default)
@@ -65,18 +86,21 @@ public sealed class FamilyMemberService(
             .AsNoTracking()
             .FirstOrDefaultAsync(m => m.Id == id, ct);
 
-        return member is null ? null : Map(member);
+        return member is null ? null : await MapWithCountryAsync(member, ct);
     }
 
-    public async Task<IReadOnlyList<FamilyMemberResponse>> ListAsync(CancellationToken ct = default)
-    {
-        var members = await context.FamilyMembers
-            .AsNoTracking()
-            .OrderBy(m => m.Name)
-            .ToListAsync(ct);
-
-        return members.Select(Map).ToList();
-    }
+    public Task<IReadOnlyList<FamilyMemberListItem>> ListAsync(
+        MemberFilter filter, CancellationToken ct = default) =>
+        // Like SearchAsync, this read does NOT go through the tenant query filter, because it is
+        // raw SQL. FamilyMemberQuery re-establishes the guarantee with an explicit predicate on
+        // every family_members reference, the recursive term included — see the class comment
+        // there, and the cross-tenant test that fails without it.
+        //
+        // Unpaginated (design spec §5.3): 349 filtered members is a small payload and the page
+        // renders every row. The limit and offset exist so that adding pagination later changes
+        // FamilyMemberQuery rather than this contract.
+        FamilyMemberQuery.ListAsync(
+            context, tenant.TenantId, filter, FamilyMemberQuery.NoLimit, 0, ct);
 
     public Task<FamilyMemberSearchResponse> SearchAsync(
         string query, int limit, int offset, CancellationToken ct = default) =>
@@ -106,11 +130,15 @@ public sealed class FamilyMemberService(
         if (member.TenantId != tenant.TenantId)
             throw new NotFoundException("MEMBER_NOT_FOUND", "Member not found.");
 
+        var contact = await ResolveContactAsync(
+            request.NationalId, request.MobileNumber, request.WhatsAppNumber, request.CountryId, ct);
+
         member.Update(
             request.Name,
             request.DateOfBirth,
             request.DateOfDeath,
             request.IsDeceased,
+            contact,
             timeProvider.GetUtcNow());
 
         // Load-bearing. EF builds `UPDATE ... WHERE id = @id AND version = @original`, and
@@ -128,8 +156,20 @@ public sealed class FamilyMemberService(
             throw new ConflictException(
                 "CONCURRENCY_CONFLICT", "This member was changed by someone else. Reload and try again.");
         }
+        catch (DbUpdateException ex)
+            when (ex.InnerException is PostgresException { SqlState: UniqueViolation } pg
+                  && pg.ConstraintName == NationalIdIndex)
+        {
+            // Caught rather than pre-checked with a SELECT: check-then-insert races, and the
+            // index is the only thing that actually holds the invariant. A ConflictException
+            // (409) rather than a DomainException (400) because this depends on current state,
+            // not on the request being malformed.
+            throw new ConflictException(
+                "MEMBER_NATIONAL_ID_DUPLICATE",
+                "Another member already has this national ID.");
+        }
 
-        return Map(member);
+        return await MapWithCountryAsync(member, ct);
     }
 
     public async Task<FamilyMemberResponse> MoveAsync(
@@ -202,7 +242,7 @@ public sealed class FamilyMemberService(
 
         await transaction.CommitAsync(ct);
 
-        return Map(member);
+        return await MapWithCountryAsync(member, ct);
     }
 
     public async Task DeleteAsync(Guid id, CancellationToken ct = default)
@@ -237,7 +277,74 @@ public sealed class FamilyMemberService(
         }
     }
 
-    internal static FamilyMemberResponse Map(FamilyMember member) => new(
+    /// <summary>
+    /// Resolves the contact details against the country list: the country must exist, and a
+    /// supplied phone number must start with that country's dialing code.
+    ///
+    /// The dial-code check lives here rather than in the aggregate because it needs a row the
+    /// aggregate cannot read (design §5.4, refined). It raises the same MEMBER_PHONE_INVALID
+    /// code the aggregate's shape check does, so the split is invisible to clients.
+    ///
+    /// With no country selected there is nothing to check against, and the number is accepted on
+    /// shape alone — a member living abroad may well keep a number from somewhere else.
+    /// </summary>
+    private async Task<ContactDetails> ResolveContactAsync(
+        string? nationalId, string? mobile, string? whatsApp, int? countryId, CancellationToken ct)
+    {
+        if (countryId is not { } id)
+            return new ContactDetails(nationalId, mobile, whatsApp, null);
+
+        var dialCode = await context.Countries
+            .Where(c => c.Id == id)
+            .Select(c => c.DialCode)
+            .FirstOrDefaultAsync(ct)
+            ?? throw new DomainException(
+                "MEMBER_COUNTRY_NOT_FOUND", "The specified country does not exist.");
+
+        EnsureDialCodeAgrees(mobile, dialCode);
+        EnsureDialCodeAgrees(whatsApp, dialCode);
+
+        return new ContactDetails(nationalId, mobile, whatsApp, id);
+    }
+
+    /// <summary>
+    /// Separators are stripped here as well as in the aggregate, because this check runs first
+    /// and a number written "+970 599 123 456" must compare against the same canonical form the
+    /// aggregate will eventually store. <see cref="ContactDetails.NormalizePhone"/> is the single
+    /// shared definition of "separator" so the two checks cannot drift apart.
+    /// </summary>
+    private static void EnsureDialCodeAgrees(string? phone, string dialCode)
+    {
+        // Blank is "not supplied"; the aggregate normalizes it to null.
+        var normalized = ContactDetails.NormalizePhone(phone);
+        if (normalized is null) return;
+
+        if (!normalized.StartsWith(dialCode, StringComparison.Ordinal))
+            throw new DomainException(
+                "MEMBER_PHONE_INVALID",
+                $"This phone number does not match the selected country's dialing code ({dialCode}).");
+    }
+
+    /// <summary>
+    /// The country code for one member, or null when they have no country. A separate keyed
+    /// lookup rather than a navigation property: the aggregate deliberately holds only
+    /// CountryId, and one read of a 22-row table is not worth complicating the entity for.
+    /// </summary>
+    private async Task<FamilyMemberResponse> MapWithCountryAsync(
+        FamilyMember member, CancellationToken ct)
+    {
+        if (member.CountryId is not { } id) return Map(member);
+
+        var code = await context.Countries
+            .Where(c => c.Id == id)
+            .Select(c => c.Code)
+            .FirstOrDefaultAsync(ct);
+
+        return Map(member, code);
+    }
+
+    internal static FamilyMemberResponse Map(FamilyMember member, string? countryCode = null) => new(
         member.Id, member.Name, member.ParentId, member.Version, member.CreatedAt, member.UpdatedAt,
-        member.DateOfBirth, member.DateOfDeath, member.IsDeceased);
+        member.DateOfBirth, member.DateOfDeath, member.IsDeceased,
+        member.NationalId, member.MobileNumber, member.WhatsAppNumber, member.CountryId, countryCode);
 }

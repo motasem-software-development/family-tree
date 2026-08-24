@@ -222,4 +222,70 @@ public sealed class FamilyTreeEndpointsTests(PostgresFixture fixture) : IAsyncLi
         mahmoudNode.Children.Should().BeEmpty();
         mahmoudNode.HasMoreChildren.Should().BeTrue("خالد exists but was not returned");
     }
+
+    [Fact]
+    public async Task Branches_requires_authentication()
+    {
+        var response = await _client.GetAsync("/api/v1/family-tree/branches");
+
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task Generations_requires_authentication()
+    {
+        var response = await _client.GetAsync("/api/v1/family-tree/generations");
+
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task Branches_lists_the_direct_children_of_the_root_ordered_by_name()
+    {
+        // Rooted explicitly: the seeded database already carries the imported family, so a
+        // whole-tree call would answer about داوود's children rather than these.
+        await AuthenticateAsync();
+        var suleiman = await CreateAsync("سليمان");
+        var faris = await CreateAsync("فارس", suleiman.Id);
+        await CreateAsync("خالد", suleiman.Id);
+        await CreateAsync("محمود", faris.Id);
+
+        var branches = await _client.GetFromJsonAsync<List<BranchResponse>>(
+            $"/api/v1/family-tree/branches?rootId={suleiman.Id}");
+
+        branches!.Select(b => b.Name).Should().Equal("خالد", "فارس");
+        // The root is not one of its own branches — specification §21 renders it as "Root".
+        branches.Should().NotContain(b => b.Id == suleiman.Id);
+        // Nor is a grandchild: branches are the DIRECT children.
+        branches.Should().NotContain(b => b.Name == "محمود");
+    }
+
+    [Fact]
+    public async Task Generations_ascend_from_zero_at_the_root()
+    {
+        await AuthenticateAsync();
+        var suleiman = await CreateAsync("سليمان");
+        var faris = await CreateAsync("فارس", suleiman.Id);
+        await CreateAsync("محمود", faris.Id);
+
+        var generations = await _client.GetFromJsonAsync<List<int>>(
+            $"/api/v1/family-tree/generations?rootId={suleiman.Id}");
+
+        // Root-relative, per design spec §1.2 — the root reads 0, not 1.
+        generations.Should().Equal(0, 1, 2);
+    }
+
+    [Fact]
+    public async Task A_root_naming_nothing_has_no_branches_and_no_generations()
+    {
+        // Not a 404: "this subtree has no branches" and "no such subtree" are the same answer to
+        // a dropdown.
+        await AuthenticateAsync();
+        var unknown = Guid.CreateVersion7();
+
+        (await _client.GetFromJsonAsync<List<BranchResponse>>(
+            $"/api/v1/family-tree/branches?rootId={unknown}"))!.Should().BeEmpty();
+        (await _client.GetFromJsonAsync<List<int>>(
+            $"/api/v1/family-tree/generations?rootId={unknown}"))!.Should().BeEmpty();
+    }
 }

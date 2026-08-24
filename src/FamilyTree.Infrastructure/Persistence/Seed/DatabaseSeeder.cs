@@ -1,4 +1,5 @@
 using FamilyTree.Domain.Authorization;
+using FamilyTree.Domain.Countries;
 using FamilyTree.Domain.FamilyTrees;
 using FamilyTree.Domain.Tenants;
 using FamilyTree.Infrastructure.Identity;
@@ -38,6 +39,7 @@ public sealed class DatabaseSeeder(
         await GuardAgainstTenantSlugMismatchAsync(ct);
 
         await SeedPermissionCatalogAsync(now, ct);
+        await SeedCountryCatalogAsync(ct);
         var tenant = await SeedTenantAsync(now, ct);
         await SeedFamilyTreeAsync(tenant.Id, now, ct);
         var roleIds = await SeedSystemRolesAsync(tenant.Id, now, ct);
@@ -84,6 +86,24 @@ public sealed class DatabaseSeeder(
         if (missing.Count == 0) return;
 
         context.Permissions.AddRange(missing.Select(code => Permission.Create(code, null, now)));
+        await context.SaveChangesAsync(ct);
+    }
+
+    /// <summary>
+    /// Idempotent by country code, exactly as the permission catalog is idempotent by permission
+    /// code: the api container re-runs seeding on every boot, so this must be a no-op the second
+    /// time. Countries already present are left untouched — a name correction shipped in
+    /// CountryCatalog will not overwrite a row, which is the conservative choice for reference
+    /// data a member row points at.
+    /// </summary>
+    private async Task SeedCountryCatalogAsync(CancellationToken ct)
+    {
+        var existing = await context.Countries.Select(c => c.Code).ToListAsync(ct);
+        var missing = CountryCatalog.All.Where(entry => !existing.Contains(entry.Code)).ToList();
+        if (missing.Count == 0) return;
+
+        context.Countries.AddRange(
+            missing.Select(entry => Country.Create(entry.Code, entry.NameAr, entry.NameEn, entry.DialCode)));
         await context.SaveChangesAsync(ct);
     }
 

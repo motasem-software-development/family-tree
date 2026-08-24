@@ -1,6 +1,7 @@
 using System.Text;
 using FamilyTree.Api.Authorization;
 using FamilyTree.Api.Endpoints.Auth;
+using FamilyTree.Api.Endpoints.Countries;
 using FamilyTree.Api.Endpoints.FamilyMembers;
 using FamilyTree.Api.Endpoints.FamilyTrees;
 using FamilyTree.Api.Endpoints.Me;
@@ -31,6 +32,9 @@ builder.Services.AddScoped<ITenantContext, HttpTenantContext>();
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddScoped<ITreeRendererAdapter, TreeRendererAdapter>();
 builder.Services.AddScoped<IFamilyTreeExporter, FamilyTreeExportService>();
+// Beside the PDF exporter, and the same shape: the Infrastructure implementation is the only
+// thing that knows which library produces the file (design spec §7.1).
+builder.Services.AddScoped<IMemberExcelExporter, ClosedXmlMemberExporter>();
 
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<DomainExceptionHandler>();
@@ -77,6 +81,7 @@ if (app.Environment.IsDevelopment())
 
 app.MapGet("/health", () => Results.Ok(new { status = "ok" })).AllowAnonymous();
 app.MapAuthEndpoints();
+app.MapCountryEndpoints();
 app.MapMeEndpoints();
 app.MapFamilyMemberEndpoints();
 app.MapFamilyTreeEndpoints();

@@ -197,12 +197,59 @@ namespace FamilyTree.Infrastructure.Persistence.Migrations
                     b.ToTable("app_user_roles", (string)null);
                 });
 
+            modelBuilder.Entity("FamilyTree.Domain.Countries.Country", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(2)
+                        .HasColumnType("character varying(2)")
+                        .HasColumnName("code");
+
+                    b.Property<string>("DialCode")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("dial_code");
+
+                    b.Property<string>("NameAr")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("name_ar");
+
+                    b.Property<string>("NameEn")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("name_en");
+
+                    b.HasKey("Id")
+                        .HasName("pk_countries");
+
+                    b.HasIndex("Code")
+                        .IsUnique()
+                        .HasDatabaseName("ix_countries_code");
+
+                    b.ToTable("countries", (string)null);
+                });
+
             modelBuilder.Entity("FamilyTree.Domain.FamilyMembers.FamilyMember", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasColumnName("id");
+
+                    b.Property<int?>("CountryId")
+                        .HasColumnType("integer")
+                        .HasColumnName("country_id");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -226,11 +273,21 @@ namespace FamilyTree.Infrastructure.Persistence.Migrations
                         .HasDefaultValue(false)
                         .HasColumnName("is_deceased");
 
+                    b.Property<string>("MobileNumber")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("mobile_number");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
                         .HasColumnName("name");
+
+                    b.Property<string>("NationalId")
+                        .HasMaxLength(9)
+                        .HasColumnType("character varying(9)")
+                        .HasColumnName("national_id");
 
                     b.Property<Guid?>("ParentId")
                         .HasColumnType("uuid")
@@ -249,14 +306,25 @@ namespace FamilyTree.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("version");
 
+                    b.Property<string>("WhatsAppNumber")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("whats_app_number");
+
                     b.HasKey("Id")
                         .HasName("pk_family_members");
 
                     b.HasAlternateKey("Id", "FamilyTreeId")
                         .HasName("ak_family_members_id_family_tree_id");
 
+                    b.HasIndex("CountryId")
+                        .HasDatabaseName("ix_family_members_country_id");
+
                     b.HasIndex("FamilyTreeId")
                         .HasDatabaseName("ix_family_members_family_tree_id");
+
+                    b.HasIndex("IsDeceased")
+                        .HasDatabaseName("ix_family_members_is_deceased");
 
                     b.HasIndex("ParentId")
                         .HasDatabaseName("ix_family_members_parent_id");
@@ -273,11 +341,18 @@ namespace FamilyTree.Infrastructure.Persistence.Migrations
                     b.HasIndex("FamilyTreeId", "TenantId")
                         .HasDatabaseName("ix_family_members_family_tree_id_tenant_id");
 
+                    b.HasIndex("TenantId", "NationalId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_family_members_tenant_national_id")
+                        .HasFilter("national_id IS NOT NULL");
+
                     b.ToTable("family_members", null, t =>
                         {
                             t.HasCheckConstraint("ck_member_death_after_birth", "date_of_death IS NULL OR date_of_birth IS NULL OR date_of_death >= date_of_birth");
 
                             t.HasCheckConstraint("ck_member_death_date_implies_deceased", "date_of_death IS NULL OR is_deceased");
+
+                            t.HasCheckConstraint("ck_member_national_id_digits", "national_id IS NULL OR national_id ~ '^[0-9]{9}$'");
                         });
                 });
 
@@ -694,6 +769,12 @@ namespace FamilyTree.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("FamilyTree.Domain.FamilyMembers.FamilyMember", b =>
                 {
+                    b.HasOne("FamilyTree.Domain.Countries.Country", null)
+                        .WithMany()
+                        .HasForeignKey("CountryId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_family_members_countries_country_id");
+
                     b.HasOne("FamilyTree.Domain.Tenants.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")

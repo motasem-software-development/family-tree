@@ -94,6 +94,74 @@ public sealed class AuthorizationTests(PostgresFixture fixture) : IAsyncLifetime
     }
 
     [Fact]
+    public async Task The_members_export_returns_403_for_a_caller_lacking_member_view()
+    {
+        // Guarded by the Members page's own permission — no new one is introduced for the export
+        // (design spec §1.4). Anyone who can see the list can export it, and nobody else.
+        _client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", TokenWith(Permissions.FamilyTree.View));
+
+        var response = await _client.GetAsync("/api/v1/family-members/export.xlsx");
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Theory]
+    [InlineData("/api/v1/family-tree/branches")]
+    [InlineData("/api/v1/family-tree/generations")]
+    public async Task The_filter_reference_lists_return_403_without_either_view_permission(
+        string path)
+    {
+        _client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", TokenWith(Permissions.Member.Edit));
+
+        var response = await _client.GetAsync(path);
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Theory]
+    [InlineData("/api/v1/family-tree/branches")]
+    [InlineData("/api/v1/family-tree/generations")]
+    public async Task The_filter_reference_lists_accept_member_view_alone(string path)
+    {
+        // The same filter bar renders on the Members page, which is guarded by Member.View. A
+        // custom Member.View-only role must not be left with permanently empty Branch and
+        // Generation dropdowns and no error to explain them.
+        _client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", TokenWith(Permissions.Member.View));
+
+        var response = await _client.GetAsync(path);
+
+        response.StatusCode.Should().NotBe(HttpStatusCode.Forbidden);
+    }
+
+    [Theory]
+    [InlineData("/api/v1/family-tree/branches")]
+    [InlineData("/api/v1/family-tree/generations")]
+    public async Task The_filter_reference_lists_accept_family_tree_view_alone(string path)
+    {
+        _client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", TokenWith(Permissions.FamilyTree.View));
+
+        var response = await _client.GetAsync(path);
+
+        response.StatusCode.Should().NotBe(HttpStatusCode.Forbidden);
+    }
+
+    [Theory]
+    [InlineData("/api/v1/family-tree/branches")]
+    [InlineData("/api/v1/family-tree/generations")]
+    public async Task The_filter_reference_lists_require_authentication(string path)
+    {
+        _client.DefaultRequestHeaders.Authorization = null;
+
+        var response = await _client.GetAsync(path);
+
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
     public async Task Me_is_authentication_only_and_never_answers_403()
     {
         // The counterpart of the three above: a token with no permission at all still reads

@@ -253,7 +253,7 @@ public class FamilyMemberTests
         var member = FamilyMember.Create(TenantId, TreeId, null, "فارس", Now);
         var later = Now.AddDays(1);
 
-        member.Update("فارس أحمد", Born, Died, isDeceased: true, now: later);
+        member.Update("فارس أحمد", Born, Died, isDeceased: true, contact: ContactDetails.Empty, now: later);
 
         member.Name.Should().Be("فارس أحمد");
         member.DateOfBirth.Should().Be(Born);
@@ -270,7 +270,7 @@ public class FamilyMemberTests
         var member = FamilyMember.Create(
             TenantId, TreeId, null, "فارس", Now, Born, Died, isDeceased: true);
 
-        member.Update("فارس", null, null, isDeceased: false, now: Now.AddDays(1));
+        member.Update("فارس", null, null, isDeceased: false, contact: ContactDetails.Empty, now: Now.AddDays(1));
 
         member.DateOfBirth.Should().BeNull();
         member.DateOfDeath.Should().BeNull();
@@ -282,7 +282,7 @@ public class FamilyMemberTests
     {
         var member = FamilyMember.Create(TenantId, TreeId, null, "فارس", Now);
 
-        var act = () => member.Update("فارس", Died, Born, isDeceased: true, now: Now);
+        var act = () => member.Update("فارس", Died, Born, isDeceased: true, contact: ContactDetails.Empty, now: Now);
 
         act.Should().Throw<DomainException>().Which.Code.Should().Be("MEMBER_DEATH_BEFORE_BIRTH");
     }
@@ -294,7 +294,7 @@ public class FamilyMemberTests
         // or a client retrying after a validation error hits a spurious concurrency conflict.
         var member = FamilyMember.Create(TenantId, TreeId, null, "فارس", Now);
 
-        var act = () => member.Update("فارس أحمد", Died, Born, isDeceased: true, now: Now);
+        var act = () => member.Update("فارس أحمد", Died, Born, isDeceased: true, contact: ContactDetails.Empty, now: Now);
 
         act.Should().Throw<DomainException>();
         member.Name.Should().Be("فارس");

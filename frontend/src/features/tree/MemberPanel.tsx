@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { LifeStatusDot } from '../members/LifeStatusDot'
 import { EMPTY_LIFE_DETAILS, type LifeDetails } from '../members/lifeDetails'
 import type { FamilyTreeNode } from '../members/types'
+import { rootRelative } from './generation'
 import { descendantCount } from './flattenTree'
 
 export interface MemberPermissions {
@@ -20,6 +21,12 @@ interface MemberPanelProps {
    * the panel only ever holds the one node. Empty for a first-generation member.
    */
   lineage: string
+  /**
+   * The absolute generation the current view is rooted at, so the panel can show the
+   * root-relative number the generation filter uses (design spec §1.2). Passed in rather than
+   * derived: the panel holds one node and has no view to read it from.
+   */
+  rootGeneration: number
   /**
    * ISO timestamps from the flat members list. The tree endpoint returns structure only, so
    * the page joins the two by id rather than widening the tree DTO for two display fields.
@@ -79,6 +86,7 @@ export const MemberPanel = ({
   member,
   parentName,
   lineage,
+  rootGeneration,
   createdAt,
   updatedAt,
   life = EMPTY_LIFE_DETAILS,
@@ -148,7 +156,10 @@ export const MemberPanel = ({
             <span>{t(life.isDeceased ? 'members.deceased' : 'members.living')}</span>
             <span aria-hidden="true">·</span>
             <span>
-              {t('tree.gen')} {member.generation}
+              {/* Root-relative, matching the generation filter — a page must not contradict
+                  its own filter (design spec §1.2). member.generation stays absolute because
+                  the reports page and the PDF caption read that same field. */}
+              {t('tree.gen')} {rootRelative(member.generation, rootGeneration)}
             </span>
           </div>
         </div>

@@ -1,5 +1,6 @@
 using FamilyTree.Application.Auth;
 using FamilyTree.Application.Authorization;
+using FamilyTree.Application.Countries;
 using FamilyTree.Application.FamilyMembers;
 using FamilyTree.Application.FamilyTrees;
 using FamilyTree.Application.Reports;
@@ -7,6 +8,7 @@ using FamilyTree.Application.Roles;
 using FamilyTree.Application.Users;
 using FamilyTree.Infrastructure.Auth;
 using FamilyTree.Infrastructure.Authorization;
+using FamilyTree.Infrastructure.Countries;
 using FamilyTree.Infrastructure.FamilyMembers;
 using FamilyTree.Infrastructure.FamilyTrees;
 using FamilyTree.Infrastructure.Identity;
@@ -40,6 +42,7 @@ public static class DependencyInjection
         services.AddScoped<ITokenService, JwtTokenService>();
         services.AddScoped<IPermissionResolver, PermissionResolver>();
         services.AddScoped<IAuthService, AuthService>();
+        services.AddScoped<ICountryService, CountryService>();
         services.AddScoped<IFamilyMemberService, FamilyMemberService>();
         services.AddScoped<IFamilyTreeService, FamilyTreeService>();
         services.AddScoped<IReportService, ReportService>();

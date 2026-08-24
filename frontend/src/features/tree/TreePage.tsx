@@ -5,12 +5,16 @@ import { AppShell, type SearchResult } from '../../app/AppShell'
 import { useDirection } from '../../i18n/useDirection'
 import { ApiError } from '../../services/apiClient'
 import { useAuth } from '../auth/AuthContext'
+import { useCountriesQuery } from '../countries/useCountries'
+import { FilterControls } from '../filters/FilterControls'
+import { useMemberFilters } from '../filters/useMemberFilters'
+import { EMPTY_CONTACT_DETAILS, contactDetailsOf, type ContactDetails } from '../members/contactDetails'
 import {
   EMPTY_LIFE_DETAILS,
   lifeDetailsOf,
   type LifeDetails,
 } from '../members/lifeDetails'
-import { fullName, indexById, lineageName } from '../members/fullName'
+import { NAME_PART_COUNT, fullName, indexById, lineageName, nameParts } from '../members/fullName'
 import type { FamilyTreeNode } from '../members/types'
 import {
   useCreateMember,
@@ -21,6 +25,7 @@ import {
   useUpdateMember,
 } from '../members/useMembers'
 import { ExportDialog } from './ExportDialog'
+import { rootGenerationOf, rootRelative } from './generation'
 import {
   allNodes,
   ancestorIds,
@@ -55,10 +60,16 @@ export const TreePage = () => {
   const direction = useDirection()
   const { hasPermission } = useAuth()
 
-  const { data: view, isLoading } = useTreeQuery()
+  const { filters, activeCount, setFilter, reset } = useMemberFilters()
+  const { data: view, isLoading } = useTreeQuery(filters)
   // The tree endpoint returns structure only. The flat list carries `version` (needed for every
   // rename) plus createdAt/updatedAt for the detail panel, so both load and join by id.
+  //
+  // Unfiltered on purpose: it is a lookup table, not a view. A member kept visible by the
+  // ancestor rule still needs their version to be renamable, and a filtered list would leave
+  // them without one.
   const { data: members } = useMembersQuery()
+  const { data: countries } = useCountriesQuery()
 
   const [expanded, setExpanded] = useState<ExpandedMap>({})
   const [rootOpen, setRootOpen] = useState(true)
@@ -81,6 +92,7 @@ export const TreePage = () => {
   const [modal, setModal] = useState<ModalKind | null>(null)
   const [nameValue, setNameValue] = useState('')
   const [lifeValue, setLifeValue] = useState<LifeDetails>(EMPTY_LIFE_DETAILS)
+  const [contactValue, setContactValue] = useState<ContactDetails>(EMPTY_CONTACT_DETAILS)
   const [errorCode, setErrorCode] = useState<string | null>(null)
   const [toast, setToast] = useState('')
   const [exportOpen, setExportOpen] = useState(false)
@@ -112,11 +124,31 @@ export const TreePage = () => {
     () => new Map((members ?? []).map((m) => [m.id, lifeDetailsOf(m)])),
     [members],
   )
+  /**
+   * A filtered tree arrives already pruned to the matches and the ancestors holding them up, so
+   * every branch still in it is one the user asked to see — it is opened for them.
+   *
+   * Without this a filter looked broken: the outline starts collapsed and nothing else expands
+   * it, so applying one left a single dimmed, unclickable root row and the matches had to be
+   * hand-expanded generation by generation. The unfiltered tree stays collapsed, because opening
+   * all 351 members would bury the user.
+   */
+  const effectiveExpanded = useMemo<ExpandedMap>(
+    () =>
+      activeCount === 0
+        ? expanded
+        : Object.fromEntries(allNodes(roots).map((node) => [node.id, expanded[node.id] !== false])),
+    [activeCount, roots, expanded],
+  )
+
   const rows = useMemo(
-    () => (rootOpen ? flattenTree(roots, expanded, query, lifeById) : []),
-    [roots, expanded, query, rootOpen, lifeById],
+    () => (rootOpen ? flattenTree(roots, effectiveExpanded, query, lifeById) : []),
+    [roots, effectiveExpanded, query, rootOpen, lifeById],
   )
   const stats = useMemo(() => treeStats(roots), [roots])
+  // The offset both display sites measure against (design spec §1.2). Derived from the view, so
+  // it stays right if a root is ever selected — subtracting one would not.
+  const rootGeneration = rootGenerationOf(roots)
   const selected = selectedId === null ? undefined : findNode(roots, selectedId)
   // Every ancestor of a selectable node is loaded by construction — a row can only be clicked
   // once its branch is expanded — so the chain composes off the tree without a second fetch.
@@ -125,7 +157,13 @@ export const TreePage = () => {
   const detailById = useMemo(() => {
     const map = new Map<
       string,
-      { version: number; createdAt: string; updatedAt: string; life: LifeDetails }
+      {
+        version: number
+        createdAt: string
+        updatedAt: string
+        life: LifeDetails
+        contact: ContactDetails
+      }
     >()
     ;(members ?? []).forEach((m) =>
       map.set(m.id, {
@@ -133,6 +171,7 @@ export const TreePage = () => {
         createdAt: m.createdAt,
         updatedAt: m.updatedAt,
         life: lifeDetailsOf(m),
+        contact: contactDetailsOf(m),
       }),
     )
     return map
@@ -151,9 +190,11 @@ export const TreePage = () => {
         meta:
           hit.ancestors.length > 0
             ? hit.ancestors.map((ancestor) => ancestor.name).join(' ‹ ')
-            : `${t('tree.gen')} ${hit.generation}`,
+            : // Root-relative, like the panel and the filter: the search endpoint's generation
+              // is absolute 1-based, and two captions on one page must not disagree.
+              `${t('tree.gen')} ${rootRelative(hit.generation, rootGeneration)}`,
       })),
-    [searchPage, t],
+    [searchPage, t, rootGeneration],
   )
 
   const permissions = {
@@ -166,8 +207,13 @@ export const TreePage = () => {
   const familyName = view?.name ?? ''
   const statLine = `${t('tree.membersCount', { count: stats.members })} · ${t('tree.generationsCount', { count: stats.generations })}`
 
-  const toggle = (id: string) =>
-    setExpanded((current) => ({ ...current, [id]: current[id] !== true }))
+  const toggle = (id: string) => {
+    // Against what the row is actually showing, not the raw map: under a filter a row with no
+    // entry of its own renders open, so flipping the raw `undefined` would write `true` and the
+    // first click on its Collapse button would do nothing.
+    const isOpen = effectiveExpanded[id] === true
+    setExpanded((current) => ({ ...current, [id]: !isOpen }))
+  }
 
   const select = (id: string) => {
     setSelectedId(id)
@@ -222,12 +268,34 @@ export const TreePage = () => {
     revealMember(id)
   }, [view, roots, revealMember])
 
-  const openModal = (kind: ModalKind, initialName = '', initialLife = EMPTY_LIFE_DETAILS) => {
+  const openModal = (
+    kind: ModalKind,
+    initialName = '',
+    initialLife = EMPTY_LIFE_DETAILS,
+    initialContact = EMPTY_CONTACT_DETAILS,
+  ) => {
     setModal(kind)
     setNameValue(initialName)
     setLifeValue(initialLife)
+    setContactValue(initialContact)
     setErrorCode(null)
     setMenu(null)
+  }
+
+  /**
+   * Opening the editor must show what is already on file. Update replaces rather than merges,
+   * so a field left blank here is a field cleared on save — the panel's Edit button used to
+   * seed only the name, which quietly wiped a member's dates the moment anyone renamed them
+   * from the detail panel.
+   */
+  const openEdit = () => {
+    const detail = selectedId === null ? undefined : detailById.get(selectedId)
+    openModal(
+      'edit',
+      selected?.name ?? '',
+      detail?.life ?? EMPTY_LIFE_DETAILS,
+      detail?.contact ?? EMPTY_CONTACT_DETAILS,
+    )
   }
 
   const openDelete = (node: FamilyTreeNode) => {
@@ -246,7 +314,7 @@ export const TreePage = () => {
       setErrorCode(null)
       const parentId = selectedId
       createMember.mutate(
-        { name: nameValue, parentId, life: lifeValue },
+        { name: nameValue, parentId, life: lifeValue, contact: contactValue },
         {
           onSuccess: (created) => {
             if (parentId !== null) setExpanded((current) => ({ ...current, [parentId]: true }))
@@ -269,7 +337,13 @@ export const TreePage = () => {
       }
       setErrorCode(null)
       updateMember.mutate(
-        { id: selected.id, name: nameValue, version: detail.version, life: lifeValue },
+        {
+          id: selected.id,
+          name: nameValue,
+          version: detail.version,
+          life: lifeValue,
+          contact: contactValue,
+        },
         {
           onSuccess: () => {
             closeModal()
@@ -343,43 +417,63 @@ export const TreePage = () => {
       onQueryChange={setQuery}
       onSelectResult={revealResult}
     >
-      <TreeCanvas
-        familyName={familyName}
-        rootCount={roots.length}
-        rootOpen={rootOpen}
-        rows={rows}
-        selectedId={selectedId}
-        direction={direction}
-        zoom={zoom}
-        isLoading={isLoading}
-        revealId={revealId}
-        onRevealed={clearReveal}
-        onToggleRoot={() => setRootOpen((open) => !open)}
-        onToggle={toggle}
-        onSelect={select}
-        onMenu={(id, anchor) => {
-          setSelectedId(id)
-          setMenu({
-            id,
-            top: anchor.bottom + 6,
-            inlineStart: direction === 'rtl' ? window.innerWidth - anchor.right : anchor.left,
-          })
-        }}
-        onZoomIn={() => setZoom((z) => Math.min(ZOOM_MAX, z + ZOOM_STEP))}
-        onZoomOut={() => setZoom((z) => Math.max(ZOOM_MIN, z - ZOOM_STEP))}
-        onZoomReset={() => setZoom(1)}
-        onCollapseAll={() => setExpanded({})}
-        onAddFirst={() => {
-          setSelectedId(null)
-          openModal('add')
-        }}
-      />
+      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}>
+        {/* Above the canvas rather than inside it: the canvas scrolls, and a filter bar that
+            scrolls away leaves the user unable to clear what is hiding half their family. */}
+        <div
+          style={{
+            padding: 'var(--space-4) var(--space-6)',
+            borderBottom: '1px solid var(--border)',
+            background: 'var(--surface)',
+          }}
+        >
+          <FilterControls
+            filters={filters}
+            activeCount={activeCount}
+            onChange={setFilter}
+            onReset={reset}
+          />
+        </div>
+
+        <TreeCanvas
+          familyName={familyName}
+          rootCount={roots.length}
+          rootOpen={rootOpen}
+          rows={rows}
+          selectedId={selectedId}
+          direction={direction}
+          zoom={zoom}
+          isLoading={isLoading}
+          revealId={revealId}
+          onRevealed={clearReveal}
+          onToggleRoot={() => setRootOpen((open) => !open)}
+          onToggle={toggle}
+          onSelect={select}
+          onMenu={(id, anchor) => {
+            setSelectedId(id)
+            setMenu({
+              id,
+              top: anchor.bottom + 6,
+              inlineStart: direction === 'rtl' ? window.innerWidth - anchor.right : anchor.left,
+            })
+          }}
+          onZoomIn={() => setZoom((z) => Math.min(ZOOM_MAX, z + ZOOM_STEP))}
+          onZoomOut={() => setZoom((z) => Math.max(ZOOM_MIN, z - ZOOM_STEP))}
+          onZoomReset={() => setZoom(1)}
+          onCollapseAll={() => setExpanded({})}
+          onAddFirst={() => {
+            setSelectedId(null)
+            openModal('add')
+          }}
+        />
+      </div>
 
       {panelOpen && selected !== undefined && (
         <MemberPanel
           member={selected}
           parentName={parentNameOf(selected)}
           lineage={lineageName(selected, byId)}
+          rootGeneration={rootGeneration}
           createdAt={detail?.createdAt}
           updatedAt={detail?.updatedAt}
           life={detail?.life}
@@ -389,7 +483,7 @@ export const TreePage = () => {
             setSelectedId(null)
           }}
           onAdd={() => openModal('add')}
-          onEdit={() => openModal('edit', selected.name)}
+          onEdit={openEdit}
           onMove={() => setMoveOpen(true)}
           onDelete={() => openDelete(selected)}
         />
@@ -405,17 +499,7 @@ export const TreePage = () => {
             setMenu(null)
           }}
           onAdd={() => openModal('add')}
-          onEdit={() =>
-            openModal(
-              'edit',
-              selected?.name ?? '',
-              // Seeded from the flat list, the same join the panel reads: opening the editor
-              // must show the dates already on file, not blank fields that would clear them.
-              selectedId === null
-                ? EMPTY_LIFE_DETAILS
-                : (detailById.get(selectedId)?.life ?? EMPTY_LIFE_DETAILS),
-            )
-          }
+          onEdit={openEdit}
           onMove={() => {
             setMenu(null)
             setMoveOpen(true)
@@ -433,11 +517,25 @@ export const TreePage = () => {
           parentName={modal === 'add' ? (selected?.name ?? familyName) : parentNameOf(selected)}
           childNames={selected?.children.map((child) => child.name) ?? []}
           nameValue={nameValue}
+          // Editing shows the member's own ancestry; adding shows the ancestry the new member
+          // is about to inherit, which is the selected node's own name followed by theirs.
+          lineage={
+            modal === 'add'
+              ? selected === undefined
+                ? ''
+                : nameParts(selected, byId).slice(0, NAME_PART_COUNT - 1).join(' ')
+              : selected === undefined
+                ? ''
+                : lineageName(selected, byId)
+          }
           lifeValue={lifeValue}
+          contactValue={contactValue}
+          countries={countries ?? []}
           errorCode={errorCode}
           isSaving={createMember.isPending || updateMember.isPending || deleteMember.isPending}
           onNameChange={setNameValue}
           onLifeChange={setLifeValue}
+          onContactChange={setContactValue}
           onCancel={closeModal}
           onConfirm={confirm}
         />

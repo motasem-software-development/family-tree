@@ -1,4 +1,6 @@
 using FamilyTree.Api.Authorization;
+using FamilyTree.Api.Endpoints.FamilyTrees;
+using FamilyTree.Application.Export;
 using FamilyTree.Application.FamilyMembers;
 using FamilyTree.Contracts.FamilyMembers;
 using FamilyTree.Domain.Authorization;
@@ -17,8 +19,48 @@ public static class FamilyMemberEndpoints
         // arrives here.
         const int defaultSearchLimit = 20;
 
-        group.MapGet("/", async (IFamilyMemberService members, CancellationToken ct) =>
-            Results.Ok(await members.ListAsync(ct)))
+        // [AsParameters] binds the whole filter set off the query string. Sharing the record
+        // with the tree view and the export is what keeps specification §15's combinability
+        // structural: a filter added to it reaches all three at once (design spec §5.1).
+        group.MapGet("/", async Task<IResult> (
+            [AsParameters] MemberFilterRequest request,
+            IFamilyMemberService members,
+            CancellationToken ct) =>
+        {
+            if (!MemberFilterBinding.TryBind(request, out var filter, out var error)) return error;
+
+            return Results.Ok(await members.ListAsync(filter, ct));
+        })
+            .RequirePermission(Permissions.Member.View);
+
+        // Guarded by Member.View, the Members page's own permission — no new permission is
+        // introduced for the export (design spec §1.4). Anyone who can see the list can export it.
+        //
+        // It takes the same [AsParameters] MemberFilterRequest the list takes and re-runs the
+        // same query, which is what makes specification §18's "export respects filters" and
+        // §27's "export respects permissions" one guarantee rather than two.
+        group.MapGet("/export.xlsx", async Task<IResult> (
+            [AsParameters] MemberFilterRequest request,
+            HttpRequest httpRequest,
+            IMemberExcelExporter exporter,
+            CancellationToken ct) =>
+        {
+            if (!MemberFilterBinding.TryBind(request, out var filter, out var error)) return error;
+
+            // The same resolver the PDF export uses, so one Accept-Language header controls the
+            // language of both exports.
+            var language = CaptionLanguageResolver.Resolve(httpRequest);
+
+            var result = await exporter.ExportAsync(filter, language, ct);
+
+            // Results.File percent-encodes a non-ASCII download name into filename* per RFC 5987,
+            // which is what lets an Arabic family name survive the header — the same mechanism
+            // export.pdf depends on.
+            return Results.File(
+                result.Content,
+                contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                fileDownloadName: $"{result.FamilyTreeName}.xlsx");
+        })
             .RequirePermission(Permissions.Member.View);
 
         // Declared before "/{id:guid}" for readability only — the guid route constraint makes

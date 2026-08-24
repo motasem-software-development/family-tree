@@ -5,8 +5,9 @@ namespace FamilyTree.Contracts.FamilyMembers;
 /// version bump, so a single form submission does not leave the client's returned version stale
 /// against its own edit.
 ///
-/// The life details are replace-semantics, not patch-semantics: omitting a date clears it. That
-/// is what makes correcting a mistaken death record possible. <paramref name="Version"/> is the value from the last read and is
+/// The life details and contact details are replace-semantics, not patch-semantics: omitting a
+/// date, a phone number, or a national ID clears it. That is what makes correcting a mistaken
+/// death record — or a wrong phone number — possible. <paramref name="Version"/> is the value from the last read and is
 /// required — omitting it is a stale write by definition.
 ///
 /// The three trailing properties exist ONLY so the API can reject them explicitly. Design
@@ -23,4 +24,8 @@ public sealed record UpdateFamilyMemberRequest(
     Guid? FamilyTreeId = null,
     DateOnly? DateOfBirth = null,
     DateOnly? DateOfDeath = null,
-    bool IsDeceased = false);
+    bool IsDeceased = false,
+    string? NationalId = null,
+    string? MobileNumber = null,
+    string? WhatsAppNumber = null,
+    int? CountryId = null);

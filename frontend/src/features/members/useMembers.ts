@@ -1,22 +1,47 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import type { ContactDetails } from './contactDetails'
 import type { LifeDetails } from './lifeDetails'
+import type { MemberFilters } from '../filters/filterParams'
 import { membersApi } from './membersApi'
-import type { FamilyMember, FamilyTreeView, TreeQueryParams } from './types'
+import type { Branch, FamilyMemberListItem, FamilyTreeView, TreeQueryParams } from './types'
 
 export const memberKeys = {
   all: ['members'] as const,
-  tree: (params?: TreeQueryParams) => ['members', 'tree', params ?? {}] as const,
+  // The filters are part of the key: two filtered views are two different results, and caching
+  // them under one key would show the previous filter's rows while the new ones load.
+  list: (filters?: MemberFilters) => ['members', 'list', filters ?? {}] as const,
+  tree: (filters?: MemberFilters, params?: TreeQueryParams) =>
+    ['members', 'tree', filters ?? {}, params ?? {}] as const,
   // Nested under 'members' so a create/edit/delete invalidation refreshes search results too.
   search: (query: string, limit: number) => ['members', 'search', query, limit] as const,
+  // Likewise nested: a move changes the tree's shape, and with it which members are branches
+  // and how deep the tree goes.
+  branches: (rootId?: string) => ['members', 'branches', rootId ?? null] as const,
+  generations: (rootId?: string) => ['members', 'generations', rootId ?? null] as const,
 }
 
-export const useMembersQuery = () =>
-  useQuery<FamilyMember[]>({ queryKey: memberKeys.all, queryFn: () => membersApi.list() })
+export const useMembersQuery = (filters?: MemberFilters) =>
+  useQuery<FamilyMemberListItem[]>({
+    queryKey: memberKeys.list(filters),
+    queryFn: () => membersApi.list(filters),
+  })
 
-export const useTreeQuery = (params?: TreeQueryParams) =>
+export const useTreeQuery = (filters?: MemberFilters, params?: TreeQueryParams) =>
   useQuery<FamilyTreeView>({
-    queryKey: memberKeys.tree(params),
-    queryFn: () => membersApi.tree(params),
+    queryKey: memberKeys.tree(filters, params),
+    queryFn: () => membersApi.tree(filters, params),
+  })
+
+export const useBranchesQuery = (rootId?: string) =>
+  useQuery<Branch[]>({
+    queryKey: memberKeys.branches(rootId),
+    queryFn: () => membersApi.branches(rootId),
+  })
+
+export const useGenerationsQuery = (rootId?: string) =>
+  useQuery<number[]>({
+    queryKey: memberKeys.generations(rootId),
+    queryFn: () => membersApi.generations(rootId),
   })
 
 /**
@@ -39,11 +64,13 @@ export const useCreateMember = () => {
       name,
       parentId,
       life,
+      contact,
     }: {
       name: string
       parentId: string | null
       life: LifeDetails
-    }) => membersApi.create(name, parentId, life),
+      contact: ContactDetails
+    }) => membersApi.create(name, parentId, life, contact),
     onSuccess: invalidate,
   })
 }
@@ -56,12 +83,14 @@ export const useUpdateMember = () => {
       name,
       version,
       life,
+      contact,
     }: {
       id: string
       name: string
       version: number
       life: LifeDetails
-    }) => membersApi.update(id, name, version, life),
+      contact: ContactDetails
+    }) => membersApi.update(id, name, version, life, contact),
     onSuccess: invalidate,
   })
 }

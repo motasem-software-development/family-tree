@@ -9,7 +9,16 @@ public interface IFamilyMemberService
     /// <summary>Returns null when no such member is visible to the caller's tenant.</summary>
     Task<FamilyMemberResponse?> GetAsync(Guid id, CancellationToken ct = default);
 
-    Task<IReadOnlyList<FamilyMemberResponse>> ListAsync(CancellationToken ct = default);
+    /// <summary>
+    /// The filtered members list, ordered by name. Every row carries the branch and generation
+    /// derived from the parent chain relative to <c>filter.RootId</c> — never stored, so a moved
+    /// subtree renumbers itself on the next read (design spec §2.5).
+    ///
+    /// Pass <see cref="MemberFilter.None"/> for the whole tree. An absent filter field means "no
+    /// filter"; a filter matching nothing returns an empty list rather than an error.
+    /// </summary>
+    Task<IReadOnlyList<FamilyMemberListItem>> ListAsync(
+        MemberFilter filter, CancellationToken ct = default);
 
     /// <summary>
     /// Case-insensitive substring match on name, ordered by (name, id).

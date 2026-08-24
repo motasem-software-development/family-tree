@@ -460,7 +460,11 @@ const TreeRowView = ({
 
       <button
         type="button"
-        onClick={() => onSelect(row.id)}
+        // A dimmed row is context, not an answer: it is present only to hold up a matching
+        // descendant (design spec §4.2), and a detail panel for a member who is not in the
+        // result is a dead end the user has to close.
+        onClick={row.dimmed ? undefined : () => onSelect(row.id)}
+        aria-disabled={row.dimmed || undefined}
         style={{
           height: 36,
           minWidth: 140,
@@ -478,7 +482,7 @@ const TreeRowView = ({
           fontSize: 14,
           fontWeight,
           color,
-          cursor: 'pointer',
+          cursor: row.dimmed ? 'default' : 'pointer',
           opacity: row.dimmed ? 0.35 : 1,
           transition: 'all var(--motion-fast) var(--ease-standard)',
         }}

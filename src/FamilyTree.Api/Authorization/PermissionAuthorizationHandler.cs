@@ -13,7 +13,7 @@ public sealed class PermissionAuthorizationHandler : AuthorizationHandler<Permis
         AuthorizationHandlerContext context, PermissionRequirement requirement)
     {
         var granted = context.User.FindAll(JwtTokenService.PermissionClaim)
-            .Any(c => c.Value == requirement.Permission);
+            .Any(c => requirement.Permissions.Contains(c.Value));
 
         if (granted) context.Succeed(requirement);
 

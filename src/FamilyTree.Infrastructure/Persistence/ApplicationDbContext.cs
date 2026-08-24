@@ -1,6 +1,7 @@
 using FamilyTree.Application.Common;
 using FamilyTree.Domain.Authentication;
 using FamilyTree.Domain.Authorization;
+using FamilyTree.Domain.Countries;
 using FamilyTree.Domain.FamilyMembers;
 using FamilyTree.Domain.FamilyTrees;
 using FamilyTree.Domain.Tenants;
@@ -34,6 +35,7 @@ public sealed class ApplicationDbContext(
     public DbSet<RolePermission> RolePermissions => Set<RolePermission>();
     public new DbSet<UserRole> UserRoles => Set<UserRole>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+    public DbSet<Country> Countries => Set<Country>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -75,7 +77,8 @@ public sealed class ApplicationDbContext(
         builder.Entity<ApplicationUser>().HasQueryFilter(x => x.TenantId == _tenantId);
         builder.Entity<FamilyMember>().HasQueryFilter(x => x.TenantId == _tenantId);
 
-        // Tenant and Permission are deliberately unfiltered: Tenant is the filter's own subject,
-        // and the permission catalog is system-level rather than tenant-owned.
+        // Tenant, Permission and Country are deliberately unfiltered: Tenant is the filter's own
+        // subject, and the permission catalog and country list are system-level reference data
+        // rather than tenant-owned (design §2.1).
     }
 }

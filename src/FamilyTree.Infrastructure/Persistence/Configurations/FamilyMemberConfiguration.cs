@@ -1,3 +1,4 @@
+using FamilyTree.Domain.Countries;
 using FamilyTree.Domain.FamilyMembers;
 using FamilyTree.Domain.FamilyTrees;
 using FamilyTree.Domain.Tenants;
@@ -25,6 +26,14 @@ public sealed class FamilyMemberConfiguration : IEntityTypeConfiguration<FamilyM
             table.HasCheckConstraint(
                 "ck_member_death_date_implies_deceased",
                 "date_of_death IS NULL OR is_deceased");
+
+            // Same belt-and-braces argument as the two constraints above: Phase 2.5's bulk
+            // import writes members in volume and a CHECK cannot be bypassed by a code path
+            // that forgets the aggregate. Uniqueness is a filtered index, not a CHECK — a
+            // constraint cannot see other rows.
+            table.HasCheckConstraint(
+                "ck_member_national_id_digits",
+                "national_id IS NULL OR national_id ~ '^[0-9]{9}$'");
         });
         builder.HasKey(x => x.Id);
         builder.Property(x => x.Name).IsRequired().HasMaxLength(FamilyMember.MaxNameLength);
@@ -35,6 +44,12 @@ public sealed class FamilyMemberConfiguration : IEntityTypeConfiguration<FamilyM
         builder.Property(x => x.DateOfBirth).HasColumnType("date");
         builder.Property(x => x.DateOfDeath).HasColumnType("date");
         builder.Property(x => x.IsDeceased).IsRequired().HasDefaultValue(false);
+
+        // Text, not a numeric type: specification §4.2 requires the value to survive exactly as
+        // entered, and any numeric column would eat a leading zero.
+        builder.Property(x => x.NationalId).HasMaxLength(9);
+        builder.Property(x => x.MobileNumber).HasMaxLength(20);
+        builder.Property(x => x.WhatsAppNumber).HasMaxLength(20);
 
         // Optimistic concurrency (design spec §3.1, technical specification §43). EF puts this
         // column in the UPDATE's WHERE clause; a stale value matches no row and raises
@@ -86,6 +101,14 @@ public sealed class FamilyMemberConfiguration : IEntityTypeConfiguration<FamilyM
                .HasForeignKey(x => x.TenantId)
                .OnDelete(DeleteBehavior.Restrict);
 
+        // Restrict, not Cascade: a country is reference data, and deleting one must never
+        // silently delete the people who live there. In practice countries are never deleted;
+        // the constraint is what makes that a guarantee rather than a habit.
+        builder.HasOne<Country>()
+               .WithMany()
+               .HasForeignKey(x => x.CountryId)
+               .OnDelete(DeleteBehavior.Restrict);
+
         // Technical specification §12. The (family_tree_id, parent_id) index carries tree
         // traversal — "give me the children of this member" — which is the hot path.
         builder.HasIndex(x => x.FamilyTreeId);
@@ -93,5 +116,19 @@ public sealed class FamilyMemberConfiguration : IEntityTypeConfiguration<FamilyM
         builder.HasIndex(x => new { x.FamilyTreeId, x.ParentId });
         builder.HasIndex(x => new { x.FamilyTreeId, x.Name });
         builder.HasIndex(x => x.TenantId);
+
+        // Design §2.3. Per-tenant, not global: two tenants are unrelated families, and a global
+        // unique index would let one tenant's write fail because of a row it cannot see —
+        // leaking the existence of that record across the boundary. Filtered on NOT NULL
+        // because the overwhelming majority of members have no recorded ID and nulls must not
+        // collide with each other.
+        builder.HasIndex(x => new { x.TenantId, x.NationalId })
+               .HasDatabaseName("ux_family_members_tenant_national_id")
+               .IsUnique()
+               .HasFilter("national_id IS NOT NULL");
+
+        // Specification §25 — both are filter predicates on the members list.
+        builder.HasIndex(x => x.CountryId);
+        builder.HasIndex(x => x.IsDeceased);
     }
 }
