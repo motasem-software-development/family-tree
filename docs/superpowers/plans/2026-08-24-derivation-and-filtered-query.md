@@ -270,7 +270,7 @@ side of the boundary.
 - Produces: `MemberFilterPredicate.Matches(FamilyMember member, MemberPlacement placement, MemberFilter filter) -> bool`.
   Used by Task 6.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 - Each predicate alone: search (case-insensitive substring, Arabic), status alive, status
   deceased, branch, generation, country.
@@ -284,14 +284,14 @@ side of the boundary.
   contact details, and a name box that silently searches them discloses more than the user asked
   for.
 
-- [ ] **Step 2: Implement `Matches`**
+- [x] **Step 2: Implement `Matches`**
 
 Plain `&&` across the supplied predicates; a null filter field is skipped. Search uses
 `CultureInfo.InvariantCulture` with `CompareOptions.IgnoreCase` `IndexOf`, matching `ILIKE`'s
 behaviour on the Arabic corpus closely enough that Task 4's cross-check test holds.
 
-- [ ] **Step 3: Run the tests** — passes.
-- [ ] **Step 4: Commit** — `feat: combine the member filters with a single AND`
+- [x] **Step 3: Run the tests** — passes.
+- [x] **Step 4: Commit** — `feat: combine the member filters with a single AND`
 
 ---
 
