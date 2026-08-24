@@ -111,6 +111,8 @@ public sealed class FamilyMemberService(
             request.DateOfBirth,
             request.DateOfDeath,
             request.IsDeceased,
+            new ContactDetails(
+                member.NationalId, member.MobileNumber, member.WhatsAppNumber, member.CountryId),
             timeProvider.GetUtcNow());
 
         // Load-bearing. EF builds `UPDATE ... WHERE id = @id AND version = @original`, and

@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using FamilyTree.Domain.Common;
 
 namespace FamilyTree.Domain.FamilyMembers;
@@ -7,7 +8,7 @@ namespace FamilyTree.Domain.FamilyMembers;
 /// <c>family_trees</c> row — so a first-generation member has <c>ParentId = null</c>
 /// (technical specification §10).
 /// </summary>
-public sealed class FamilyMember : Entity, ITenantOwned
+public sealed partial class FamilyMember : Entity, ITenantOwned
 {
     public const int MaxNameLength = 200;
 
@@ -32,6 +33,29 @@ public sealed class FamilyMember : Entity, ITenantOwned
     public bool IsDeceased { get; private set; }
 
     /// <summary>
+    /// Palestinian national identification number: exactly nine digits, stored as text so a
+    /// leading zero survives (specification §4). Null when unknown, which is the norm for the
+    /// imported tree. Uniqueness is per-tenant and enforced by a filtered database index, not
+    /// here — this aggregate cannot see its siblings.
+    /// </summary>
+    public string? NationalId { get; private set; }
+
+    /// <summary>Normalized E.164, dialing code included. Null when unknown.</summary>
+    public string? MobileNumber { get; private set; }
+
+    /// <summary>
+    /// Normalized E.164. Deliberately independent of <see cref="MobileNumber"/>: the number a
+    /// person uses for WhatsApp is often not the one they answer calls on (specification §6).
+    /// </summary>
+    public string? WhatsAppNumber { get; private set; }
+
+    /// <summary>
+    /// References the system-level countries table. Not a navigation property: the aggregate
+    /// has no business reading country names, and the reference is resolved at the read model.
+    /// </summary>
+    public int? CountryId { get; private set; }
+
+    /// <summary>
     /// Application-managed optimistic concurrency token (design spec §3.1). Mapped as an EF
     /// concurrency token, so a stale update fails loudly instead of silently overwriting a
     /// concurrent edit (technical specification §43).
@@ -40,7 +64,8 @@ public sealed class FamilyMember : Entity, ITenantOwned
 
     public static FamilyMember Create(
         Guid tenantId, Guid familyTreeId, Guid? parentId, string name, DateTimeOffset now,
-        DateOnly? dateOfBirth = null, DateOnly? dateOfDeath = null, bool isDeceased = false)
+        DateOnly? dateOfBirth = null, DateOnly? dateOfDeath = null, bool isDeceased = false,
+        ContactDetails contact = default)
     {
         if (tenantId == Guid.Empty)
             throw new DomainException("MEMBER_TENANT_REQUIRED", "A family member must belong to a tenant.");
@@ -58,39 +83,60 @@ public sealed class FamilyMember : Entity, ITenantOwned
         };
         member.Name = ValidateName(name);
         member.ApplyLifeDetails(dateOfBirth, dateOfDeath, isDeceased, now);
+        member.ApplyContactDetails(contact);
         member.InitializeTimestamps(now);
         return member;
     }
 
     /// <summary>
-    /// The single edit command behind the update endpoint. Name and life details move together
-    /// because one form submission is one edit: bumping <see cref="Version"/> twice for a
-    /// single save would leave the version returned to the client already stale against its
-    /// own write.
+    /// The single edit command behind the update endpoint. Name, life details, and contact
+    /// details move together because one form submission is one edit: bumping
+    /// <see cref="Version"/> more than once for a single save would leave the version returned
+    /// to the client already stale against its own write.
     /// </summary>
     public void Update(
-        string name, DateOnly? dateOfBirth, DateOnly? dateOfDeath, bool isDeceased, DateTimeOffset now)
+        string name, DateOnly? dateOfBirth, DateOnly? dateOfDeath, bool isDeceased,
+        ContactDetails contact, DateTimeOffset now)
     {
         // Validate everything before mutating anything: a rejected update must leave the
         // entity exactly as it was, version included.
         var validatedName = ValidateName(name);
         var life = ValidateLifeDetails(dateOfBirth, dateOfDeath, isDeceased, now);
+        var validatedContact = ValidateContactDetails(contact);
 
         Name = validatedName;
         DateOfBirth = life.DateOfBirth;
         DateOfDeath = life.DateOfDeath;
         IsDeceased = life.IsDeceased;
+        NationalId = validatedContact.NationalId;
+        MobileNumber = validatedContact.MobileNumber;
+        WhatsAppNumber = validatedContact.WhatsAppNumber;
+        CountryId = validatedContact.CountryId;
         Version++;
         Touch(now);
     }
 
     /// <summary>
-    /// Changes only the name, leaving the life details as they are. A delegate to
+    /// Back-compatibility overload for callers that only ever knew about life details.
+    /// Delegates to the six-parameter <see cref="Update"/> with the member's current contact
+    /// details threaded through, so an old-style call preserves contact data instead of
+    /// wiping it — the same threading pattern <see cref="Rename"/> uses.
+    /// </summary>
+    public void Update(
+        string name, DateOnly? dateOfBirth, DateOnly? dateOfDeath, bool isDeceased, DateTimeOffset now) =>
+        Update(
+            name, dateOfBirth, dateOfDeath, isDeceased,
+            new ContactDetails(NationalId, MobileNumber, WhatsAppNumber, CountryId), now);
+
+    /// <summary>
+    /// Changes only the name, leaving the life and contact details as they are. A delegate to
     /// <see cref="Update"/> rather than its own validate-then-mutate block, so there is exactly
     /// one path through the member's write rules and no way for the two to drift apart.
     /// </summary>
     public void Rename(string name, DateTimeOffset now) =>
-        Update(name, DateOfBirth, DateOfDeath, IsDeceased, now);
+        Update(
+            name, DateOfBirth, DateOfDeath, IsDeceased,
+            new ContactDetails(NationalId, MobileNumber, WhatsAppNumber, CountryId), now);
 
     /// <summary>
     /// Re-parents the member. A null <paramref name="newParentId"/> promotes them to first
@@ -156,4 +202,70 @@ public sealed class FamilyMember : Entity, ITenantOwned
             throw new DomainException("MEMBER_NAME_TOO_LONG", $"Member name exceeds {MaxNameLength} characters.");
         return trimmed;
     }
+
+    private void ApplyContactDetails(ContactDetails contact)
+    {
+        var validated = ValidateContactDetails(contact);
+        NationalId = validated.NationalId;
+        MobileNumber = validated.MobileNumber;
+        WhatsAppNumber = validated.WhatsAppNumber;
+        CountryId = validated.CountryId;
+    }
+
+    /// <summary>
+    /// Validates and normalizes the contact details, returning the value to store. Blank is
+    /// normalized to null throughout: a form submits "" for an untouched optional field, and
+    /// storing that would make "empty string" and "unknown" two different states of the same
+    /// fact.
+    ///
+    /// Dial-code agreement is NOT checked here. It needs the country's dial code, which lives
+    /// in the countries table, and this aggregate cannot read the database —
+    /// FamilyMemberService applies that check and raises the same MEMBER_PHONE_INVALID code
+    /// (design §5.4, refined).
+    /// </summary>
+    private static ContactDetails ValidateContactDetails(ContactDetails contact) => new(
+        ValidateNationalId(contact.NationalId),
+        ValidatePhone(contact.MobileNumber),
+        ValidatePhone(contact.WhatsAppNumber),
+        contact.CountryId);
+
+    private static string? ValidateNationalId(string? nationalId)
+    {
+        var trimmed = nationalId?.Trim();
+        if (string.IsNullOrEmpty(trimmed)) return null;
+
+        if (!NationalIdPattern().IsMatch(trimmed))
+            throw new DomainException(
+                "MEMBER_NATIONAL_ID_INVALID", "A national ID must be exactly 9 digits.");
+
+        // Returned exactly as matched, never reformatted: specification §4.2 requires the value
+        // to be preserved as entered, and a leading zero is meaningful.
+        return trimmed;
+    }
+
+    private static string? ValidatePhone(string? phone)
+    {
+        if (string.IsNullOrWhiteSpace(phone)) return null;
+
+        // Spaces, dashes and parentheses are how people write phone numbers and how a pasted
+        // number arrives; E.164 has no room for them. Stripping before validating accepts the
+        // human form and stores the canonical one.
+        var normalized = PhoneSeparators().Replace(phone.Trim(), string.Empty);
+
+        if (!E164Pattern().IsMatch(normalized))
+            throw new DomainException(
+                "MEMBER_PHONE_INVALID",
+                "A phone number must be in international format, e.g. +970599123456.");
+
+        return normalized;
+    }
+
+    [GeneratedRegex("^[0-9]{9}$")]
+    private static partial Regex NationalIdPattern();
+
+    [GeneratedRegex(@"^\+[1-9]\d{7,14}$")]
+    private static partial Regex E164Pattern();
+
+    [GeneratedRegex(@"[\s\-()]")]
+    private static partial Regex PhoneSeparators();
 }
