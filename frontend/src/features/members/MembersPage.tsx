@@ -13,6 +13,7 @@ import { fullName, indexById, lineageName } from './fullName'
 import { lifeDetailsOf, lifeYears, type LifeDetails } from './lifeDetails'
 import { LifeStatusDot } from './LifeStatusDot'
 import { MemberForm } from './MemberForm'
+import { downloadMembersXlsx } from './membersExportApi'
 import {
   memberKeys,
   useCreateMember,
@@ -78,6 +79,7 @@ export function MembersPage() {
   const [editing, setEditing] = useState<Editing>({ mode: 'none' })
   const [pendingDelete, setPendingDelete] = useState<FamilyMember | null>(null)
   const [errorCode, setErrorCode] = useState<string | null>(null)
+  const [isExporting, setIsExporting] = useState(false)
 
   /**
    * The form renders above the list, inside the page's own scroll container. Editing a member
@@ -154,6 +156,23 @@ export function MembersPage() {
   const familyName = user?.familyTreeName ?? ''
   const isFiltered = activeCount > 0
 
+  const handleExport = async () => {
+    setErrorCode(null)
+    setIsExporting(true)
+    try {
+      // The filters currently in the URL, passed through rather than re-derived — the server
+      // re-runs them, so the file matches what the page is showing.
+      await downloadMembersXlsx(filters, i18n.language, `${familyName}.xlsx`)
+    } catch {
+      // No coded errors to distinguish here: the only 400 the endpoint gives is for a status the
+      // filter controls cannot produce, so anything reaching this point is a transport failure.
+      setErrorCode('MEMBERS_EXPORT_FAILED')
+    } finally {
+      setIsExporting(false)
+    }
+  }
+
+
   /** The flag and the localised name, or a dash when the member has no country on file. */
   const countryCell = (member: FamilyMemberListItem): string => {
     const country = countries?.find((candidate) => candidate.id === member.countryId)
@@ -175,6 +194,33 @@ export function MembersPage() {
             }}
           >
             <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>{t('members.title')}</h1>
+            <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
+            {/* Guarded by Member.View, the permission that gets you this page at all — the
+                export carries exactly the data already on screen (design spec §1.4). */}
+            {hasPermission('Member.View') && (
+              <button
+                type="button"
+                onClick={() => void handleExport()}
+                // Exporting zero rows produces a header-only workbook, which is a confusing
+                // thing to hand someone who just clicked Export.
+                disabled={isExporting || all.length === 0}
+                style={{
+                  height: 'var(--control-h-md)',
+                  padding: '0 16px',
+                  border: '1px solid var(--border-strong)',
+                  borderRadius: 'var(--r-md)',
+                  background: 'var(--surface)',
+                  color: all.length === 0 || isExporting ? 'var(--text-4)' : 'var(--text-1)',
+                  fontFamily: 'inherit',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: all.length === 0 || isExporting ? 'default' : 'pointer',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {t(isExporting ? 'members.exporting' : 'members.export')}
+              </button>
+            )}
             {hasPermission('Member.Create') && editing.mode === 'none' && (
               <button
                 type="button"
@@ -195,6 +241,7 @@ export function MembersPage() {
                 {t('members.add')}
               </button>
             )}
+            </div>
           </div>
 
           {/* Error text comes from the stable server code, never from the server's message —

@@ -183,7 +183,9 @@
     "dialCode": "رمز الاتصال",
     "noMatches": "لا توجد دولة مطابقة",
     "searchPlaceholder": "بحث…",
-    "lineage": "النسب"
+    "lineage": "النسب",
+    "export": "تصدير إلى إكسل",
+    "exporting": "جارٍ التصدير…"
   },
   "filters": {
     "title": "عوامل التصفية",
@@ -417,6 +419,7 @@
     "COUNTRY_NAME_REQUIRED": "اسم البلد مطلوب.",
     "COUNTRY_NAME_TOO_LONG": "اسم البلد طويل جداً (100 حرف كحد أقصى).",
     "COUNTRY_DIAL_CODE_INVALID": "رمز الاتصال غير صالح.",
-    "FILTER_INVALID_STATUS": "قيمة تصفية الحالة غير معروفة. استخدم الكل أو على قيد الحياة أو متوفى."
+    "FILTER_INVALID_STATUS": "قيمة تصفية الحالة غير معروفة. استخدم الكل أو على قيد الحياة أو متوفى.",
+    "MEMBERS_EXPORT_FAILED": "تعذّر إنشاء ملف التصدير. حاول مرة أخرى."
   }
 }

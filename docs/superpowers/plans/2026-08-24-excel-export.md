@@ -284,7 +284,7 @@ Binds `[AsParameters] MemberFilterRequest`, resolves the language through `Capti
 - Consumes: `apiFetchBlob`, `toFilterParams`.
 - Produces: `downloadMembersXlsx(filters, language, fileName)`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 - The request URL carries the **current filters**, built by `toFilterParams` — not re-derived.
   A second serialisation is a second chance to disagree with the server.
@@ -298,16 +298,16 @@ Binds `[AsParameters] MemberFilterRequest`, resolves the language through `Capti
 - The button is disabled while the list is empty. Exporting zero rows produces a header-only
   workbook, which is a confusing thing to hand someone who clicked Export.
 
-- [ ] **Step 2: Implement**
+- [x] **Step 2: Implement**
 
 `membersExportApi.ts` mirrors `exportApi.ts` — same blob-and-revoke shape, same comment about the
 language header, so the two read as siblings.
 
 The button sits in the page header beside Add Member.
 
-- [ ] **Step 3: Add the locale keys** — `members.export`, `members.exportFailed`.
-- [ ] **Step 4: Run the checks** — `npm test && npm run lint && npm run build` in `frontend/`.
-- [ ] **Step 5: Commit** — `feat: download the filtered members list as a workbook`
+- [x] **Step 3: Add the locale keys** — `members.export`, `members.exportFailed`.
+- [x] **Step 4: Run the checks** — `npm test && npm run lint && npm run build` in `frontend/`.
+- [x] **Step 5: Commit** — `feat: download the filtered members list as a workbook`
 
 ---
 
