@@ -6,6 +6,8 @@ import { useDirection } from '../../i18n/useDirection'
 import { ApiError } from '../../services/apiClient'
 import { useAuth } from '../auth/AuthContext'
 import { useCountriesQuery } from '../countries/useCountries'
+import { FilterControls } from '../filters/FilterControls'
+import { useMemberFilters } from '../filters/useMemberFilters'
 import { EMPTY_CONTACT_DETAILS, contactDetailsOf, type ContactDetails } from '../members/contactDetails'
 import {
   EMPTY_LIFE_DETAILS,
@@ -57,9 +59,14 @@ export const TreePage = () => {
   const direction = useDirection()
   const { hasPermission } = useAuth()
 
-  const { data: view, isLoading } = useTreeQuery()
+  const { filters, activeCount, setFilter, reset } = useMemberFilters()
+  const { data: view, isLoading } = useTreeQuery(filters)
   // The tree endpoint returns structure only. The flat list carries `version` (needed for every
   // rename) plus createdAt/updatedAt for the detail panel, so both load and join by id.
+  //
+  // Unfiltered on purpose: it is a lookup table, not a view. A member kept visible by the
+  // ancestor rule still needs their version to be renamable, and a filtered list would leave
+  // them without one.
   const { data: members } = useMembersQuery()
   const { data: countries } = useCountriesQuery()
 
@@ -382,37 +389,56 @@ export const TreePage = () => {
       onQueryChange={setQuery}
       onSelectResult={revealResult}
     >
-      <TreeCanvas
-        familyName={familyName}
-        rootCount={roots.length}
-        rootOpen={rootOpen}
-        rows={rows}
-        selectedId={selectedId}
-        direction={direction}
-        zoom={zoom}
-        isLoading={isLoading}
-        revealId={revealId}
-        onRevealed={clearReveal}
-        onToggleRoot={() => setRootOpen((open) => !open)}
-        onToggle={toggle}
-        onSelect={select}
-        onMenu={(id, anchor) => {
-          setSelectedId(id)
-          setMenu({
-            id,
-            top: anchor.bottom + 6,
-            inlineStart: direction === 'rtl' ? window.innerWidth - anchor.right : anchor.left,
-          })
-        }}
-        onZoomIn={() => setZoom((z) => Math.min(ZOOM_MAX, z + ZOOM_STEP))}
-        onZoomOut={() => setZoom((z) => Math.max(ZOOM_MIN, z - ZOOM_STEP))}
-        onZoomReset={() => setZoom(1)}
-        onCollapseAll={() => setExpanded({})}
-        onAddFirst={() => {
-          setSelectedId(null)
-          openModal('add')
-        }}
-      />
+      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}>
+        {/* Above the canvas rather than inside it: the canvas scrolls, and a filter bar that
+            scrolls away leaves the user unable to clear what is hiding half their family. */}
+        <div
+          style={{
+            padding: 'var(--space-4) var(--space-6)',
+            borderBottom: '1px solid var(--border)',
+            background: 'var(--surface)',
+          }}
+        >
+          <FilterControls
+            filters={filters}
+            activeCount={activeCount}
+            onChange={setFilter}
+            onReset={reset}
+          />
+        </div>
+
+        <TreeCanvas
+          familyName={familyName}
+          rootCount={roots.length}
+          rootOpen={rootOpen}
+          rows={rows}
+          selectedId={selectedId}
+          direction={direction}
+          zoom={zoom}
+          isLoading={isLoading}
+          revealId={revealId}
+          onRevealed={clearReveal}
+          onToggleRoot={() => setRootOpen((open) => !open)}
+          onToggle={toggle}
+          onSelect={select}
+          onMenu={(id, anchor) => {
+            setSelectedId(id)
+            setMenu({
+              id,
+              top: anchor.bottom + 6,
+              inlineStart: direction === 'rtl' ? window.innerWidth - anchor.right : anchor.left,
+            })
+          }}
+          onZoomIn={() => setZoom((z) => Math.min(ZOOM_MAX, z + ZOOM_STEP))}
+          onZoomOut={() => setZoom((z) => Math.max(ZOOM_MIN, z - ZOOM_STEP))}
+          onZoomReset={() => setZoom(1)}
+          onCollapseAll={() => setExpanded({})}
+          onAddFirst={() => {
+            setSelectedId(null)
+            openModal('add')
+          }}
+        />
+      </div>
 
       {panelOpen && selected !== undefined && (
         <MemberPanel

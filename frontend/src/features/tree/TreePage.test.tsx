@@ -358,7 +358,7 @@ describe('TreePage', () => {
     })
     renderPage()
 
-    await user.type(await screen.findByLabelText(/بحث|Search/i), 'محمد')
+    await user.type(await screen.findByLabelText(i18n.t('tree.searchPlaceholder')), 'محمد')
 
     // Generation alone was the old caption and could not tell 39 محمدs apart.
     expect(await screen.findByText('داوود ‹ سلمان')).toBeInTheDocument()
@@ -370,7 +370,7 @@ describe('TreePage', () => {
     vi.mocked(membersApi.search).mockResolvedValue({ total: 0, items: [] })
     renderPage()
 
-    await user.type(await screen.findByLabelText(/بحث|Search/i), 'فارس')
+    await user.type(await screen.findByLabelText(i18n.t('tree.searchPlaceholder')), 'فارس')
 
     await waitFor(() => expect(membersApi.search).toHaveBeenCalledWith('فارس', 8))
   })
@@ -410,7 +410,7 @@ describe('TreePage', () => {
     })
     renderPage()
 
-    await user.type(await screen.findByLabelText(/بحث|Search/i), 'فارس')
+    await user.type(await screen.findByLabelText(i18n.t('tree.searchPlaceholder')), 'فارس')
     // The dropdown result button contains BOTH the name and the ancestor caption, so its
     // accessible name is the two joined — unique, whereas the caption alone ("سليمان") also
     // matches the root row rendered in the outline behind the dropdown.

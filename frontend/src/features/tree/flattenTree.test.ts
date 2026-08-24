@@ -80,6 +80,38 @@ describe('flattenTree', () => {
     expect(faris?.dimmed).toBe(true)
   })
 
+  it('dims a member the server filter kept only as an ancestor', () => {
+    // Design spec §4.2: they are present to hold up a matching descendant, not as an answer.
+    const filtered: FamilyTreeNode[] = [
+      { ...node('s1', 'سليمان', 1, [node('f1', 'فارس', 2, [], 's1')]), matches: false },
+    ]
+
+    const rows = flattenTree(filtered, ALL_OPEN)
+
+    expect(rows.find((r) => r.id === 's1')?.dimmed).toBe(true)
+    expect(rows.find((r) => r.id === 'f1')?.dimmed).toBe(false)
+  })
+
+  it('dims nothing when every node matches the server filter', () => {
+    // The unfiltered path must not change: matches is true on every node with no filter applied.
+    expect(flattenTree(tree(), ALL_OPEN).every((r) => !r.dimmed)).toBe(true)
+  })
+
+  it('composes the two reasons to dim rather than letting one cancel the other', () => {
+    // A row can fail the server's filter and the outline's own text search at once. Two
+    // independent reasons, ORed — neither may overwrite the other.
+    const filtered: FamilyTreeNode[] = [
+      { ...node('s1', 'سليمان', 1, [node('f1', 'فارس', 2, [], 's1')]), matches: false },
+    ]
+
+    // 'سليمان' matches the text search but fails the server filter: still dimmed.
+    const rows = flattenTree(filtered, ALL_OPEN, 'سليمان')
+
+    const suleiman = rows.find((r) => r.id === 's1')
+    expect(suleiman?.matched).toBe(true)
+    expect(suleiman?.dimmed).toBe(true)
+  })
+
   it('marks nothing as dimmed when the search box is empty', () => {
     const rows = flattenTree(tree(), ALL_OPEN, '   ')
 
