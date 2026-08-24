@@ -160,7 +160,7 @@ Application precisely so it is testable without ClosedXML.
   `IMemberExcelExporter.ExportAsync(MemberFilter, CaptionLanguage, CancellationToken) -> Task<ExcelExportResult>`.
   Used by Tasks 4 and 5.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 - The eight headers come back in §19's order, in both languages.
 - A fully populated member produces all eight cells.
@@ -177,7 +177,7 @@ Application precisely so it is testable without ClosedXML.
   through the row builder. The cell-type decision is Task 4's, but a row that has already lost
   the zero cannot be saved by it.
 
-- [ ] **Step 2: Implement**
+- [x] **Step 2: Implement**
 
 `MemberExportRow` holds strings for everything except Generation. Deciding the *cell type* is the
 workbook's job; deciding the *text* is this one's.
@@ -186,8 +186,8 @@ Localisation follows `CaptionLocalizer`: a small lookup, not a framework. Nothin
 codebase is localised server-side, and one more `.resx` for eight headers is not the moment to
 start.
 
-- [ ] **Step 3: Run the tests** — passes.
-- [ ] **Step 4: Commit** — `feat: build the member export rows`
+- [x] **Step 3: Run the tests** — passes.
+- [x] **Step 4: Commit** — `feat: build the member export rows`
 
 ---
 
