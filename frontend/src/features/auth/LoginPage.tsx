@@ -114,7 +114,9 @@ export const LoginPage = () => {
         style={{
           width: '100%',
           maxWidth: 400,
-          padding: 'var(--space-8)',
+          // The card is the whole screen on a phone, so its padding is the page gutter. Scales
+          // with the viewport and stops at the designed --space-8.
+          padding: 'clamp(var(--space-5), 6vw, var(--space-8))',
           background: 'var(--surface)',
           border: '1px solid var(--border)',
           borderRadius: 'var(--r-lg)',

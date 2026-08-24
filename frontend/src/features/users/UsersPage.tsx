@@ -139,13 +139,23 @@ export function UsersPage() {
 
   return (
     <AppShell familyName={familyName} statLine={t('users.count', { count: all.length })}>
-      <div style={{ flex: 1, minWidth: 0, overflow: 'auto', padding: 'var(--space-8)' }}>
+      {/* 32px of gutter on each side takes a fifth of a 320px screen. Scales with the viewport
+          and stops at the designed --space-8, so wide screens are unchanged. */}
+      <div
+        style={{
+          flex: 1,
+          minWidth: 0,
+          overflow: 'auto',
+          padding: 'clamp(var(--space-4), 4vw, var(--space-8))',
+        }}
+      >
         <div style={{ maxWidth: 900, margin: '0 auto' }}>
           <div
             style={{
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
+              flexWrap: 'wrap',
               gap: 'var(--space-4)',
               marginBottom: 'var(--space-6)',
             }}
@@ -228,78 +238,84 @@ export function UsersPage() {
                 overflow: 'hidden',
               }}
             >
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr>
-                    <th style={headCellStyle}>{t('users.email')}</th>
-                    <th style={headCellStyle}>{t('users.roles')}</th>
-                    <th style={headCellStyle}>{t('users.status')}</th>
-                    <th style={headCellStyle}>{t('users.lastLogin')}</th>
-                    <th style={headCellStyle} />
-                  </tr>
-                </thead>
-                <tbody>
-                  {all.map((current) => (
-                    <tr key={current.id}>
-                      <td style={{ ...cellStyle, fontWeight: 500 }}>{current.email}</td>
-                      <td style={{ ...cellStyle, color: 'var(--text-3)' }}>
-                        {current.roles.map((role) => role.name).join(', ')}
-                      </td>
-                      <td style={cellStyle}>
-                        {current.isActive ? t('users.active') : t('users.inactive')}
-                        {current.mustChangePassword && (
-                          <span style={badgeStyle}>{t('users.pendingPasswordChange')}</span>
-                        )}
-                      </td>
-                      <td style={{ ...cellStyle, color: 'var(--text-3)' }}>
-                        {current.lastLoginAt === null
-                          ? t('users.neverSignedIn')
-                          : formatDate(current.lastLoginAt, i18n.language)}
-                      </td>
-                      <td style={{ ...cellStyle, whiteSpace: 'nowrap' }}>
-                        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                          {hasPermission('User.Edit') && (
-                            <button
-                              type="button"
-                              onClick={() => setEditing({ mode: 'edit', user: current })}
-                              style={rowButtonStyle(false)}
-                            >
-                              {t('users.edit')}
-                            </button>
+              {/* The one place horizontal scrolling is right rather than a failure: five columns of
+                  member data cannot be read at 320px, and folding them into stacked cards would
+                  drop the column headers that say what each value is. The scroll is contained
+                  by the card, so the page itself never scrolls sideways. */}
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', minWidth: 720, borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr>
+                      <th style={headCellStyle}>{t('users.email')}</th>
+                      <th style={headCellStyle}>{t('users.roles')}</th>
+                      <th style={headCellStyle}>{t('users.status')}</th>
+                      <th style={headCellStyle}>{t('users.lastLogin')}</th>
+                      <th style={headCellStyle} />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {all.map((current) => (
+                      <tr key={current.id}>
+                        <td style={{ ...cellStyle, fontWeight: 500 }}>{current.email}</td>
+                        <td style={{ ...cellStyle, color: 'var(--text-3)' }}>
+                          {current.roles.map((role) => role.name).join(', ')}
+                        </td>
+                        <td style={cellStyle}>
+                          {current.isActive ? t('users.active') : t('users.inactive')}
+                          {current.mustChangePassword && (
+                            <span style={badgeStyle}>{t('users.pendingPasswordChange')}</span>
                           )}
-                          {hasPermission('User.Edit') && (
-                            <button
-                              type="button"
-                              onClick={() => setResettingPasswordFor(current)}
-                              style={rowButtonStyle(false)}
-                            >
-                              {t('users.resetPassword')}
-                            </button>
-                          )}
-                          {hasPermission('User.Deactivate') &&
-                            (current.isActive ? (
+                        </td>
+                        <td style={{ ...cellStyle, color: 'var(--text-3)' }}>
+                          {current.lastLoginAt === null
+                            ? t('users.neverSignedIn')
+                            : formatDate(current.lastLoginAt, i18n.language)}
+                        </td>
+                        <td style={{ ...cellStyle, whiteSpace: 'nowrap' }}>
+                          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                            {hasPermission('User.Edit') && (
                               <button
                                 type="button"
-                                onClick={() => setPendingDeactivate(current)}
-                                style={rowButtonStyle(true)}
-                              >
-                                {t('users.deactivate')}
-                              </button>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() => handleActivate(current)}
+                                onClick={() => setEditing({ mode: 'edit', user: current })}
                                 style={rowButtonStyle(false)}
                               >
-                                {t('users.activate')}
+                                {t('users.edit')}
                               </button>
-                            ))}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                            )}
+                            {hasPermission('User.Edit') && (
+                              <button
+                                type="button"
+                                onClick={() => setResettingPasswordFor(current)}
+                                style={rowButtonStyle(false)}
+                              >
+                                {t('users.resetPassword')}
+                              </button>
+                            )}
+                            {hasPermission('User.Deactivate') &&
+                              (current.isActive ? (
+                                <button
+                                  type="button"
+                                  onClick={() => setPendingDeactivate(current)}
+                                  style={rowButtonStyle(true)}
+                                >
+                                  {t('users.deactivate')}
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => handleActivate(current)}
+                                  style={rowButtonStyle(false)}
+                                >
+                                  {t('users.activate')}
+                                </button>
+                              ))}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
         </div>
@@ -317,7 +333,9 @@ export function UsersPage() {
             alignItems: 'center',
             justifyContent: 'center',
             zIndex: 400,
-            padding: 24,
+            // A fixed 24px gutter costs a 320px screen 15% of its width. Scales with the
+            // viewport and stops at the designed 24px, so wide screens are unchanged.
+            padding: 'clamp(12px, 4vw, 24px)',
           }}
         >
           <div
@@ -327,6 +345,10 @@ export function UsersPage() {
             style={{
               width: '100%',
               maxWidth: 420,
+              // Never taller than the viewport, so the confirm and cancel buttons stay on
+              // screen on a short phone or in landscape.
+              maxHeight: '100%',
+              overflowY: 'auto',
               padding: 'var(--space-6)',
               background: 'var(--surface)',
               borderRadius: 'var(--r-lg)',
@@ -390,7 +412,9 @@ export function UsersPage() {
             alignItems: 'center',
             justifyContent: 'center',
             zIndex: 400,
-            padding: 24,
+            // A fixed 24px gutter costs a 320px screen 15% of its width. Scales with the
+            // viewport and stops at the designed 24px, so wide screens are unchanged.
+            padding: 'clamp(12px, 4vw, 24px)',
           }}
         >
           <form
@@ -401,6 +425,10 @@ export function UsersPage() {
             style={{
               width: '100%',
               maxWidth: 420,
+              // Never taller than the viewport, so the confirm and cancel buttons stay on
+              // screen on a short phone or in landscape.
+              maxHeight: '100%',
+              overflowY: 'auto',
               padding: 'var(--space-6)',
               background: 'var(--surface)',
               borderRadius: 'var(--r-lg)',

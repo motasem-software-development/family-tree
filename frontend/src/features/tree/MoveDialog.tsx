@@ -145,7 +145,9 @@ export const MoveDialog = ({
         alignItems: 'center',
         justifyContent: 'center',
         zIndex: 400,
-        padding: 24,
+        // A fixed 24px gutter costs a 320px screen 15% of its width. Scales with the viewport
+        // and stops at the designed 24px, so wide screens are unchanged.
+        padding: 'clamp(12px, 4vw, 24px)',
       }}
     >
       <form
@@ -156,6 +158,12 @@ export const MoveDialog = ({
         style={{
           width: '100%',
           maxWidth: 440,
+          // Was a 70vh cap on the body alone. Capping the dialog instead and letting the body
+          // take the remaining height keeps the footer buttons on screen at any viewport
+          // height, and vh is the wrong unit on a mobile browser with a collapsing URL bar.
+          maxHeight: '100%',
+          display: 'flex',
+          flexDirection: 'column',
           background: 'var(--surface)',
           borderRadius: 'var(--r-lg)',
           boxShadow: 'var(--shadow-high)',
@@ -163,7 +171,14 @@ export const MoveDialog = ({
           animation: 'fadeUp var(--motion-base) var(--ease-standard)',
         }}
       >
-        <div style={{ padding: '22px 24px 0', maxHeight: '70vh', overflowY: 'auto' }}>
+        <div
+          style={{
+            padding: '22px clamp(16px, 5vw, 24px) 0',
+            flex: '1 1 auto',
+            minHeight: 0,
+            overflowY: 'auto',
+          }}
+        >
           <div style={{ fontSize: 17, fontWeight: 600, lineHeight: 1.35 }}>{t('move.title')}</div>
           <div style={{ fontSize: 14, lineHeight: 1.65, color: 'var(--text-2)', marginTop: 8 }}>
             {t('move.body', { name: member.name })}
@@ -261,7 +276,16 @@ export const MoveDialog = ({
           )}
         </div>
 
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, padding: '22px 24px' }}>
+        <div
+          style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            justifyContent: 'flex-end',
+            gap: 8,
+            flex: '0 0 auto',
+            padding: '22px clamp(16px, 5vw, 24px)',
+          }}
+        >
           <button type="button" onClick={onCancel} style={CANCEL_BUTTON_STYLE}>
             {t('modal.cancel')}
           </button>

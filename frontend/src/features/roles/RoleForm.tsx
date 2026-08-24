@@ -144,7 +144,9 @@ export function RoleForm({ role, isSaving, onSubmit, onCancel }: RoleFormProps) 
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+            // min() rather than a bare 220px: below that width the track would otherwise
+            // overflow its own container instead of collapsing to a single column.
+            gridTemplateColumns: 'repeat(auto-fit, minmax(min(220px, 100%), 1fr))',
             gap: 'var(--space-4)',
           }}
         >

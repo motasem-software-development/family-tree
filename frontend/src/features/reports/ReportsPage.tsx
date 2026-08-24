@@ -26,37 +26,52 @@ export const ReportsPage = () => {
       familyName={familyName}
       statLine={t('tree.membersCount', { count: data?.structure.totalMembers ?? 0 })}
     >
-      <h1>{t('reports.title')}</h1>
+      {/* AppShell lays its children out as a flex row, so the headline, the timestamp and the
+          sections were becoming three columns side by side with nothing to scroll them. Wrapped
+          in the same scroll container the members, users and roles screens use — this is a
+          layout fix at every width, not only below the breakpoint. */}
+      <div
+        style={{
+          flex: 1,
+          minWidth: 0,
+          overflow: 'auto',
+          padding: 'clamp(var(--space-4), 4vw, var(--space-8))',
+        }}
+      >
+        <div style={{ maxWidth: 900, margin: '0 auto' }}>
+          <h1>{t('reports.title')}</h1>
 
-      {isError && <p role="alert">{t('reports.loadFailed')}</p>}
+          {isError && <p role="alert">{t('reports.loadFailed')}</p>}
 
-      {isPending && !isError && <p>{t('reports.loading')}</p>}
+          {isPending && !isError && <p>{t('reports.loading')}</p>}
 
-      {data !== undefined && (
-        <>
-          {/* The server's reference day, shown rather than re-derived: a client in another
-              time zone must not disagree with the figures it is labelling (design §5).
-              Pinned to UTC: `generatedOn` is a YYYY-MM-DD string, which `Date` parses as UTC
-              midnight, so the formatter must stay in UTC too — otherwise a viewer west of
-              UTC sees the day before the one the server measured. Do not "fix" this back to
-              the viewer's local zone. */}
-          <p style={{ fontSize: 11, color: 'var(--text-3)' }}>
-            {t('reports.generatedOn', {
-              date: new Intl.DateTimeFormat(i18n.language, { timeZone: 'UTC' }).format(
-                new Date(data.generatedOn),
-              ),
-            })}
-          </p>
+          {data !== undefined && (
+            <>
+              {/* The server's reference day, shown rather than re-derived: a client in another
+                  time zone must not disagree with the figures it is labelling (design §5).
+                  Pinned to UTC: `generatedOn` is a YYYY-MM-DD string, which `Date` parses as UTC
+                  midnight, so the formatter must stay in UTC too — otherwise a viewer west of
+                  UTC sees the day before the one the server measured. Do not "fix" this back to
+                  the viewer's local zone. */}
+              <p style={{ fontSize: 11, color: 'var(--text-3)' }}>
+                {t('reports.generatedOn', {
+                  date: new Intl.DateTimeFormat(i18n.language, { timeZone: 'UTC' }).format(
+                    new Date(data.generatedOn),
+                  ),
+                })}
+              </p>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
-            <StructureSection report={data.structure} />
-            <LifeStatusSection report={data.lifeStatus} />
-            <CompletenessSection report={data.completeness} byId={byId} />
-            <UpcomingSection report={data.upcoming} byId={byId} />
-            <ActivitySection report={data.activity} byId={byId} />
-          </div>
-        </>
-      )}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
+                <StructureSection report={data.structure} />
+                <LifeStatusSection report={data.lifeStatus} />
+                <CompletenessSection report={data.completeness} byId={byId} />
+                <UpcomingSection report={data.upcoming} byId={byId} />
+                <ActivitySection report={data.activity} byId={byId} />
+              </div>
+            </>
+          )}
+        </div>
+      </div>
     </AppShell>
   )
 }

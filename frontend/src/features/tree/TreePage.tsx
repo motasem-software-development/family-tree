@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useSearchParams } from 'react-router-dom'
 import { AppShell, type SearchResult } from '../../app/AppShell'
+import { useIsCompact } from '../../app/useIsCompact'
 import { useDirection } from '../../i18n/useDirection'
 import { ApiError } from '../../services/apiClient'
 import { useAuth } from '../auth/AuthContext'
@@ -52,12 +53,20 @@ const TOAST_MS = 3200
 // overlap structurally impossible instead of merely unlikely.
 const MEMBER_PANEL_WIDTH = 320
 const EXPORT_BUTTON_GAP = 24
+// ContextMenu's own box (see MemberActions.tsx) plus the margin the menu keeps from the
+// viewport edge. Both live here because this is where the anchor is turned into coordinates,
+// and it is the only place that knows which inline edge the menu is measured from.
+const CONTEXT_MENU_WIDTH = 190
+const CONTEXT_MENU_MARGIN = 8
 
 const codeOf = (error: unknown): string => (error instanceof ApiError ? error.code : 'UNKNOWN')
 
 export const TreePage = () => {
   const { t } = useTranslation()
   const direction = useDirection()
+  // Below the breakpoint the member panel overlays the canvas instead of standing beside it,
+  // so the export button has no panel to clear and is anchored to the bottom edge instead.
+  const isCompact = useIsCompact()
   const { hasPermission } = useAuth()
 
   const { filters, activeCount, setFilter, reset } = useMemberFilters()
@@ -451,10 +460,17 @@ export const TreePage = () => {
           onSelect={select}
           onMenu={(id, anchor) => {
             setSelectedId(id)
+            // A row deep in the outline sits far along the inline axis, and on a narrow viewport
+            // its menu would open past the edge with no way to scroll to it — the overlay is
+            // position:fixed, so nothing scrolls. Clamped to the viewport instead.
+            const start = direction === 'rtl' ? window.innerWidth - anchor.right : anchor.left
             setMenu({
               id,
               top: anchor.bottom + 6,
-              inlineStart: direction === 'rtl' ? window.innerWidth - anchor.right : anchor.left,
+              inlineStart: Math.max(
+                CONTEXT_MENU_MARGIN,
+                Math.min(start, window.innerWidth - CONTEXT_MENU_WIDTH - CONTEXT_MENU_MARGIN),
+              ),
             })
           }}
           onZoomIn={() => setZoom((z) => Math.min(ZOOM_MAX, z + ZOOM_STEP))}
@@ -563,13 +579,20 @@ export const TreePage = () => {
         onClick={() => setExportOpen(true)}
         style={{
           position: 'fixed',
-          top: 76,
+          // Compact anchors to the bottom edge rather than to a header whose height now varies
+          // with the search row; the zoom toolbar holds the opposite inline edge, so the two
+          // floating clusters cannot meet. Wide keeps the original top placement exactly.
+          top: isCompact ? undefined : 76,
+          bottom: isCompact ? 20 : undefined,
           // Cleared past MemberPanel's own width when it's on screen, so the two boxes never
-          // share inline-axis space — see the MEMBER_PANEL_WIDTH comment above.
+          // share inline-axis space — see the MEMBER_PANEL_WIDTH comment above. Compact has no
+          // such column to clear: there the panel overlays the canvas.
           insetInlineEnd:
-            panelOpen && selected !== undefined
+            !isCompact && panelOpen && selected !== undefined
               ? MEMBER_PANEL_WIDTH + EXPORT_BUTTON_GAP
-              : EXPORT_BUTTON_GAP,
+              : isCompact
+                ? 16
+                : EXPORT_BUTTON_GAP,
           height: 36,
           padding: '0 14px',
           border: '1px solid var(--border-strong)',
