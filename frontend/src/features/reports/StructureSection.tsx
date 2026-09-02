@@ -1,75 +1,84 @@
 import { useTranslation } from 'react-i18next'
+import { Card, CardHead, Figure, FigureRow, Ladder, Stack, type LadderRow } from './reportUi'
 import type { StructureReport } from './types'
 
-/** A labelled figure. The building block of every count-only section. */
-const Stat = ({ label, value, testId }: { label: string; value: string; testId?: string }) => (
-  <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-    <span style={{ fontSize: 11, color: 'var(--text-3)' }}>{label}</span>
-    <strong data-testid={testId} style={{ fontSize: 22 }}>
-      {value}
-    </strong>
-  </div>
-)
-
+/**
+ * The page's opening statement. The generation ladder goes first and the totals annotate it,
+ * rather than the other way round: the shape of the family is the thing a reader came for, and
+ * a row of boxed figures above it would bury the one figure that is specific to this product.
+ */
 export const StructureSection = ({ report }: { report: StructureReport }) => {
   const { t, i18n } = useTranslation()
   // Arabic-Indic digits where the locale calls for them, rather than toString().
   const number = (value: number) => new Intl.NumberFormat(i18n.language).format(value)
 
+  // Rungs are proportional to the largest generation, so the widest bar is always full width
+  // and the comparison between generations is the one the reader is being asked to make.
+  const peakGeneration = Math.max(1, ...report.generations.map((g) => g.count))
+  const generationRows: LadderRow[] = report.generations.map((generation) => ({
+    key: String(generation.generation),
+    label: t('reports.structure.generation', { number: generation.generation }),
+    value: number(generation.count),
+    ratio: generation.count / peakGeneration,
+  }))
+
+  const largestBranch = Math.max(1, ...report.branches.map((b) => b.descendantCount))
+  const branchRows: LadderRow[] = report.branches.map((branch) => ({
+    key: branch.id,
+    label: branch.name,
+    value: number(branch.descendantCount),
+    ratio: branch.descendantCount / largestBranch,
+  }))
+
   return (
-    <section aria-labelledby="structure-heading">
-      <h2 id="structure-heading">{t('reports.structure.title')}</h2>
+    <>
+      <Card labelledBy="structure-heading">
+        {/* No caption: the rung labels below already name each generation, and the figures
+            already give the depth. A line restating either is the accessory to remove. */}
+        <CardHead id="structure-heading" title={t('reports.structure.title')} />
 
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 24 }}>
-        <Stat
-          label={t('reports.structure.totalMembers')}
-          value={number(report.totalMembers)}
-          testId="structure-total"
-        />
-        <Stat
-          label={t('reports.structure.depth')}
-          value={number(report.depth)}
-          testId="structure-depth"
-        />
-        <Stat
-          label={t('reports.structure.membersWithChildren')}
-          value={number(report.membersWithChildren)}
-        />
-        <Stat label={t('reports.structure.leafMembers')} value={number(report.leafMembers)} />
-        <Stat
-          label={t('reports.structure.averageChildren')}
-          value={number(report.averageChildrenPerParent)}
-        />
-      </div>
+        <Stack gap="var(--space-5)">
+          <Ladder rows={generationRows} rowTestId="generation-row" />
 
-      <ul style={{ listStyle: 'none', padding: 0, marginBlockStart: 16 }}>
-        {report.generations.map((generation) => (
-          <li
-            key={generation.generation}
-            data-testid="generation-row"
-            style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}
-          >
-            <span>{t('reports.structure.generation', { number: generation.generation })}</span>
-            <span>{number(generation.count)}</span>
-          </li>
-        ))}
-      </ul>
+          <div style={{ height: 1, background: 'var(--divider)' }} />
 
-      <h3>{t('reports.structure.branches')}</h3>
-      <ul style={{ listStyle: 'none', padding: 0 }}>
-        {report.branches.map((branch) => (
-          <li
-            key={branch.id}
-            data-testid="branch-row"
-            style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}
-          >
-            <span>{branch.name}</span>
-            <span>
-              {t('reports.structure.descendants')} {number(branch.descendantCount)}
-            </span>
-          </li>
-        ))}
-      </ul>
-    </section>
+          <FigureRow>
+            <Figure
+              label={t('reports.structure.totalMembers')}
+              value={number(report.totalMembers)}
+              testId="structure-total"
+            />
+            <Figure
+              label={t('reports.structure.depth')}
+              value={number(report.depth)}
+              testId="structure-depth"
+            />
+            <Figure
+              label={t('reports.structure.membersWithChildren')}
+              value={number(report.membersWithChildren)}
+            />
+            <Figure
+              label={t('reports.structure.leafMembers')}
+              value={number(report.leafMembers)}
+            />
+            <Figure
+              label={t('reports.structure.averageChildren')}
+              value={number(report.averageChildrenPerParent)}
+            />
+          </FigureRow>
+        </Stack>
+      </Card>
+
+      {/* Branches answer a different question from generations — which line grew largest — so
+          they get their own card rather than a heading buried under the structure figures. */}
+      <Card labelledBy="branches-heading">
+        <CardHead
+          id="branches-heading"
+          title={t('reports.structure.branches')}
+          caption={t('reports.structure.descendants')}
+        />
+        <Ladder rows={branchRows} rowTestId="branch-row" />
+      </Card>
+    </>
   )
 }

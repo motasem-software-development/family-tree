@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import { fullName, type NamedNode } from '../members/fullName'
+import { Badge, Card, CardHead, Empty, GroupHead, Note, Row, RowList, Stack } from './reportUi'
 import type { ActivityEntry, ActivityReport } from './types'
 
 interface Props {
@@ -18,51 +19,55 @@ export const ActivitySection = ({ report, byId }: Props) => {
   const when = (iso: string) => new Intl.DateTimeFormat(i18n.language).format(new Date(iso))
 
   const rows = (entries: ActivityEntry[], testId: string) => (
-    <ul style={{ listStyle: 'none', padding: 0 }}>
+    <RowList>
       {entries.map((entry) => (
-        <li key={entry.member.id} data-testid={testId}>
-          <Link to={`/?memberId=${entry.member.id}`}>{fullName(entry.member, byId)}</Link>{' '}
-          <span>{when(entry.at)}</span>
-        </li>
+        <Row key={entry.member.id} testId={testId} trailing={when(entry.at)}>
+          <Link to={`/?memberId=${entry.member.id}`}>{fullName(entry.member, byId)}</Link>
+        </Row>
       ))}
-    </ul>
+    </RowList>
   )
 
   const empty = report.added.length === 0 && report.edited.length === 0
 
   return (
-    <section aria-labelledby="activity-heading">
-      <h2 id="activity-heading">
-        {t('reports.activity.title', { days: number(report.windowDays) })}
-      </h2>
+    <Card labelledBy="activity-heading">
+      <CardHead
+        id="activity-heading"
+        title={t('reports.activity.title', { days: number(report.windowDays) })}
+      />
 
-      {empty ? (
-        <p>{t('reports.activity.empty', { days: number(report.windowDays) })}</p>
-      ) : (
-        <>
-          {report.added.length > 0 && (
-            <>
-              <h3>
-                {t('reports.activity.added')} {number(report.addedCount)}
-              </h3>
-              {rows(report.added, 'activity-added-row')}
-            </>
-          )}
+      <Stack gap="var(--space-5)">
+        {empty ? (
+          <Empty>{t('reports.activity.empty', { days: number(report.windowDays) })}</Empty>
+        ) : (
+          <>
+            {report.added.length > 0 && (
+              <div>
+                <GroupHead
+                  title={t('reports.activity.added')}
+                  trailing={<Badge>{number(report.addedCount)}</Badge>}
+                />
+                {rows(report.added, 'activity-added-row')}
+              </div>
+            )}
 
-          {report.edited.length > 0 && (
-            <>
-              <h3>
-                {t('reports.activity.edited')} {number(report.editedCount)}
-              </h3>
-              {rows(report.edited, 'activity-edited-row')}
-            </>
-          )}
-        </>
-      )}
+            {report.edited.length > 0 && (
+              <div>
+                <GroupHead
+                  title={t('reports.activity.edited')}
+                  trailing={<Badge>{number(report.editedCount)}</Badge>}
+                />
+                {rows(report.edited, 'activity-edited-row')}
+              </div>
+            )}
+          </>
+        )}
 
-      {/* Stated plainly rather than left to be discovered: this reads record timestamps, so a
-          deleted member leaves no trace here. The real fix is AuditLog (design §9). */}
-      <p style={{ fontSize: 11, color: 'var(--text-3)' }}>{t('reports.activity.note')}</p>
-    </section>
+        {/* Stated plainly rather than left to be discovered: this reads record timestamps, so a
+            deleted member leaves no trace here. The real fix is AuditLog (design §9). */}
+        <Note>{t('reports.activity.note')}</Note>
+      </Stack>
+    </Card>
   )
 }
