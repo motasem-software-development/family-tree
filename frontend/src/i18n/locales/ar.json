@@ -315,6 +315,10 @@
     "generatedOn": "حتى تاريخ {{date}}",
     "loading": "جارٍ تحميل التقارير…",
     "loadFailed": "تعذّر تحميل التقارير.",
+    "zones": {
+      "family": "العائلة",
+      "attention": "يحتاج إلى متابعة"
+    },
     "structure": {
       "title": "بنية العائلة",
       "totalMembers": "الأفراد",
@@ -324,7 +328,7 @@
       "averageChildren": "معدل الأبناء لكل والد",
       "generation": "الجيل {{number}}",
       "branches": "الفروع",
-      "descendants": "الذرية"
+      "descendants": "عدد الذرية في كل فرع"
     },
     "lifeStatus": {
       "title": "الأحياء والمتوفون",
@@ -332,9 +336,10 @@
       "deceased": "متوفّون",
       "ages": "أعمار الأحياء",
       "unknownAge": "أحياء بتاريخ ميلاد غير معروف",
-      "longevity": "أعمار المتوفين",
-      "longevityRange": "من {{min}} إلى {{max}} سنة",
-      "longevityMedian": "الوسيط {{years}} سنة",
+      "longevity": "أعمار المتوفين، بالسنوات",
+      "longevityShortest": "الأقصر",
+      "longevityMedian": "الوسيط",
+      "longevityLongest": "الأطول",
       "longevityUnavailable": "لا يوجد متوفٍّ مسجَّل له تاريخا ميلاد ووفاة معًا."
     },
     "completeness": {

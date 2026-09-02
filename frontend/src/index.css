@@ -183,6 +183,26 @@ textarea {
   }
 }
 
+/*
+ * The reports ladder draws itself once on load. In CSS rather than inline because a keyframe
+ * cannot be expressed in a style attribute; the per-rung stagger is set inline as a delay.
+ * `--origin-x` is the same reading-edge token the tree canvas zooms from, so a rung grows away
+ * from the spine in both directions — transform-origin has no logical-property form.
+ */
+@keyframes growFromSpine {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+.report-rung {
+  transform-origin: var(--origin-x) center;
+  animation: growFromSpine var(--motion-slow) var(--ease-standard) both;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

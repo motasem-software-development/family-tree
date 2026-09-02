@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import { fullName, type NamedNode } from '../members/fullName'
+import { Badge, Card, CardHead, Empty, GroupHead, Note, Row, RowList, Stack } from './reportUi'
 import type { MemberRef, UpcomingReport } from './types'
 
 interface Props {
@@ -23,78 +24,88 @@ export const UpcomingSection = ({ report, byId }: Props) => {
   const empty = report.birthdays.length === 0 && report.anniversaries.length === 0
 
   return (
-    <section aria-labelledby="upcoming-heading">
-      <h2 id="upcoming-heading">
-        {t('reports.upcoming.title', { days: number(report.windowDays) })}
-      </h2>
+    <Card labelledBy="upcoming-heading">
+      <CardHead id="upcoming-heading" title={t('reports.upcoming.title', { days: number(report.windowDays) })} />
 
-      {empty && (
-        <p data-testid="upcoming-empty">
-          {t('reports.upcoming.empty', { days: number(report.windowDays) })}
-        </p>
-      )}
+      <Stack gap="var(--space-5)">
+        {empty && (
+          <Empty testId="upcoming-empty">
+            {t('reports.upcoming.empty', { days: number(report.windowDays) })}
+          </Empty>
+        )}
 
-      {report.birthdays.length > 0 && (
-        <>
-          <h3>
-            {t('reports.upcoming.birthdays')}{' '}
-            {/* The true count, never birthdays.length: the list is capped at 50 and a client
-                that reported the row count would understate what's coming up. */}
-            <span data-testid="birthday-count">{number(report.birthdayCount)}</span>
-          </h3>
+        {report.birthdays.length > 0 && (
+          <div>
+            <GroupHead
+              title={t('reports.upcoming.birthdays')}
+              trailing={
+                /* The true count, never birthdays.length: the list is capped at 50 and a client
+                   that reported the row count would understate what's coming up. */
+                <Badge testId="birthday-count">{number(report.birthdayCount)}</Badge>
+              }
+            />
 
-          {report.birthdayCount > report.birthdays.length && (
-            <p style={{ fontSize: 11, color: 'var(--text-3)' }}>
-              {t('reports.completeness.showingSome', { shown: number(report.birthdays.length) })}
-            </p>
-          )}
+            <RowList>
+              {report.birthdays.map((birthday) => (
+                <Row key={birthday.member.id} testId="birthday-row" trailing={when(birthday.daysAway)}>
+                  <Link to={`/?memberId=${birthday.member.id}`}>{display(birthday.member)}</Link>{' '}
+                  {/* The age reached on the occurrence, not today's — the server computed it. */}
+                  <span style={{ color: 'var(--text-3)' }}>
+                    {t('reports.upcoming.turningAge', { count: birthday.turningAge })}
+                  </span>
+                </Row>
+              ))}
+            </RowList>
 
-          <ul style={{ listStyle: 'none', padding: 0 }}>
-            {report.birthdays.map((birthday) => (
-              <li key={birthday.member.id} data-testid="birthday-row">
-                <Link to={`/?memberId=${birthday.member.id}`}>{display(birthday.member)}</Link>{' '}
-                {/* The age reached on the occurrence, not today's — the server computed it. */}
-                <span>
-                  {t('reports.upcoming.turningAge', { count: birthday.turningAge })}
-                </span>{' '}
-                <span>{when(birthday.daysAway)}</span>
-              </li>
-            ))}
-          </ul>
-        </>
-      )}
+            {report.birthdayCount > report.birthdays.length && (
+              <div style={{ marginTop: 'var(--space-2)' }}>
+                <Note>
+                  {t('reports.completeness.showingSome', { shown: number(report.birthdays.length) })}
+                </Note>
+              </div>
+            )}
+          </div>
+        )}
 
-      {report.anniversaries.length > 0 && (
-        <>
-          <h3>
-            {t('reports.upcoming.anniversaries')}{' '}
-            {/* The true count, never anniversaries.length: same cap, same rule. */}
-            <span data-testid="anniversary-count">{number(report.anniversaryCount)}</span>
-          </h3>
+        {report.anniversaries.length > 0 && (
+          <div>
+            <GroupHead
+              title={t('reports.upcoming.anniversaries')}
+              trailing={
+                /* The true count, never anniversaries.length: same cap, same rule. */
+                <Badge testId="anniversary-count">{number(report.anniversaryCount)}</Badge>
+              }
+            />
 
-          {report.anniversaryCount > report.anniversaries.length && (
-            <p style={{ fontSize: 11, color: 'var(--text-3)' }}>
-              {t('reports.completeness.showingSome', {
-                shown: number(report.anniversaries.length),
-              })}
-            </p>
-          )}
+            <RowList>
+              {report.anniversaries.map((anniversary) => (
+                <Row
+                  key={anniversary.member.id}
+                  testId="anniversary-row"
+                  trailing={when(anniversary.daysAway)}
+                >
+                  <Link to={`/?memberId=${anniversary.member.id}`}>
+                    {display(anniversary.member)}
+                  </Link>{' '}
+                  <span style={{ color: 'var(--text-3)' }}>
+                    {t('reports.upcoming.yearsSince', { count: anniversary.years })}
+                  </span>
+                </Row>
+              ))}
+            </RowList>
 
-          <ul style={{ listStyle: 'none', padding: 0 }}>
-            {report.anniversaries.map((anniversary) => (
-              <li key={anniversary.member.id} data-testid="anniversary-row">
-                <Link to={`/?memberId=${anniversary.member.id}`}>
-                  {display(anniversary.member)}
-                </Link>{' '}
-                <span>
-                  {t('reports.upcoming.yearsSince', { count: anniversary.years })}
-                </span>{' '}
-                <span>{when(anniversary.daysAway)}</span>
-              </li>
-            ))}
-          </ul>
-        </>
-      )}
-    </section>
+            {report.anniversaryCount > report.anniversaries.length && (
+              <div style={{ marginTop: 'var(--space-2)' }}>
+                <Note>
+                  {t('reports.completeness.showingSome', {
+                    shown: number(report.anniversaries.length),
+                  })}
+                </Note>
+              </div>
+            )}
+          </div>
+        )}
+      </Stack>
+    </Card>
   )
 }

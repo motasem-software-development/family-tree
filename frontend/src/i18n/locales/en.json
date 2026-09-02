@@ -287,6 +287,10 @@
     "generatedOn": "As of {{date}}",
     "loading": "Loading the reports…",
     "loadFailed": "The reports could not be loaded.",
+    "zones": {
+      "family": "The family",
+      "attention": "Needs attention"
+    },
     "structure": {
       "title": "Family structure",
       "totalMembers": "Members",
@@ -296,7 +300,7 @@
       "averageChildren": "Children per parent",
       "generation": "Generation {{number}}",
       "branches": "Branches",
-      "descendants": "Descendants"
+      "descendants": "Descendants in each line"
     },
     "lifeStatus": {
       "title": "Living and deceased",
@@ -304,9 +308,10 @@
       "deceased": "Deceased",
       "ages": "Ages of living members",
       "unknownAge": "Living, birth date unknown",
-      "longevity": "Lifespan of deceased members",
-      "longevityRange": "{{min}} to {{max}} years",
-      "longevityMedian": "Median {{years}} years",
+      "longevity": "Lifespan of deceased members, in years",
+      "longevityShortest": "Shortest",
+      "longevityMedian": "Median",
+      "longevityLongest": "Longest",
       "longevityUnavailable": "No deceased member has both a birth and a death date recorded."
     },
     "completeness": {
