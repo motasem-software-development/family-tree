@@ -86,3 +86,81 @@ export const lifeYears = (life: LifeDetails, locale: string): string | null => {
   // recorded: "1920–" reads as "born 1920, still living", which is exactly right.
   return life.isDeceased === true || died !== '' ? `${born}–${died}` : born
 }
+
+/**
+ * Whole years lived: to the death date where there is one, to `today` otherwise — the same rule
+ * the Excel export applies server-side, so the age in a downloaded workbook matches the age on
+ * the screen it was exported from.
+ *
+ * Null, meaning a blank cell, in the two cases where no honest number exists: no birth date at
+ * all, and a member marked deceased whose death date was never recorded. Measuring that second
+ * one against today would report an age they never reached.
+ */
+export const ageYears = (life: LifeDetails, today: Date): number | null => {
+  const born = parseIsoDate(life.dateOfBirth)
+  if (born === null) return null
+
+  const died = parseIsoDate(life.dateOfDeath)
+  if (died !== null) return wholeYearsBetween(born, died)
+
+  return life.isDeceased === true
+    ? null
+    : wholeYearsBetween(born, { year: today.getFullYear(), month: today.getMonth() + 1, day: today.getDate() })
+}
+
+interface CalendarDate {
+  year: number
+  month: number
+  day: number
+}
+
+/**
+ * The date parts of an ISO `yyyy-MM-dd`, without going through `new Date`. Deliberate: `new
+ * Date('2013-04-28')` is parsed as UTC midnight and then read back in local time, so west of
+ * UTC every birth date lands a day early. A calendar date has no time zone and must not acquire
+ * one on its way to the screen.
+ */
+const parseIsoDate = (iso: string | null | undefined): CalendarDate | null => {
+  if (iso == null) return null
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso)
+  if (match === null) return null
+  return { year: Number(match[1]), month: Number(match[2]), day: Number(match[3]) }
+}
+
+/** Decremented when the anniversary has not yet come round in the target year. */
+const wholeYearsBetween = (from: CalendarDate, to: CalendarDate): number => {
+  const years = to.year - from.year
+  const beforeAnniversary = to.month < from.month || (to.month === from.month && to.day < from.day)
+  return beforeAnniversary ? years - 1 : years
+}
+
+/**
+ * The locale's ten digits, indexed 0-9. Arabic renders Arabic-Indic numerals per the design
+ * system's numeral rule, and a digit table is the only way to get them onto a zero-padded field:
+ * `(2).toLocaleString('ar')` is "٢", never "٠٢", so padding has to happen before translation.
+ */
+const digitsOf = (locale: string): string[] =>
+  Array.from({ length: 10 }, (_, n) => n.toLocaleString(locale, { useGrouping: false }))
+
+const localiseDigits = (text: string, locale: string): string => {
+  const digits = digitsOf(locale)
+  // Already Latin: skip the work for the language that needs none.
+  if (digits[0] === '0') return text
+  return text.replace(/\d/g, (digit) => digits[Number(digit)] ?? digit)
+}
+
+/**
+ * A birth or death date for a table cell, as `dd/MM/yyyy`.
+ *
+ * Assembled by hand rather than through `Intl.DateTimeFormat`: the pattern is the same in both
+ * languages by request, and Intl will not give that — an `en` locale formats the same date as
+ * `03/02/1940`, day and month swapped, which is not a formatting difference but a different
+ * date to anyone reading it. Only the digits follow the locale.
+ */
+export const formatLifeDate = (iso: string | null | undefined, locale: string): string | null => {
+  const date = parseIsoDate(iso)
+  if (date === null) return null
+
+  const pad = (value: number): string => String(value).padStart(2, '0')
+  return localiseDigits(`${pad(date.day)}/${pad(date.month)}/${date.year}`, locale)
+}
