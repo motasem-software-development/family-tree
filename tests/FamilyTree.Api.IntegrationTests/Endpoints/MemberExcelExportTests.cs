@@ -53,14 +53,18 @@ public sealed class MemberExcelExportTests(PostgresFixture fixture) : IAsyncLife
         string name,
         string? nationalId = null,
         string? mobile = null,
-        bool isDeceased = false) =>
+        bool isDeceased = false,
+        DateOnly? dateOfBirth = null,
+        DateOnly? dateOfDeath = null) =>
         (await (await _client.PostAsJsonAsync(
             "/api/v1/family-members",
             new CreateFamilyMemberRequest(name, parentId)
             {
                 NationalId = nationalId,
                 MobileNumber = mobile,
-                IsDeceased = isDeceased
+                IsDeceased = isDeceased,
+                DateOfBirth = dateOfBirth,
+                DateOfDeath = dateOfDeath
             })).Content.ReadFromJsonAsync<FamilyMemberResponse>())!;
 
     private async Task<FamilyMemberListItem> RootAsync() =>
@@ -100,6 +104,9 @@ public sealed class MemberExcelExportTests(PostgresFixture fixture) : IAsyncLife
 
         CellText(sheet, 1, 1).Should().Be("National ID");
         CellText(sheet, 1, 8).Should().Be("Status");
+        CellText(sheet, 1, 9).Should().Be("Date of Birth");
+        CellText(sheet, 1, 10).Should().Be("Age");
+        CellText(sheet, 1, 11).Should().Be("Date of Death");
         DataRowCount(sheet).Should().Be(members!.Count);
     }
 
@@ -179,6 +186,78 @@ public sealed class MemberExcelExportTests(PostgresFixture fixture) : IAsyncLife
         using var workbook = await DownloadAsync();
 
         SheetOf(workbook).Cell(2, 7).DataType.Should().Be(XLDataType.Number);
+    }
+
+    [Fact]
+    public async Task The_dates_are_date_cells_and_the_age_is_their_age_at_death()
+    {
+        // Date cells, not their text: these two columns exist to be sorted and filtered by, and
+        // a string of digits sorts lexically. The age is measured to the death date, so the file
+        // still reads correctly when it is opened again next year.
+        await AuthenticateAsync();
+        var root = await RootAsync();
+        var member = await CreateAsync(
+            root.Id, "داوود المصدَّر",
+            dateOfBirth: new DateOnly(1940, 3, 2), dateOfDeath: new DateOnly(2011, 3, 1));
+
+        using var workbook = await DownloadAsync($"?search={Uri.EscapeDataString(member.Name)}");
+        var sheet = SheetOf(workbook);
+
+        sheet.Cell(2, 9).DataType.Should().Be(XLDataType.DateTime);
+        sheet.Cell(2, 9).GetDateTime().Should().Be(new DateTime(1940, 3, 2));
+        sheet.Cell(2, 10).DataType.Should().Be(XLDataType.Number);
+        // 70, not 71: the birthday had not come round in 2011.
+        sheet.Cell(2, 10).GetValue<int>().Should().Be(70);
+        sheet.Cell(2, 11).GetDateTime().Should().Be(new DateTime(2011, 3, 1));
+    }
+
+    [Fact]
+    public async Task A_living_members_age_is_measured_against_today()
+    {
+        await AuthenticateAsync();
+        var root = await RootAsync();
+        var born = DateOnly.FromDateTime(DateTime.UtcNow).AddYears(-30);
+        var member = await CreateAsync(root.Id, "حي المصدَّر", dateOfBirth: born);
+
+        using var workbook = await DownloadAsync($"?search={Uri.EscapeDataString(member.Name)}");
+        var sheet = SheetOf(workbook);
+
+        sheet.Cell(2, 10).GetValue<int>().Should().Be(30);
+        sheet.Cell(2, 11).IsEmpty().Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task A_member_with_no_recorded_dates_gets_blank_cells_not_zero()
+    {
+        // A 0 in the age column would read as a newborn and would drag any average taken over it.
+        await AuthenticateAsync();
+        var root = await RootAsync();
+        var member = await CreateAsync(root.Id, "مجهول التاريخ");
+
+        using var workbook = await DownloadAsync($"?search={Uri.EscapeDataString(member.Name)}");
+        var sheet = SheetOf(workbook);
+
+        sheet.Cell(2, 9).IsEmpty().Should().BeTrue();
+        sheet.Cell(2, 10).IsEmpty().Should().BeTrue();
+        sheet.Cell(2, 11).IsEmpty().Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task A_deceased_member_with_no_death_date_has_a_blank_age()
+    {
+        // Measuring against today would report an age they never reached.
+        await AuthenticateAsync();
+        var root = await RootAsync();
+        var member = await CreateAsync(
+            root.Id, "متوفى بلا تاريخ", isDeceased: true,
+            dateOfBirth: new DateOnly(1940, 1, 1));
+
+        using var workbook = await DownloadAsync($"?search={Uri.EscapeDataString(member.Name)}");
+        var sheet = SheetOf(workbook);
+
+        sheet.Cell(2, 9).GetDateTime().Should().Be(new DateTime(1940, 1, 1));
+        sheet.Cell(2, 10).IsEmpty().Should().BeTrue();
+        sheet.Cell(2, 11).IsEmpty().Should().BeTrue();
     }
 
     [Fact]

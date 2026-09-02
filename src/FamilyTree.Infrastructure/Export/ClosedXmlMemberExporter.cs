@@ -24,13 +24,24 @@ namespace FamilyTree.Infrastructure.Export;
 public sealed class ClosedXmlMemberExporter(
     ApplicationDbContext context,
     ITenantContext tenant,
-    ICountryService countries) : IMemberExcelExporter
+    ICountryService countries,
+    TimeProvider timeProvider) : IMemberExcelExporter
 {
     /// <summary>1-based, matching ClosedXML. Specification §19's order.</summary>
     private const int NationalIdColumn = 1;
     private const int MobileColumn = 3;
     private const int WhatsAppColumn = 4;
-    private const int ColumnCount = 8;
+    private const int DateOfBirthColumn = 9;
+    private const int AgeColumn = 10;
+    private const int DateOfDeathColumn = 11;
+    private const int ColumnCount = 11;
+
+    /// <summary>
+    /// ISO, so the file reads the same in every locale that opens it. Excel still stores the
+    /// underlying serial number, so the column sorts and filters as a date either way — this
+    /// decides only what the reader sees.
+    /// </summary>
+    private const string DateFormat = "yyyy-mm-dd";
 
     public async Task<ExcelExportResult> ExportAsync(
         MemberFilter filter, CaptionLanguage language, CancellationToken ct = default)
@@ -54,7 +65,12 @@ public sealed class ClosedXmlMemberExporter(
             .Select(m => new { m.Id, m.Name, m.ParentId })
             .ToDictionaryAsync(m => m.Id, m => new NamedMember(m.Name, m.ParentId), ct);
 
-        var rows = MemberExportRows.Build(members, lineage, await countries.ListAsync(ct), language);
+        // The same UTC reference day the domain bounds a birth date by, so a member recorded
+        // today cannot come back one year old.
+        var today = DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime);
+
+        var rows = MemberExportRows.Build(
+            members, lineage, await countries.ListAsync(ct), language, today);
 
         return new ExcelExportResult(Write(rows, language), tree.Name);
     }
@@ -97,6 +113,9 @@ public sealed class ClosedXmlMemberExporter(
             // The one column that should sort and filter numerically: it is a count.
             sheet.Cell(line, 7).Value = row.Generation;
             sheet.Cell(line, 8).Value = row.Status;
+            SetDate(sheet, line, DateOfBirthColumn, row.DateOfBirth);
+            SetNumber(sheet, line, AgeColumn, row.Age);
+            SetDate(sheet, line, DateOfDeathColumn, row.DateOfDeath);
         }
 
         sheet.Columns(1, ColumnCount).AdjustToContents();
@@ -104,6 +123,31 @@ public sealed class ClosedXmlMemberExporter(
         using var stream = new MemoryStream();
         workbook.SaveAs(stream);
         return stream.ToArray();
+    }
+
+    /// <summary>
+    /// Writes a real date cell, or leaves the cell untouched when the date was never recorded.
+    ///
+    /// A date, not its text: the two date columns exist to be sorted and filtered by, and a
+    /// string of digits sorts lexically. An unrecorded date is a blank cell rather than a dash or
+    /// an epoch — the same rule the country column already follows.
+    /// </summary>
+    private static void SetDate(IXLWorksheet sheet, int row, int column, DateOnly? value)
+    {
+        if (value is not { } date) return;
+
+        var cell = sheet.Cell(row, column);
+        cell.Value = date.ToDateTime(TimeOnly.MinValue);
+        cell.Style.NumberFormat.Format = DateFormat;
+    }
+
+    /// <summary>
+    /// Blank rather than 0 for an age that cannot be computed: a zero here would read as a
+    /// newborn and would drag any average taken over the column.
+    /// </summary>
+    private static void SetNumber(IXLWorksheet sheet, int row, int column, int? value)
+    {
+        if (value is { } number) sheet.Cell(row, column).Value = number;
     }
 
     /// <summary>
