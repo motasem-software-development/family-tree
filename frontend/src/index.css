@@ -230,6 +230,26 @@ textarea {
 }
 
 /*
+ * The death date of a deceased member, revealed when the row is hovered or focused. In CSS
+ * because a `:hover` on a *descendant* cannot be expressed in a style attribute at all, which
+ * is the same reason the rules above are here.
+ *
+ * `opacity`, not `display` or `visibility`: it keeps the date in the layout, so revealing it
+ * cannot widen the column and reflow a 351-row table under the pointer, and it keeps the date
+ * in the accessibility tree, so a screen reader still reads a fact a mouse user has to hover
+ * for. The transition is covered by the reduced-motion rule above.
+ */
+.member-row .revealed-on-hover {
+  opacity: 0;
+  transition: opacity var(--motion-fast) var(--ease-standard);
+}
+
+.member-row:hover .revealed-on-hover,
+.member-row:focus-within .revealed-on-hover {
+  opacity: 1;
+}
+
+/*
  * iOS Safari zooms the page whenever a focused form control's text is under 16px, and it never
  * zooms back out. Every control in this app is styled inline at 13–14px, so this is the one
  * place `!important` is warranted: nothing else can outrank an inline declaration. Scoped to

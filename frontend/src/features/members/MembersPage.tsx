@@ -10,7 +10,7 @@ import { FilterControls } from '../filters/FilterControls'
 import { useMemberFilters } from '../filters/useMemberFilters'
 import type { ContactDetails } from './contactDetails'
 import { fullName, indexById, lineageName } from './fullName'
-import { lifeDetailsOf, lifeYears, type LifeDetails } from './lifeDetails'
+import { ageYears, formatLifeDate, lifeDetailsOf, type LifeDetails } from './lifeDetails'
 import { LifeStatusDot } from './LifeStatusDot'
 import { MemberForm } from './MemberForm'
 import { downloadMembersXlsx } from './membersExportApi'
@@ -43,6 +43,31 @@ const headCellStyle: CSSProperties = {
   whiteSpace: 'nowrap',
 }
 
+/**
+ * The columns that hold a figure rather than a word: national ID, both dates and the age. Tabular
+ * numerals so the digits line up down the column, and no wrapping — a date broken across two
+ * lines stops being scannable, which is the only reason to put it in a column of its own.
+ */
+const figureCellStyle: CSSProperties = {
+  ...cellStyle,
+  color: 'var(--text-3)',
+  fontFamily: 'var(--mono)',
+  fontVariantNumeric: 'tabular-nums',
+  whiteSpace: 'nowrap',
+}
+
+/**
+ * The whole row is tinted by life status: a faint green for the living, the sunken grey for the
+ * dead. It replaces the Status column — the fact is worth seeing at a glance down 351 rows, and
+ * a column of repeated words is a poor way to show it.
+ *
+ * The tint is never the only carrier of the status. The dot in the name cell is labelled for
+ * screen readers, so the fact survives both a colour-blind reader and a monochrome print.
+ */
+const rowStyle = (deceased: boolean): CSSProperties => ({
+  background: deceased ? 'var(--sunken)' : 'var(--success-subtle)',
+})
+
 const rowButtonStyle = (danger: boolean): CSSProperties => ({
   height: 'var(--control-h-sm)',
   padding: '0 12px',
@@ -57,8 +82,6 @@ const rowButtonStyle = (danger: boolean): CSSProperties => ({
 
 export function MembersPage() {
   const { t, i18n } = useTranslation()
-  /** Life years for one row, in the active language — see lifeYears for the convention. */
-  const yearsOf = (m: FamilyMember): string | null => lifeYears(lifeDetailsOf(m), i18n.language)
   const { user, hasPermission } = useAuth()
   const queryClient = useQueryClient()
   const { filters, activeCount, setFilter, reset } = useMemberFilters()
@@ -150,6 +173,10 @@ export function MembersPage() {
 
   const all = members ?? []
   const unfiltered = everyone ?? []
+  // One reference day for every row, taken once per render rather than per cell: a list that
+  // asked the clock 351 times could in principle straddle midnight and show two different ages
+  // for two members born on the same day.
+  const today = new Date()
   // Indexed once per render: every row needs to walk its own parent chain to compose the name.
   // Built from the unfiltered list — see the query above.
   const byId = indexById(unfiltered)
@@ -358,92 +385,110 @@ export function MembersPage() {
                 overflow: 'hidden',
               }}
             >
-              {/* The one place horizontal scrolling is right rather than a failure: five columns of
-                  member data cannot be read at 320px, and folding them into stacked cards would
-                  drop the column headers that say what each value is. The scroll is contained
-                  by the card, so the page itself never scrolls sideways. */}
+              {/* The one place horizontal scrolling is right rather than a failure: seven columns
+                  of member data cannot be read at 320px, and folding them into stacked cards
+                  would drop the column headers that say what each value is. The scroll is
+                  contained by the card, so the page itself never scrolls sideways. */}
               <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', minWidth: 720, borderCollapse: 'collapse' }}>
+                <table style={{ width: '100%', minWidth: 860, borderCollapse: 'collapse' }}>
                   <thead>
+                    {/* Identity first (who this is), then life (when), then placement — in the
+                        family and in the world. Two columns are deliberately absent: the father,
+                        because the lineage already follows every name in the first column, and
+                        the status, which the row's own colour now carries. The death date rides
+                        with the birth date, revealed on hover — see the birth cell below. */}
                     <tr>
                       <th style={headCellStyle}>{t('members.name')}</th>
-                      <th style={headCellStyle}>{t('members.parent')}</th>
+                      <th style={headCellStyle}>{t('members.nationalId')}</th>
+                      <th style={headCellStyle}>{t('members.dateOfBirth')}</th>
+                      <th style={headCellStyle}>{t('members.age')}</th>
                       <th style={headCellStyle}>{t('filters.country')}</th>
                       <th style={headCellStyle}>{t('filters.branch')}</th>
                       <th style={headCellStyle} />
                     </tr>
                   </thead>
                   <tbody>
-                    {all.map((current) => (
-                      <tr key={current.id}>
-                        <td style={{ ...cellStyle, fontWeight: 500 }}>
-                          <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <LifeStatusDot deceased={lifeDetailsOf(current).isDeceased} />
-                            {/* Own name, then father, grandfather and great-grandfather. The
-                                lineage is muted so the row still scans by given name — it is
-                                context, not four names of equal weight. */}
-                            <span>
-                              {current.name}
-                              {lineageName(current, byId) !== '' && (
-                                <span style={{ fontWeight: 400, color: 'var(--text-3)' }}>
-                                  {' '}
-                                  {lineageName(current, byId)}
-                                </span>
-                              )}
+                    {all.map((current) => {
+                      const life = lifeDetailsOf(current)
+                      const age = ageYears(life, today)
+
+                      const died = formatLifeDate(life.dateOfDeath, i18n.language)
+
+                      return (
+                        <tr key={current.id} className="member-row" style={rowStyle(life.isDeceased)}>
+                          <td style={{ ...cellStyle, fontWeight: 500 }}>
+                            <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              {/* The labelled, non-colour carrier of the life status the row is
+                                  tinted by — see rowStyle. */}
+                              <LifeStatusDot deceased={life.isDeceased} />
+                              {/* Own name, then father, grandfather and great-grandfather. The
+                                  lineage is muted so the row still scans by given name — it is
+                                  context, not four names of equal weight. */}
+                              <span>
+                                {current.name}
+                                {lineageName(current, byId) !== '' && (
+                                  <span style={{ fontWeight: 400, color: 'var(--text-3)' }}>
+                                    {' '}
+                                    {lineageName(current, byId)}
+                                  </span>
+                                )}
+                              </span>
                             </span>
-                            {/* Same treatment as the tree outline, so a member reads the same way
-                                whichever screen they are looked at on. */}
-                            {yearsOf(current) !== null && (
-                              <span
-                                style={{
-                                  fontFamily: 'var(--mono)',
-                                  fontSize: 11,
-                                  fontWeight: 400,
-                                  color: 'var(--text-3)',
-                                }}
-                              >
-                                {yearsOf(current)}
+                          </td>
+                          <td style={figureCellStyle}>{current.nationalId ?? '—'}</td>
+                          {/* Birth date, and — for a member who has died — the death date beside
+                              it in the genealogy convention, revealed when the row is hovered.
+                              It holds its space while hidden, so nothing shifts under the
+                              pointer; see .revealed-on-hover in index.css. */}
+                          <td style={figureCellStyle}>
+                            {formatLifeDate(life.dateOfBirth, i18n.language) ?? '—'}
+                            {died !== null && (
+                              <span className="revealed-on-hover" style={{ color: 'var(--text-3)' }}>
+                                {' – '}
+                                {died}
                               </span>
                             )}
-                          </span>
-                        </td>
-                        <td style={{ ...cellStyle, color: 'var(--text-3)' }}>
-                          {current.parentId === null
-                            ? t('members.noParent')
-                            : (byId.get(current.parentId)?.name ?? '—')}
-                        </td>
-                        <td style={{ ...cellStyle, color: 'var(--text-3)', whiteSpace: 'nowrap' }}>
-                          {countryCell(current)}
-                        </td>
-                        <td style={{ ...cellStyle, color: 'var(--text-3)' }}>
-                          {/* The root belongs to no branch; specification §21 renders that as
-                              "Root" rather than as a blank cell. */}
-                          {current.branchName ?? t('filters.branchRoot')}
-                        </td>
-                        <td style={{ ...cellStyle, whiteSpace: 'nowrap' }}>
-                          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                            {hasPermission('Member.Edit') && (
-                              <button
-                                type="button"
-                                onClick={() => setEditing({ mode: 'edit', member: current })}
-                                style={rowButtonStyle(false)}
-                              >
-                                {t('members.edit')}
-                              </button>
-                            )}
-                            {hasPermission('Member.Delete') && (
-                              <button
-                                type="button"
-                                onClick={() => setPendingDelete(current)}
-                                style={rowButtonStyle(true)}
-                              >
-                                {t('members.delete')}
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
+                          </td>
+                          {/* Localised so Arabic gets Arabic-Indic numerals, and ungrouped — an
+                              age is never large enough for a separator to be anything but noise. */}
+                          <td style={figureCellStyle}>
+                            {age === null
+                              ? '—'
+                              : age.toLocaleString(i18n.language, { useGrouping: false })}
+                          </td>
+                          <td style={{ ...cellStyle, color: 'var(--text-3)', whiteSpace: 'nowrap' }}>
+                            {countryCell(current)}
+                          </td>
+                          <td style={{ ...cellStyle, color: 'var(--text-3)' }}>
+                            {/* The root belongs to no branch; specification §21 renders that as
+                                "Root" rather than as a blank cell. */}
+                            {current.branchName ?? t('filters.branchRoot')}
+                          </td>
+                          <td style={{ ...cellStyle, whiteSpace: 'nowrap' }}>
+                            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                              {hasPermission('Member.Edit') && (
+                                <button
+                                  type="button"
+                                  onClick={() => setEditing({ mode: 'edit', member: current })}
+                                  style={rowButtonStyle(false)}
+                                >
+                                  {t('members.edit')}
+                                </button>
+                              )}
+                              {hasPermission('Member.Delete') && (
+                                <button
+                                  type="button"
+                                  onClick={() => setPendingDelete(current)}
+                                  style={rowButtonStyle(true)}
+                                >
+                                  {t('members.delete')}
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>

@@ -9,6 +9,7 @@ namespace FamilyTree.Application.Tests.Export;
 public class MemberExportRowsTests
 {
     private static readonly DateTimeOffset Now = new(2026, 8, 16, 12, 0, 0, TimeSpan.Zero);
+    private static readonly DateOnly Today = new(2026, 8, 16);
 
     private static readonly CountryResponse Palestine = new(165, "PS", "فلسطين", "Palestine", "+970");
     private static readonly IReadOnlyList<CountryResponse> Countries = [Palestine];
@@ -24,8 +25,10 @@ public class MemberExportRowsTests
         Guid? branchId = null,
         string? branchName = null,
         int generation = 1,
-        bool isDeceased = false) =>
-        new(id, name, parentId, 1, Now, Now, null, null, isDeceased,
+        bool isDeceased = false,
+        DateOnly? dateOfBirth = null,
+        DateOnly? dateOfDeath = null) =>
+        new(id, name, parentId, 1, Now, Now, dateOfBirth, dateOfDeath, isDeceased,
             nationalId, mobile, whatsApp, countryId, null, branchId, branchName, generation);
 
     /// <summary>
@@ -38,7 +41,8 @@ public class MemberExportRowsTests
             members,
             members.ToDictionary(m => m.Id, m => new NamedMember(m.Name, m.ParentId)),
             Countries,
-            language);
+            language,
+            Today);
 
     [Fact]
     public void The_headers_follow_specification_19s_order_in_english() =>
@@ -50,34 +54,124 @@ public class MemberExportRowsTests
             "Country of Residence",
             "Branch",
             "Generation",
-            "Status");
+            "Status",
+            "Date of Birth",
+            "Age",
+            "Date of Death");
 
     [Fact]
     public void The_headers_are_arabic_in_arabic()
     {
         var headers = MemberExportRows.Headers(CaptionLanguage.Ar);
 
-        headers.Should().HaveCount(8);
+        headers.Should().HaveCount(11);
         headers[0].Should().Be("رقم الهوية");
         headers[7].Should().Be("الحالة");
+        headers[10].Should().Be("تاريخ الوفاة");
     }
 
     [Fact]
-    public void A_populated_member_fills_all_eight_cells()
+    public void A_populated_member_fills_every_cell()
     {
         var branchId = Guid.CreateVersion7();
         var member = Member(
             Guid.CreateVersion7(), "فارس",
             nationalId: "123456789", mobile: "+970599123456", whatsApp: "+970599999999",
             countryId: 165, branchId: branchId, branchName: "سليمان",
-            generation: 2, isDeceased: true);
+            generation: 2, isDeceased: true,
+            dateOfBirth: new DateOnly(1940, 3, 2), dateOfDeath: new DateOnly(2011, 3, 1));
 
         var row = Build([member], CaptionLanguage.En).Should()
             .ContainSingle().Subject;
 
         row.Should().Be(new MemberExportRow(
             "123456789", "فارس", "+970599123456", "+970599999999",
-            "Palestine", "سليمان", 2, "Deceased"));
+            "Palestine", "سليمان", 2, "Deceased",
+            new DateOnly(1940, 3, 2), 70, new DateOnly(2011, 3, 1)));
+    }
+
+    [Fact]
+    public void A_living_members_age_is_measured_against_today()
+    {
+        var member = Member(
+            Guid.CreateVersion7(), "فارس", dateOfBirth: new DateOnly(1990, 8, 16));
+
+        Build([member], CaptionLanguage.En)[0].Age.Should().Be(36);
+    }
+
+    [Fact]
+    public void An_age_does_not_count_a_birthday_that_has_not_come_round_yet()
+    {
+        // Today is 16 August 2026; this member turns 36 the day after.
+        var member = Member(
+            Guid.CreateVersion7(), "فارس", dateOfBirth: new DateOnly(1990, 8, 17));
+
+        Build([member], CaptionLanguage.En)[0].Age.Should().Be(35);
+    }
+
+    [Fact]
+    public void A_deceased_members_age_is_their_age_at_death_not_today()
+    {
+        // The whole point of the split: measured against today this would read 86 and grow every
+        // time the file is exported again.
+        var member = Member(
+            Guid.CreateVersion7(), "داوود", isDeceased: true,
+            dateOfBirth: new DateOnly(1940, 1, 1), dateOfDeath: new DateOnly(2000, 1, 1));
+
+        Build([member], CaptionLanguage.En)[0].Age.Should().Be(60);
+    }
+
+    [Fact]
+    public void A_deceased_member_with_no_death_date_has_no_age()
+    {
+        // Measuring against today would report an age they never reached.
+        var member = Member(
+            Guid.CreateVersion7(), "داوود", isDeceased: true,
+            dateOfBirth: new DateOnly(1940, 1, 1));
+
+        var row = Build([member], CaptionLanguage.En)[0];
+
+        row.Age.Should().BeNull();
+        row.DateOfBirth.Should().Be(new DateOnly(1940, 1, 1));
+        row.DateOfDeath.Should().BeNull();
+    }
+
+    [Fact]
+    public void A_member_with_no_birth_date_has_no_dates_and_no_age()
+    {
+        var row = Build([Member(Guid.CreateVersion7(), "فارس")], CaptionLanguage.En)[0];
+
+        row.DateOfBirth.Should().BeNull();
+        row.Age.Should().BeNull();
+        row.DateOfDeath.Should().BeNull();
+    }
+
+    [Fact]
+    public void A_death_date_without_a_birth_date_still_reaches_the_row()
+    {
+        var member = Member(
+            Guid.CreateVersion7(), "داوود", isDeceased: true,
+            dateOfDeath: new DateOnly(2000, 1, 1));
+
+        var row = Build([member], CaptionLanguage.En)[0];
+
+        row.DateOfDeath.Should().Be(new DateOnly(2000, 1, 1));
+        row.Age.Should().BeNull();
+    }
+
+    [Fact]
+    public void A_leap_day_birth_ages_on_the_first_of_march_in_a_common_year()
+    {
+        // DateOnly.AddYears clamps 29 February to the 28th, which is what makes this correct.
+        var born = new DateOnly(2000, 2, 29);
+        var member = Member(Guid.CreateVersion7(), "فارس", dateOfBirth: born);
+
+        MemberExportRows.Build(
+            [member],
+            new Dictionary<Guid, NamedMember> { [member.Id] = new(member.Name, null) },
+            Countries,
+            CaptionLanguage.En,
+            new DateOnly(2026, 3, 1))[0].Age.Should().Be(26);
     }
 
     [Fact]
@@ -220,7 +314,8 @@ public class MemberExportRowsTests
         // Only the son survived the filter.
         var filtered = new[] { Member(son, "فارس", parentId: father, generation: 2) };
 
-        var rows = MemberExportRows.Build(filtered, lineage, Countries, CaptionLanguage.En);
+        var rows = MemberExportRows.Build(
+            filtered, lineage, Countries, CaptionLanguage.En, Today);
 
         rows.Should().ContainSingle().Which.FullName.Should().Be("فارس سليمان داوود");
     }

@@ -171,7 +171,8 @@
     "searchPlaceholder": "Search…",
     "lineage": "Lineage",
     "export": "Export to Excel",
-    "exporting": "Exporting…"
+    "exporting": "Exporting…",
+    "age": "Age"
   },
   "filters": {
     "title": "Filters",

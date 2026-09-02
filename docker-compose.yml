@@ -40,11 +40,15 @@ services:
       postgres:
         condition: service_healthy
 
+  # The published port is overridable because 8080 is a popular default — an Oracle TNS
+  # listener, a Tomcat, a second project's dev server — and a machine that already has one
+  # cannot start this stack at all. Set FRONTEND_PORT in .env to move it; the default is
+  # unchanged, so nothing has to be configured on a machine where 8080 is free.
   frontend:
     build:
       context: ./frontend
     ports:
-      - "8080:80"
+      - "${FRONTEND_PORT:-8080}:80"
     depends_on:
       - api
 

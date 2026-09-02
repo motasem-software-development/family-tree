@@ -187,7 +187,8 @@
     "searchPlaceholder": "بحث…",
     "lineage": "النسب",
     "export": "تصدير إلى إكسل",
-    "exporting": "جارٍ التصدير…"
+    "exporting": "جارٍ التصدير…",
+    "age": "العمر"
   },
   "filters": {
     "title": "عوامل التصفية",
